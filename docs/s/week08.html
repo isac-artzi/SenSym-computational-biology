@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 8 — Classifiers, From Scratch</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="week07.html">← Week 7</a><a href="week09.html">Week 9 →</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Week 8</span>
+      <span class="badge aim2">Aim 2 · Simulation</span>
+    </div>
+    <h1 class="chapter-title">Classifiers, From Scratch</h1>
+    <div class="chapter-sub">Logistic regression derived and coded · kNN and the curse of dimensionality · train/test discipline · and why the classifier is not the bottleneck</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<h2>Objectives</h2>
+<ul class="objectives">
+  <li>State, in one sentence, why this project writes its own classifiers instead of importing scikit-learn, and what a gap between naive Bayes and logistic regression actually measures.</li>
+  <li>Derive the logistic-regression gradient $\nabla_w \mathcal{L} = X^{\mathsf T}(p - y)/n$ from the binary cross-entropy loss, including the step where $\sigma' = \sigma(1-\sigma)$ cancels.</li>
+  <li>Explain why $1/(1+e^{-z})$ is numerically unsafe for large negative $z$, and show algebraically that the two branches of the repository's <code>_sigmoid</code> agree.</li>
+  <li>State and obey the three rules of train/test discipline: report test accuracy only, shuffle $X$ and $y$ with the <em>same</em> permutation, and compute standardization statistics on the training split alone.</li>
+  <li>Give the concentration-of-distances calculation — squared distances pile up at $2d\sigma^2$ with relative spread $\sim 1/\sqrt{d}$ — and use it to explain why kNN degrades in high dimensions while a linear rule does not.</li>
+  <li>Implement <code>train_test_split</code>, <code>accuracy</code>, <code>naive_bayes_predict</code>, <code>LogisticRegression</code> and <code>knn_predict</code>, and get <code>tests/test_classify.py</code> fully green.</li>
+  <li>Produce <code>week08_classifiers.png</code> and <code>week08_curse.png</code> with SEED 108, and report the <em>ordering and the size of the gaps</em> rather than the absolute numbers.</li>
+</ul>
+
+<h2>1 &nbsp;The classifier is not the point, which is exactly why you must write it</h2>
+
+<p>Here is the claim this whole project is built on, stated as baldly as it can be stated:</p>
+
+<div class="box definition">
+  <span class="box-tag">The claim under test</span>
+  Classification accuracy on this problem is limited by <strong>counting noise</strong> — by how few
+  molecules the sequencer captured — and not by the classifier. Better algorithms cannot buy what
+  the data does not contain.
+</div>
+
+<p>That is a strong claim, and it is also an unusually <em>vulnerable</em> one. Anybody can knock it down by producing a classifier that beats $\Phi(d'/2)$. So you had better know exactly what your classifiers do, because if one of them appears to beat the ceiling, the very first question is whether the ceiling is wrong or the experiment is.</p>
+
+<p>Nine times out of ten, the experiment is. A classifier that "beats the theory" is almost always one that has seen its test set: through a normalization step fitted on all the data, through markers selected using the labels, or through the simplest bug of all, reporting the accuracy on the cells it was trained on. Every one of those is invisible if the classifier is a library call. Every one of them is visible if you wrote the forty lines yourself.</p>
+
+<p>So this week you write three classifiers, you do not tune any of them, and — this is the part that will feel wrong — <strong>you treat any gap between them as a result rather than as a bug to be fixed with hyperparameters</strong>. The gaps are the measurement. Closing them by tuning would be like adjusting a thermometer until it agreed with your prediction.</p>
+
+<div class="box warning">
+  <span class="box-tag">What "from scratch" does and does not mean</span>
+  <p>It means: you write the update rule, the distance computation and the split. It does not mean
+  you write your own matrix multiply, and it does not mean the code has to be slow — the scaffold
+  points you at the vectorised form every time, and usually asks you to write the slow loop first
+  only so you can check the fast version against it.</p>
+  <p>It also does not mean scikit-learn is bad. It means that a library is the right tool when the
+  classifier is the instrument, and the wrong tool when the classifier is the thing being measured.</p>
+</div>
+
+<h2>2 &nbsp;Three classifiers, and the question each one answers</h2>
+
+<p>Three is exactly enough, because each one is missing something different from the one above it.</p>
+
+<table class="simple">
+  <tr><th>Classifier</th><th>What it is given</th><th>What its accuracy measures</th></tr>
+  <tr><td><strong>Naive Bayes</strong> with the true rates $\lambda_1, \lambda_2$</td>
+      <td>The exact generative model. Nothing is estimated.</td>
+      <td>The <em>ceiling</em>. Week 4 proved no rule can do better; Week 5 proved that ceiling equals $\Phi(d'/2)$.</td></tr>
+  <tr><td><strong>Logistic regression</strong></td>
+      <td>Only labelled training cells. The decision rule has the same linear <em>shape</em>, but the coefficients are learned.</td>
+      <td>The cost of <em>not knowing the rates</em>. The gap to naive Bayes is a pure finite-sample effect.</td></tr>
+  <tr><td><strong>kNN</strong></td>
+      <td>Only labelled training cells, and no model at all — not even the knowledge that the boundary is a straight line.</td>
+      <td>The cost of <em>assuming nothing</em>. It pays for that freedom in high dimensions.</td></tr>
+</table>
+
+<p>Read the middle row again, because it is the one students skip. Week 5 proved that the optimal rule is</p>
+
+$$\mathrm{LLR}(x) = \sum_g \left[x_g \log\frac{\lambda_{1g}}{\lambda_{2g}}\right] - \sum_g(\lambda_{1g} - \lambda_{2g}) \;=\; w\cdot x + b,$$
+
+<p>a straight line in count space, with $w_g = \log(\lambda_{1g}/\lambda_{2g})$ and $b = -\sum_g(\lambda_{1g}-\lambda_{2g})$. Logistic regression fits <em>exactly that functional form</em>. It is not a more flexible model, it is not a "machine learning upgrade", and on this problem it cannot in principle beat naive Bayes. It has the same hands tied behind its back; it simply has to work out the values of $w$ and $b$ from data instead of being handed them.</p>
+
+<div class="box win">
+  <span class="box-tag">Why that identity of shape is so useful</span>
+  <p>Because it turns a vague question — "how much does it hurt not to know the biology?" — into a
+  clean subtraction. Both rules search the same family of decision boundaries. One is given the best
+  member of that family; the other has to find it from $n$ noisy examples. The difference in test
+  accuracy is therefore <em>entirely</em> the price of estimation, with no confounding difference in
+  model class. That is a controlled experiment, and controlled experiments are rare enough in
+  machine learning that it is worth noticing when you have one.</p>
+  <p>Concretely, you will find that with a couple of thousand training cells the gap is a fraction of
+  a percent, and that it grows as the number of genes grows at fixed sample size — because there are
+  more coefficients to estimate from the same data.</p>
+</div>
+
+<h2>3 &nbsp;Logistic regression, from the model down to the gradient</h2>
+
+<p>Start from what the model claims. It does not model the counts at all; it models only the <em>probability of the label given the counts</em>:</p>
+
+<div class="box definition">
+  <span class="box-tag">Definition · the logistic model</span>
+  With $\sigma(z) = \dfrac{1}{1+e^{-z}}$ (the <strong>logistic</strong> or <strong>sigmoid</strong> function),
+  $$P(y = 1 \mid x) \;=\; \sigma(w\cdot x + b), \qquad P(y=0\mid x) = 1 - \sigma(w\cdot x + b).$$
+  The decision boundary is the set where the probability is exactly $\tfrac12$, i.e. where
+  $w\cdot x + b = 0$: a line in two dimensions, a plane in three, a hyperplane in $k$.
+</div>
+
+<p>Two properties of $\sigma$ are worth having in your hands before the derivation. First, $\sigma$ maps all of $\mathbb{R}$ into $(0,1)$, is increasing, and satisfies $\sigma(-z) = 1 - \sigma(z)$. Second, and this is the one that does the work:</p>
+
+<div class="box example">
+  <span class="box-tag">The derivative of the sigmoid</span>
+  <p>$$\sigma'(z) = \frac{d}{dz}\left(1+e^{-z}\right)^{-1} = \frac{e^{-z}}{(1+e^{-z})^{2}}
+  = \frac{1}{1+e^{-z}}\cdot\frac{e^{-z}}{1+e^{-z}} = \sigma(z)\big(1-\sigma(z)\big),$$
+  using $\dfrac{e^{-z}}{1+e^{-z}} = \dfrac{(1+e^{-z}) - 1}{1+e^{-z}} = 1 - \sigma(z)$ in the last
+  step. <span class="qed">∎</span></p>
+  <p class="muted">A function whose derivative is a polynomial in itself. That is not a coincidence
+  — it is the logistic differential equation $\sigma' = \sigma(1-\sigma)$, the same equation that
+  describes population growth against a carrying capacity, which is where the curve got its name.</p>
+</div>
+
+<p>Now the loss. Given training cells $x_1,\dots,x_n$ with labels $y_i \in \{0,1\}$, the model assigns each cell a probability $p_i = \sigma(w\cdot x_i + b)$ of being class 1. The likelihood of the observed labels is $\prod_i p_i^{y_i}(1-p_i)^{1-y_i}$ — check the exponents: when $y_i=1$ the term is $p_i$, when $y_i=0$ it is $1-p_i$. Taking $-\tfrac1n\log$ of that gives the loss we actually minimise:</p>
+
+<div class="box definition">
+  <span class="box-tag">Definition · binary cross-entropy (mean log-loss)</span>
+  $$\mathcal{L}(w,b) \;=\; -\frac{1}{n}\sum_{i=1}^{n}\Big[\,y_i \log p_i + (1-y_i)\log(1-p_i)\,\Big],
+    \qquad p_i = \sigma(w\cdot x_i + b).$$
+  It is the negative average log-likelihood of the labels. Minimising it is maximum likelihood, and
+  nothing more exotic than that.
+</div>
+
+<p>The gradient of this looks like it should be a mess. It is not, and the reason it is not is one small cancellation.</p>
+
+<div class="box theorem">
+  <span class="box-tag">Theorem · the logistic gradient &nbsp;<span class="claim proved">proved</span></span>
+  With $X$ the $n\times k$ matrix whose rows are the training cells, $p$ the vector of predicted
+  probabilities and $y$ the vector of labels,
+  $$\nabla_w \mathcal{L} = \frac{1}{n}X^{\mathsf T}(p - y), \qquad
+    \frac{\partial \mathcal{L}}{\partial b} = \frac{1}{n}\sum_{i=1}^n (p_i - y_i).$$
+  The gradient is the <em>data matrix transposed, applied to the errors</em>. No sigmoid appears
+  anywhere in it.
+</div>
+
+<div class="box proof">
+  <span class="box-tag">Proof · chain rule, and one cancellation</span>
+  <p>Work with one training cell at a time and add up at the end; the loss is a sum, so its gradient
+  is the sum of the gradients. Write $z_i = w\cdot x_i + b$, so $p_i = \sigma(z_i)$, and let
+  $$\ell_i = -\big[y_i \log p_i + (1-y_i)\log(1-p_i)\big].$$</p>
+
+  <p><strong>Step 1 — differentiate the loss with respect to the probability.</strong>
+  $$\frac{\partial \ell_i}{\partial p_i} = -\frac{y_i}{p_i} + \frac{1-y_i}{1-p_i}.$$
+  (The second term picks up a plus sign because $\frac{d}{dp}\log(1-p) = -\frac{1}{1-p}$, and there
+  is already a minus in front of the bracket.)</p>
+
+  <p><strong>Step 2 — differentiate the probability with respect to the score.</strong> This is where
+  the sigmoid identity enters: $\dfrac{\partial p_i}{\partial z_i} = p_i(1-p_i)$.</p>
+
+  <p><strong>Step 3 — multiply, and watch everything cancel.</strong>
+  $$\frac{\partial \ell_i}{\partial z_i}
+    = \left(-\frac{y_i}{p_i} + \frac{1-y_i}{1-p_i}\right) p_i(1-p_i)
+    = -y_i(1-p_i) + (1-y_i)p_i.$$
+  The $p_i$ in the first denominator is killed by the $p_i$ in the factor; the $(1-p_i)$ in the
+  second denominator is killed by the $(1-p_i)$ in the factor. Expanding what is left,
+  $$-y_i + y_i p_i + p_i - y_i p_i = p_i - y_i.$$
+  The cross terms $y_i p_i$ cancel too. So
+  $$\boxed{\ \frac{\partial \ell_i}{\partial z_i} = p_i - y_i\ }$$
+  — the derivative of the loss with respect to the score is simply the <em>error</em>.</p>
+
+  <p><strong>Step 4 — push through to the parameters.</strong> Since $z_i = \sum_j w_j x_{ij} + b$,
+  we have $\partial z_i/\partial w_j = x_{ij}$ and $\partial z_i/\partial b = 1$. Chain rule and
+  average over the $n$ cells:
+  $$\frac{\partial \mathcal{L}}{\partial w_j} = \frac{1}{n}\sum_i (p_i - y_i)x_{ij},
+    \qquad \frac{\partial \mathcal{L}}{\partial b} = \frac{1}{n}\sum_i (p_i - y_i),$$
+  and the first of these is exactly the $j$-th entry of $X^{\mathsf T}(p-y)/n$.
+  <span class="qed">∎</span></p>
+
+  <p class="muted"><strong>Assumptions used:</strong> the labels are 0/1; the loss is the mean
+  cross-entropy; the model is $\sigma(w\cdot x + b)$. Nothing about Poisson counts, nothing about
+  the data being separable, and nothing about $n$ being large. This gradient is exact for any $n$.</p>
+</div>
+
+<p>That derivation is <strong>exercise 8.3</strong>, and you should do it on paper before you write the code, because the result is short enough to memorise and the memorised version teaches you nothing.</p>
+
+<p>Gradient descent is then three lines. Start at $w = 0$, $b = 0$, and repeat:</p>
+
+$$w \leftarrow w - \eta\,\frac{X^{\mathsf T}(p-y)}{n}, \qquad b \leftarrow b - \eta\,\overline{(p-y)}, \qquad p = \sigma(Xw + b).$$
+
+<p>The scaffold's defaults are $\eta = 0.5$ (<code>lr</code>) and 800 steps (<code>n_iter</code>). There is no regularization, no momentum, no learning-rate schedule and no early stopping, on purpose: every one of those is a knob, and the point of this week is a classifier with no knobs.</p>
+
+<div class="box example">
+  <span class="box-tag">Why the error is the gradient, in words</span>
+  <p>Look at $\partial\mathcal{L}/\partial w_j = \frac1n\sum_i (p_i - y_i)x_{ij}$ and read it as an
+  instruction. If a cell has a high count of gene $j$ and you predicted class 1 too weakly
+  ($p_i < y_i = 1$), the term is negative, so the update <em>increases</em> $w_j$: next time, a high
+  count of gene $j$ will push harder towards class 1. If you were already confident and right,
+  $p_i - y_i \approx 0$ and that cell stops contributing. Cells near the boundary dominate the
+  learning; cells far from it are ignored. That is the whole algorithm, and it is worth being able
+  to say it in this form out loud.</p>
+</div>
+
+<h2>4 &nbsp;A sigmoid that does not blow up</h2>
+
+<p>The formula $\sigma(z) = 1/(1+e^{-z})$ is correct mathematics and unsafe arithmetic. A 64-bit float can hold numbers up to about $1.8\times 10^{308}$, and $e^{z}$ passes that at $z \approx 709.8$. So the moment your model becomes confident — and a linear model on count data becomes confident quickly, because $w\cdot x$ can be in the hundreds — the naive formula starts evaluating $e^{-z}$ for $z = -800$, gets $+\infty$, and returns $1/(1+\infty) = 0$.</p>
+
+<p>Notice what is wrong with that. The answer $0$ is not absurd; the true value really is about $10^{-348}$. The problem is that it is <em>exactly</em> zero, and the loss then asks for $\log(0) = -\infty$, and the gradient becomes NaN, and the NaN propagates into every weight in one step. Worse, if you had written the algebraically equivalent $e^{z}/(1+e^{z})$ instead, the same input gives $\infty/\infty$, which is NaN immediately. Either way you get a warning you will be tempted to silence and a result you cannot trust.</p>
+
+<p>The repository provides the fix, and asks you to explain it rather than write it:</p>
+
+<div class="box python">
+  <span class="box-tag">The provided <code>_sigmoid</code>, in <code>celldetect/classify.py</code></span>
+<pre><code>z = np.asarray(z, dtype=float)
+out = np.empty_like(z)
+pos = z &gt;= 0
+out[pos] = 1.0 / (1.0 + np.exp(-z[pos]))
+ez = np.exp(z[~pos])
+out[~pos] = ez / (1.0 + ez)</code></pre>
+</div>
+
+<div class="box example">
+  <span class="box-tag">Why the two branches agree, and why each is safe</span>
+  <p><strong>They are the same function.</strong> Multiply numerator and denominator of
+  $\dfrac{1}{1+e^{-z}}$ by $e^{z}$:
+  $$\frac{1}{1+e^{-z}} \;=\; \frac{1\cdot e^{z}}{(1+e^{-z})e^{z}} \;=\; \frac{e^{z}}{e^{z} + 1}.$$
+  That is an identity, valid for every real $z$, with no approximation anywhere.</p>
+  <p><strong>Each branch is used only where its exponential is small.</strong> The first form
+  exponentiates $-z$, and it is used only when $z \ge 0$, so the argument $-z \le 0$ and
+  $e^{-z} \le 1$. The second form exponentiates $z$, and it is used only when $z &lt; 0$, so again
+  $e^{z} &lt; 1$. <em>Neither branch ever exponentiates a positive number.</em> Overflow becomes
+  impossible; the worst that can happen is that $e^{z}$ underflows gracefully to $0$ around
+  $z \approx -745$, which returns exactly $0$ — but only when the true answer is below $10^{-323}$,
+  far past anything a probability needs to represent.</p>
+  <p>The payoff is not just "no crash". It is that a score of $z = -40$ now returns
+  $4.2\times 10^{-18}$ rather than being rounded into the neighbourhood of zero, so
+  $\log(1-p)$ and $\log p$ stay finite and the gradient stays meaningful for confidently classified
+  cells.</p>
+</div>
+
+<div class="box pitfall">
+  <span class="box-tag">The test that catches this</span>
+  <code>test_logistic_regression_is_stable_at_extreme_scores</code> sets <code>w = [1000.0]</code> by
+  hand and evaluates the model at $x = \pm 5$, i.e. $z = \pm 5000$. It asserts the output is
+  <em>finite</em> and that $p(-5) &lt; 10^{-12}$ while $p(+5) &gt; 1 - 10^{-12}$. If your
+  <code>predict_proba</code> re-implements the sigmoid instead of calling the provided
+  <code>_sigmoid</code>, this is where you find out.
+</div>
+
+<h2>5 &nbsp;Lab: watch a decision boundary learn</h2>
+
+<p>Two genes only, so the whole thing fits on one pair of axes. Each dot is a simulated cell: its position is (count of gene 1, count of gene 2), and its colour is its true type. The line is the current decision boundary $w\cdot x + b = 0$. Drag the slider to give gradient descent more steps and watch the line rotate into place.</p>
+
+<div class="lab">
+  <div class="lab-title">Lab 1 · Logistic regression, trained in front of you</div>
+  <div class="lab-desc">Blue dots are type 1 (the higher-expressing type), purple dots are type 2; open circles are the held-out test cells, which the fit never sees. The line is the learned boundary; the orange dashed line is the optimal (naive Bayes) boundary computed from the true rates. Watch three things: the boundary starts at nothing and swings into position; it converges to <em>near</em> the orange line but not exactly onto it; and the train and test accuracies are not the same number.</div>
+  <canvas id="w8lab1" height="380"></canvas>
+  <div class="controls" id="w8lab1ctl"></div>
+  <div class="readout" id="w8lab1out"></div>
+</div>
+
+<p>Things to try, in this order:</p>
+<ul>
+  <li><strong>Set the steps to 1.</strong> The surprise is that the boundary is already roughly right — the coefficients are tiny (around $0.12$) but they point almost in the correct direction. The box below explains why, and it is worth understanding rather than shrugging at.</li>
+  <li><strong>Walk the slider up through 10, 50, 400.</strong> The coefficients grow by a factor of twenty; the <em>line</em> barely moves and the accuracy barely changes. What later training is mostly doing is not finding the boundary but sharpening the probabilities — making $p$ close to 0 and 1 rather than close to $\tfrac12$. A decision boundary depends only on the direction of $w$ and on $b/\|w\|$, not on the size of $w$.</li>
+  <li><strong>Drop the training set to 40 cells per type at 400 steps.</strong> Now the learned line sits visibly off the orange one and, more instructively, the train accuracy runs about ten points <em>above</em> the test accuracy. You are watching a model fit noise in 56 training cells.</li>
+  <li><strong>Push the training set to 400 per type.</strong> The two lines become hard to tell apart, and train and test accuracy come back together within a point or two of each other and of the ceiling. This is the middle row of Section 2's table, drawn.</li>
+  <li><strong>One honesty note</strong> to notice while you do this: at 20 cells per type there are only 12 test cells, so the test accuracy can only take values that are multiples of $1/12 = 8.3$ points. Small test sets do not produce slightly noisy numbers; they produce numbers with visible granularity, and the granularity is the noise made visible.</li>
+</ul>
+
+<div class="box example">
+  <span class="box-tag">Why one gradient step already gets the direction right</span>
+  <p>Gradient descent starts at $w = 0, b = 0$, where every predicted probability is
+  $p_i = \sigma(0) = \tfrac12$. Put that into the gradient:
+  $$\nabla_w\mathcal{L}\Big|_{w=0} = \frac1n\sum_i\left(\tfrac12 - y_i\right)x_i
+  = \frac{1}{2n}\left(\sum_{y_i=0} x_i - \sum_{y_i=1} x_i\right)
+  = \frac{1}{4}\big(\bar x_0 - \bar x_1\big)$$
+  for a balanced dataset with $n_0 = n_1 = n/2$. So the first update is
+  $w \leftarrow \frac{\eta}{4}(\bar x_1 - \bar x_0)$: it points exactly along the
+  <strong>difference of the two class means</strong>.</p>
+  <p>In other words, one step of logistic regression is the nearest-centroid classifier — and on
+  standardized data with roughly equal per-gene noise, that direction is already close to the
+  optimal $w_g = \log(\lambda_{1g}/\lambda_{2g})$. Everything after step 1 is a correction. That is
+  reassuring rather than disappointing: it says the problem is easy in the sense that matters, and
+  that any classifier's accuracy here is governed by how much separation the counts contain, which is
+  the thesis of the entire project.</p>
+</div>
+
+<h2>6 &nbsp;Train, test, and the discipline that makes a number mean something</h2>
+
+<p>An accuracy is not a property of a classifier. It is a property of a classifier <em>and</em> the cells you measured it on, and the difference between those two statements is where most overstated results in student projects come from.</p>
+
+<div class="box definition">
+  <span class="box-tag">Rule 1 · every accuracy in this project is a test accuracy</span>
+  Split the cells once, at random, into a training set and a test set. Fit only on the training set.
+  Report only the accuracy on the test set. The scaffold uses a 30% test fraction throughout; the
+  Week 8 experiment script passes <code>0.3</code> to <code>train_test_split</code> and never
+  computes a training accuracy at all except when a lab asks for it explicitly to make a point.
+</div>
+
+<p>Why it matters here specifically, in numbers: kNN with $k=1$ has a training accuracy of exactly 100% on any dataset with no duplicate rows, because every cell's nearest neighbour is itself. That number is not merely optimistic; it carries no information whatsoever. It would be 100% on pure noise.</p>
+
+<div class="box pitfall">
+  <span class="box-tag">Reporting training accuracy</span>
+  <p>This is the single most common way a student project overstates a result, and a reviewer's first
+  question is always "is that in-sample or out-of-sample?". If the answer is "I'm not sure", the
+  number is worth nothing and everything downstream of it is too.</p>
+  <p>The tell is a suspiciously round win. If your logistic regression reports 99.8% where the theory
+  predicts 87%, you have not beaten counting noise — you have measured on the training set, or your
+  labels have leaked into the features. Check in that order; it is almost never the theory.</p>
+  <p>The habit that makes this impossible: write your evaluation so the trained model and the test
+  matrix meet in exactly one line, and make sure the variable in that line is called
+  <code>X_test</code>. If a training-set variable ever appears on the same line as the word
+  "accuracy" in your report, something has gone wrong.</p>
+</div>
+
+<div class="box definition">
+  <span class="box-tag">Rule 2 · one permutation, applied to both</span>
+  To shuffle a dataset you draw <em>one</em> permutation and index both $X$ and $y$ with it:
+<pre><code>perm = rng.permutation(n)
+test_idx, train_idx = perm[:n_test], perm[n_test:]
+return X[train_idx], X[test_idx], y[train_idx], y[test_idx]</code></pre>
+  Never shuffle $X$ and $y$ in two separate calls.
+</div>
+
+<p>The reason this deserves a rule of its own is that the failure is <em>silent</em>. Shuffle the labels independently of the rows and nothing raises, nothing warns, no shape mismatches: you simply get a dataset in which the labels are random with respect to the features, and every classifier you run on it reports about 50%. You will then spend a day debugging your logistic regression, which is fine. This is precisely what <code>test_train_test_split_labels_travel_with_rows</code> checks, and it checks it in a clever way worth stealing: it builds $X$ so that the label is recoverable from the row itself ($y_i$ equals $X_{i0}$), then asserts that the relationship still holds after the split.</p>
+
+<div class="box definition">
+  <span class="box-tag">Rule 3 · standardization statistics come from the training split only</span>
+  Logistic regression on raw counts converges badly, because a gene with mean count 40 and a gene
+  with mean count 0.4 produce gradients a hundred times apart and there is one shared learning rate.
+  So <code>LogisticRegression._prep</code> centres and scales each column:
+  $z_{ij} = (x_{ij} - \mu_j)/s_j$. The rule is that $\mu$ and $s$ are computed <strong>on the
+  training rows</strong> (<code>fit=True</code>) and then <em>reused unchanged</em> on the test rows
+  (<code>fit=False</code>).
+</div>
+
+<p>Recomputing $\mu$ and $s$ on the test set — or, more insidiously, on the full matrix before splitting — is a form of leakage. It is a mild one: you are only leaking two summary numbers per gene, not labels. But it is leakage in the exact technical sense that your test-time transformation depended on the test data, and with small test sets it can move the third decimal place, which is the decimal place several of this project's claims live in. Do it properly and you never have to argue about it.</p>
+
+<div class="box example">
+  <span class="box-tag">A detail in <code>_prep</code> that is not a detail</span>
+  <p>The scaffold tells you to replace any zero standard deviation with $1.0$ before dividing. That
+  case is not hypothetical: at low depth a marker gene can easily come back as zero in every single
+  training cell, giving $s_j = 0$. Divide by it and the whole matrix becomes NaN, including the
+  columns that were fine, because NaN propagates through the matrix product.</p>
+  <p>Replacing $s_j$ with 1 is the right repair rather than a hack: a column with no variance carries
+  no information about anything, its centred values are all exactly zero, and $0/1 = 0$ leaves it as
+  a column of zeros, which contributes nothing to $w\cdot x$ and lets gradient descent leave its
+  coefficient at whatever it started at. The gene is ignored, which is exactly what it deserves.</p>
+</div>
+
+<h2>7 &nbsp;Genes you should not have measured: the curse of dimensionality</h2>
+
+<p>kNN is the honest baseline. It assumes nothing: no linear boundary, no Poisson counts, no model of anything. To classify a cell, find the $k$ training cells closest to it in Euclidean distance and take a majority vote. In two dimensions it is excellent, and in Lab 1's setting it would be within a percent of optimal.</p>
+
+<p>In two hundred dimensions it is a disaster, and the reason is worth doing with algebra rather than adjectives.</p>
+
+<div class="box theorem">
+  <span class="box-tag">Concentration of distances &nbsp;<span class="claim proved">proved</span></span>
+  <p>Let $x$ and $x'$ be two independent points in $d$ dimensions whose coordinates are independent,
+  each with variance $\sigma^2$ and carrying <em>no</em> information about the class. Write
+  $R^2 = \sum_{j=1}^{d}(x_j - x'_j)^2$ for their squared distance. Then</p>
+  $$E[R^2] = 2d\sigma^2, \qquad \frac{\mathrm{sd}(R^2)}{E[R^2]} \;=\; \frac{c}{\sqrt d}$$
+  <p>for a constant $c$ of order 1 ($c = \sqrt2$ for Gaussian coordinates). Every pair of points is
+  at essentially the same distance, and the more coordinates you add the truer that becomes.</p>
+</div>
+
+<div class="box proof">
+  <span class="box-tag">Proof · two moments, and Week 1's square-root argument again</span>
+  <p><strong>The mean.</strong> For one coordinate, $x_j - x'_j$ is a difference of independent
+  variables with the same mean, so it has mean $0$ and variance $\sigma^2 + \sigma^2 = 2\sigma^2$
+  (variances add for independent variables — Week 1, exercise 1.4). Therefore
+  $E[(x_j-x'_j)^2] = \mathrm{Var}(x_j - x'_j) = 2\sigma^2$, and summing the $d$ independent
+  coordinates, $E[R^2] = 2d\sigma^2$.</p>
+  <p><strong>The spread.</strong> $R^2$ is a sum of $d$ independent terms, so its variance is $d$
+  times the variance of one term. For Gaussian coordinates, $u = x_j - x'_j \sim N(0, 2\sigma^2)$
+  and $\mathrm{Var}(u^2) = E[u^4] - (E[u^2])^2 = 3(2\sigma^2)^2 - (2\sigma^2)^2 = 8\sigma^4$, using
+  the Gaussian fourth-moment fact $E[u^4] = 3(\mathrm{Var}\,u)^2$. Hence
+  $\mathrm{Var}(R^2) = 8d\sigma^4$ and $\mathrm{sd}(R^2) = 2\sqrt2\,\sigma^2\sqrt d$. Dividing,
+  $$\frac{\mathrm{sd}(R^2)}{E[R^2]} = \frac{2\sqrt2\,\sigma^2\sqrt d}{2d\sigma^2} = \frac{\sqrt2}{\sqrt d}.
+  \qquad\blacksquare$$</p>
+  <p><strong>Assumptions used:</strong> coordinates independent, identically scaled, and carrying no
+  class information; Gaussian only for the constant $c$, not for the $1/\sqrt d$ rate. Exercise 8.5
+  redoes it for Poisson counts and gets the same rate.</p>
+</div>
+
+<p>Now put the signal back in. Suppose $k$ of the $d$ coordinates are informative, each separating the two types by $\Delta$ in the mean. Comparing a same-type pair with a different-type pair, the expected squared distances differ by</p>
+
+$$E[R^2_{\text{different}}] - E[R^2_{\text{same}}] \;=\; k\Delta^2,$$
+
+<p>a quantity that does <em>not</em> grow when you add uninformative genes. Meanwhile the spread of $R^2$ grows like $\sigma^2\sqrt d$. So the signal-to-spread ratio of the distance itself is</p>
+
+$$\frac{k\Delta^2}{\sigma^2\sqrt{d}} \;\propto\; \frac{1}{\sqrt d},$$
+
+<p>and it decays for exactly the same reason everything in this project decays: a square root over an accumulating number of independent noisy contributions. At $d = 4$ the nearest neighbour of a cell is genuinely one of its own type. At $d = 128$ the nearest neighbour is whichever cell happened to get lucky in 128 coordinates of pure noise, and the vote is a coin flip.</p>
+
+<div class="box win">
+  <span class="box-tag">Why the linear rules do not suffer this</span>
+  <p>Because a linear rule can put <strong>zero weight</strong> on a coordinate, and kNN cannot.</p>
+  <p>Look at the optimal weights: $w_g = \log(\lambda_{1g}/\lambda_{2g})$. A gene expressed
+  identically in both types has $\lambda_{1g} = \lambda_{2g}$, so $w_g = 0$ <em>exactly</em>. The
+  gene contributes nothing to $w\cdot x$; it is not merely down-weighted, it is deleted. Add ten
+  thousand such genes and the naive Bayes rule does not move at all. Logistic regression has to
+  <em>learn</em> that the weight is zero, and with finite data it learns something small but nonzero,
+  which is why it degrades slowly rather than not at all.</p>
+  <p>Euclidean distance has no such freedom. Every coordinate enters the sum $\sum_j (x_j - x'_j)^2$
+  with the same weight 1, by definition of the metric, and there is nowhere in the algorithm to put
+  the knowledge that a gene is useless. kNN is not being stupid; it is being asked to work without
+  the one piece of information that matters.</p>
+</div>
+
+<div class="box warning">
+  <span class="box-tag">Do not tune $k$ until kNN wins</span>
+  <p>You will be tempted. kNN's accuracy does depend on $k$, and by sweeping $k$ on the test set you
+  can certainly find a value that looks better. Two things are wrong with that.</p>
+  <p>First, choosing $k$ by looking at the test set makes the test set a training set, and the
+  resulting number is no longer an out-of-sample accuracy. If you genuinely need to choose $k$, it is
+  chosen by cross-validation <em>inside the training split</em> — which is what
+  <code>cross_validated_accuracy</code> is provided for.</p>
+  <p>Second and more importantly, it answers a different and less interesting question. "What is the
+  best accuracy I can extract with unlimited fiddling?" is an engineering question with a fuzzy
+  answer. "How does each classifier's accuracy behave as the data gets harder, at fixed, stated,
+  untuned settings?" is a scientific question with a sharp answer, and it is the one this project
+  asks. Every chapter uses <code>k = 15</code>, odd so that a two-class vote can never tie, fixed
+  in advance, and stated in the figure legend. Report the ordering and the gaps. If a reviewer asks
+  whether kNN would do better with a different $k$, the honest answer is "somewhat, and it would
+  still collapse as the dimension grows, because the collapse is a property of the metric and not
+  of $k$."</p>
+</div>
+
+<h2>8 &nbsp;Lab: who survives more genes?</h2>
+
+<p>This is the second figure of the week, live. The number of genes goes up; the total amount of biological signal does not. Under the fixed-total-mass convention of Week 5, $d'$ is <em>exactly independent of $k$</em> — so the theory line is flat, and any classifier that tracks the theory should be flat too.</p>
+
+<div class="lab">
+  <div class="lab-title">Lab 2 · Three classifiers against the number of genes</div>
+  <div class="lab-desc">Orange: the theoretical ceiling $\Phi(d'/2)$. Blue: naive Bayes with the true rates. Teal: logistic regression, trained on 70% of the cells. Purple: kNN with $k = 15$. The toggle switches between two ways of adding genes — <em>split the same signal over more genes</em> (the Week 5 fixed-total-mass convention, and what the experiment script does; the orange line is then perfectly flat) and <em>keep up to four real markers and add pure-noise genes at a typical expression level</em> (the orange line rises to four genes and is flat thereafter, since a gene with $\lambda_1 = \lambda_2$ contributes exactly zero to $d'$). Both are honest; they fail in the same direction for the same reason, and the first fails harder because it thins the signal as well as adding dimensions.</div>
+  <canvas id="w8lab2" height="360"></canvas>
+  <div class="controls" id="w8lab2ctl"></div>
+  <div class="readout" id="w8lab2out"></div>
+</div>
+
+<p>With the total signal held fixed, the flat orange line sits at $\Phi(d'/2)$ with $d' = \sqrt{D m}\cdot\frac{2(f-1)}{f+1}$ — no $k$ in it anywhere. The two linear rules stay pinned to it across a 64-fold change in dimension. kNN starts on it and ends at chance. The lab uses 300 cells per type so that it stays responsive, which leaves about 180 test cells per point and therefore a standard error of roughly 2 percentage points; expect visible wobble. The experiment script uses 1,500 cells per type and the pattern is the same but cleaner.</p>
+
+<div class="box example">
+  <span class="box-tag">What you should find when you run the real thing</span>
+  <p>At depth 3,000 with total marker mass 0.032 and fold change 1.5, the prediction is
+  $d' = \sqrt{3000\times 0.032}\times \frac{2(0.5)}{2.5} = 9.798\times 0.4 = 3.92$, so
+  $\Phi(d'/2) = \Phi(1.96) = 0.975$ at <em>every</em> gene count. Running
+  <code>week08_classifiers.py</code> you should see naive Bayes and logistic regression hold within
+  about a percent of 0.975 from 2 genes to 128, while kNN falls from roughly 0.97 at 2 genes to
+  roughly 0.94 at 32 genes and to <strong>chance</strong> — about 0.50 — at 128.</p>
+  <p class="muted">Write that sentence down in that form. "kNN degrades in high dimensions" is a
+  thing people say; "kNN went from 0.97 to 0.50 while the linear rules did not move, at constant
+  $d'$" is a measurement, and the constant $d'$ is what makes it one.</p>
+</div>
+
+<h2>9 &nbsp;Your Python laboratory</h2>
+
+<div class="box python">
+  <span class="box-tag">This week in the celldetect project</span>
+  <p>The whole of <code>python/celldetect/classify.py</code>, in the order the file lists:</p>
+  <ul>
+    <li><code>train_test_split(X, y, test_fraction, rng)</code> — one permutation, applied to both.
+    Note the return order in the signature: <code>(X_train, X_test, y_train, y_test)</code>, X's
+    first then y's. Raise <code>ValueError</code> unless <code>0 &lt; test_fraction &lt; 1</code>.</li>
+    <li><code>accuracy(y_true, y_pred)</code> — two lines, one of which is a shape check that raises
+    <code>ValueError</code>. That check exists because mismatched shapes almost always mean a split
+    bug, and NumPy would otherwise broadcast them into a silently meaningless answer.</li>
+    <li><code>naive_bayes_predict(X, lam1, lam2)</code> — one line on top of Week 5's
+    <code>log_likelihood_ratio</code>: threshold at 0 and cast to <code>int</code>.</li>
+    <li><code>LogisticRegression</code> — <code>_prep</code> (standardize, learning $\mu$ and $s$
+    only when <code>fit=True</code>), <code>fit</code> (the three-line gradient loop of Section 3,
+    returning <code>self</code>), <code>predict_proba</code>, <code>decision_function</code> (the raw
+    score $w\cdot x + b$, which is what you feed an ROC curve) and <code>predict</code> (threshold
+    the probability at 0.5). Both <code>predict_proba</code> and <code>decision_function</code> raise
+    <code>RuntimeError</code> if called before <code>fit</code>.</li>
+    <li><code>knn_predict(X_train, y_train, X_query, k=5)</code> — all pairwise squared distances in
+    one expression via $\|a-b\|^2 = \|a\|^2 - 2a\cdot b + \|b\|^2$, then
+    <code>np.argpartition</code> for the $k$ smallest per row and a majority vote. Write the double
+    loop first if it helps, check the two agree on a $4\times2$ example, then keep the fast one.
+    Raise <code>ValueError</code> if $k$ is outside $1..n_{\text{train}}$.</li>
+  </ul>
+  <p><code>_sigmoid</code> and <code>cross_validated_accuracy</code> are provided. Read both; you are
+  asked to explain the first (Section 4) and you will use the second from Week 9 onwards.</p>
+  <p>Then:</p>
+  <p><code>pytest tests/test_classify.py</code></p>
+  <p>All twelve, not a subset. Three of them are the week in miniature:
+  <code>test_naive_bayes_predict_beats_chance_and_hits_the_ceiling</code> (the optimal rule attains
+  $\Phi(d'/2)$ to within 0.02),
+  <code>test_logistic_regression_approaches_the_bayes_ceiling</code> (the learned rule comes within
+  0.03 of the optimal one, which is the middle row of Section 2's table as an assertion), and
+  <code>test_knn_is_beaten_by_the_linear_rule_in_high_dimensions</code> (60 genes, and naive Bayes
+  wins). That last test is a result written as a test — do not "fix" it by tuning $k$.</p>
+  <p>Then the figures:</p>
+  <p><code>python experiments/week08_classifiers.py</code></p>
+  <p>with <strong>SEED 108</strong>, producing <code>figures/week08_classifiers.png</code> (the three
+  classifiers and the theory curve against depth, at 8 marker genes) and
+  <code>figures/week08_curse.png</code> (the same three against the number of genes with the total
+  signal held fixed). The script prints both tables to the terminal; paste them into
+  <code>progress/week08.md</code>. It uses <code>K_NN = 15</code> and a 30% test split, and it takes
+  about 40 seconds.</p>
+</div>
+
+<div class="box pitfall">
+  <span class="box-tag">The three that catch everyone in Week 8</span>
+  <ul>
+    <li><strong>The label convention.</strong> <code>simulate_dataset</code> labels the first profile
+    as type <code>0</code>, but <code>naive_bayes_predict</code> returns <code>1</code> when type 1
+    (the first profile) is favoured. So the comparison is against <code>1 - y</code>, not
+    <code>y</code>. Get it backwards and you measure $1 - \text{accuracy}$, which for a good
+    classifier looks like a catastrophic bug and for a mediocre one looks like a mediocre
+    classifier. Both the tests and <code>week08_classifiers.py</code> write <code>z = 1 - y</code>
+    explicitly at the top for exactly this reason. Copy the habit.</li>
+    <li><strong>Standardizing with test statistics.</strong> <code>_prep(X, fit=False)</code> must
+    reuse the stored $\mu$ and $s$. If you recompute them, nothing raises and the accuracy moves by
+    a few thousandths — in the wrong direction, and in the decimal place your Week 9 milestone
+    depends on.</li>
+    <li><strong>Even $k$ in kNN.</strong> With two classes and $k = 4$, a 2–2 vote has to be broken
+    somehow, and the tie-break is invisible and arbitrary. Every chapter uses odd $k$. The
+    scaffold's vote test <code>votes * 2 &gt; k</code> is written on that assumption.</li>
+  </ul>
+</div>
+
+<h2>10 &nbsp;Exercises</h2>
+<p class="muted">Stars mark difficulty: ★ routine · ★★ requires an idea · ★★★ challenge. Write full sentences; every claim needs a reason. Solutions are provided — attempt first, then compare.</p>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 8.1</span><span class="stars">★</span></div>
+  <div class="ex-body">(a) Show that $\sigma(-z) = 1 - \sigma(z)$ for every real $z$. (b) Show that the logistic model's log-odds are linear: $\log\frac{P(y=1\mid x)}{P(y=0\mid x)} = w\cdot x + b$. (c) A cell has score $w\cdot x + b = 2.2$. What probability does the model assign it, and how confident is that in odds terms?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) $\sigma(-z) = \dfrac{1}{1+e^{z}}$. Multiply top and bottom by $e^{-z}$:
+      $\dfrac{e^{-z}}{e^{-z}+1} = 1 - \dfrac{1}{1+e^{-z}} = 1 - \sigma(z)$, using the same
+      "add and subtract the denominator" trick as in Section 3.</p>
+      <p>(b) With $p = \sigma(z)$ and $1-p = \sigma(-z) = \dfrac{e^{-z}}{1+e^{-z}}$,
+      $$\frac{p}{1-p} = \frac{1/(1+e^{-z})}{e^{-z}/(1+e^{-z})} = \frac{1}{e^{-z}} = e^{z},$$
+      so $\log\frac{p}{1-p} = z = w\cdot x + b$.</p>
+      <p>(c) $\sigma(2.2) = 1/(1+e^{-2.2}) = 1/(1+0.1108) = 0.900$. The odds are $e^{2.2} = 9.03$ to
+      one.</p>
+      <p class="muted">Part (b) is the reason logistic regression belongs in this chapter at all.
+      Week 5 proved the optimal rule's log-<em>likelihood</em> ratio is linear in the counts; part (b)
+      says logistic regression assumes the log-<em>odds</em> are linear in the counts. Under equal
+      priors those are the same statement, so the model is not an approximation to the truth here —
+      it is exactly the right family, with unknown coefficients.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 8.2</span><span class="stars">★</span></div>
+  <div class="ex-body">A classifier is evaluated on 400 test cells and gets 348 right. (a) Report the accuracy. (b) Give a rough standard error. (c) Another classifier gets 356 right on the same test set. Is that a real difference? (d) What would you need to do to make a difference of that size measurable?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) $348/400 = 0.870$.</p>
+      <p>(b) For a proportion, $\mathrm{se} = \sqrt{p(1-p)/n} = \sqrt{0.87\times0.13/400}
+      = \sqrt{0.000283} = 0.0168$, so about $1.7$ percentage points.</p>
+      <p>(c) $356/400 = 0.890$, a difference of $0.020$ — about one standard error of a single
+      measurement, and the two measurements share a test set, so they are correlated in a way this
+      crude calculation does not capture. It is not a real difference. You cannot distinguish these
+      two classifiers with this experiment.</p>
+      <p>(d) The standard error falls as $1/\sqrt n$, so to resolve $0.02$ comfortably — say, to get
+      the standard error down to $0.005$ — you need $n$ about $(1.7/0.5)^2 \approx 11$ times larger,
+      so roughly 4,500 test cells. This is why the experiment scripts simulate thousands of cells
+      per type rather than hundreds: the cells are free, and the alternative is arguing about noise.</p>
+      <p class="muted">In Week 13 you replace this back-of-envelope with a Wilson interval, which
+      behaves properly near accuracy 1 where this formula does not. But the habit starts now: an
+      accuracy without a sense of its own noise is not yet a result. Note also that the correct
+      comparison of two classifiers on the <em>same</em> test cells is a paired one — Week 13's
+      permutation test — and it is more sensitive than comparing two independent intervals.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 8.3</span><span class="stars">★★</span></div>
+  <div class="ex-body">Derive the logistic gradient from scratch, without looking at Section 3: start from $\mathcal{L} = -\frac1n\sum_i[y_i\log p_i + (1-y_i)\log(1-p_i)]$ and show $\nabla_w\mathcal{L} = X^{\mathsf T}(p-y)/n$. Then (a) state which step used $\sigma' = \sigma(1-\sigma)$ and what would have happened without it; (b) show that the gradient with respect to $b$ is the mean error, and interpret the fixed point $\overline{p} = \overline{y}$; (c) verify the units: if you scaled every count in column $j$ by 1000, what happens to $w_j$ at the optimum?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>The derivation is Section 3's proof. The four steps are: differentiate the loss with respect
+      to $p_i$; differentiate $p_i$ with respect to $z_i$; multiply, and observe that the factor
+      $p_i(1-p_i)$ exactly cancels the two denominators, leaving $p_i - y_i$; then chain through
+      $\partial z_i/\partial w_j = x_{ij}$ and average.</p>
+      <p>(a) Step 2 is where $\sigma' = \sigma(1-\sigma)$ enters. Without that identity you would be
+      left with $\frac{e^{-z_i}}{(1+e^{-z_i})^2}$ multiplying a sum of two fractions, and the
+      expression would not simplify: the gradient would still be computable but it would involve the
+      sigmoid explicitly, and the tidy statement "the gradient is the data matrix applied to the
+      errors" would be false. Cross-entropy is chosen <em>because</em> its derivative cancels the
+      sigmoid's. Pair the sigmoid with squared-error loss instead and the factor $p(1-p)$ survives,
+      which is why squared-error logistic regression trains badly: a confidently wrong cell has
+      $p(1-p)\approx 0$ and therefore produces almost no gradient.</p>
+      <p>(b) $\partial\mathcal{L}/\partial b = \frac1n\sum_i(p_i - y_i) = \overline p - \overline y$.
+      At a stationary point this is zero, so $\overline p = \overline y$: the model's average
+      predicted probability equals the observed class frequency. The intercept's whole job is to get
+      the base rate right, which is why a model fitted on a 50/50 dataset and applied to a 5/95 one
+      is miscalibrated even when $w$ is perfect.</p>
+      <p>(c) The score $w\cdot x + b$ must be unchanged for the fit to be equivalent, so if
+      $x_{ij}\to 1000x_{ij}$ then $w_j \to w_j/1000$. Coefficients carry inverse units of their
+      feature. This is why comparing raw coefficient magnitudes across genes is meaningless unless
+      the columns were standardized first — which <code>_prep</code> does, and which is a second,
+      quieter reason for standardizing beyond convergence speed.</p>
+      <p class="muted">Part (a) is the one to remember. Students often think cross-entropy is chosen
+      because it is "the probabilistic loss"; it is chosen because it is the loss whose gradient is
+      clean, and the two facts are the same fact viewed from opposite ends.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 8.4</span><span class="stars">★★</span></div>
+  <div class="ex-body">Naive Bayes with the true rates gets 87.1% on a simulated dataset; logistic regression trained on 1,050 of those cells gets 86.4% on the held-out 450. (a) What does the 0.7-point gap measure? (b) Predict what happens to the gap if you train on 10,000 cells instead, and why. (c) Predict what happens to the gap if you keep 1,050 training cells but raise the number of genes from 8 to 80, and why. (d) Your friend says "let me add L2 regularization, it'll close the gap." What is right and what is wrong about that?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) Purely the cost of estimating $w$ and $b$ from finite data. Both rules search the same
+      family of linear boundaries; one is handed the best member, the other has to find it from 1,050
+      noisy examples. Nothing about model class, nothing about optimization (gradient descent on a
+      convex loss with enough steps finds the minimum), and nothing about counting noise, which both
+      rules face equally.</p>
+      <p>(b) It shrinks, roughly like $1/n$ in the excess error. Estimating $k+1$ parameters from $n$
+      examples has an error that falls as $1/\sqrt n$ per parameter, and the resulting accuracy loss
+      is second order because the loss is flat at its minimum. With 10,000 training cells expect a
+      gap in the low tenths of a percent, comparable to the measurement noise of the test set itself.</p>
+      <p>(c) It grows. Ten times as many coefficients estimated from the same 1,050 cells means ten
+      times as much estimation variance, while the underlying $d'$ (if the total signal is held
+      fixed) has not improved at all. This is exactly what the teal curve does in Lab 2 at large $k$:
+      it holds up far better than kNN but it does slowly droop, and the droop is this.</p>
+      <p>(d) <strong>Right:</strong> regularization genuinely does reduce estimation variance, and at
+      $k = 80$ with $n = 1050$ a small L2 penalty would likely improve the test accuracy.
+      <strong>Wrong:</strong> it introduces a hyperparameter, which has to be chosen, which means
+      either choosing it on the test set (fatal) or building a nested cross-validation loop (fine but
+      a different project). More fundamentally, the gap is the <em>quantity being measured</em> this
+      week. Shrinking it with a knob does not tell you how big it was; it tells you that you have a
+      knob. Keep the unregularized number as the headline and, if you want, report the regularized
+      one as a footnote in Week 14.</p>
+      <p class="muted">This exercise is a rehearsal for a Q&amp;A question you will get in Week 15,
+      in almost these words: "why didn't you use a better classifier?" The answer is that a better
+      classifier would have made the experiment worse, and being able to say why in thirty seconds
+      is the difference between a defensible project and a defensive one.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 8.5</span><span class="stars">★★</span></div>
+  <div class="ex-body">Redo the concentration-of-distances calculation for count data. Let each coordinate be $\mathrm{Poisson}(\lambda)$, independently, in both points. (a) Find $E[R^2]$ over $d$ coordinates. (b) Show $\mathrm{Var}(R^2) = d(2\lambda + 8\lambda^2)$ and hence find the relative spread. (c) Evaluate the relative spread for $\lambda = 0.75$ at $d = 4$ and $d = 128$, and say what that means for the nearest neighbour of a cell. <em>Hint for (b): write $u = X - X'$ as a sum of two independent centred variables and use $E[(A-\mu)^4] = \lambda + 3\lambda^2$ for a Poisson.</em></div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) Per coordinate, $u = X - X'$ has mean 0 and variance $2\lambda$, so $E[u^2] = 2\lambda$
+      and $E[R^2] = 2d\lambda$. (Note that this is the same as the Gaussian answer with
+      $\sigma^2 = \lambda$, as it must be — the Poisson coincidence again.)</p>
+      <p>(b) Write $u = A + B$ with $A = X - \lambda$ and $B = -(X'-\lambda)$, independent, each with
+      mean 0, variance $\lambda$ and fourth moment $\lambda + 3\lambda^2$. Then
+      $$E[u^4] = E[A^4] + 6E[A^2]E[B^2] + E[B^4] = 2(\lambda + 3\lambda^2) + 6\lambda^2
+      = 2\lambda + 12\lambda^2$$
+      (the odd cross terms vanish because both variables are symmetric about 0 in their odd moments
+      — more precisely, $E[A^3]E[B] = 0$ and $E[A]E[B^3] = 0$). So
+      $$\mathrm{Var}(u^2) = E[u^4] - (E[u^2])^2 = 2\lambda + 12\lambda^2 - 4\lambda^2
+      = 2\lambda + 8\lambda^2,$$
+      and summing $d$ independent coordinates, $\mathrm{Var}(R^2) = d(2\lambda + 8\lambda^2)$. The
+      relative spread is
+      $$\frac{\sqrt{d(2\lambda + 8\lambda^2)}}{2d\lambda}
+      = \frac{1}{\sqrt d}\cdot\frac{\sqrt{2\lambda + 8\lambda^2}}{2\lambda}.$$
+      For large $\lambda$ the second factor tends to $\sqrt2$, recovering the Gaussian constant
+      exactly.</p>
+      <p>(c) At $\lambda = 0.75$: $\sqrt{2(0.75) + 8(0.5625)} = \sqrt{1.5 + 4.5} = \sqrt6 = 2.449$,
+      divided by $2(0.75) = 1.5$, gives $1.633$. So the relative spread is $1.633/\sqrt d$: about
+      $82\%$ at $d = 4$ and about $14\%$ at $d = 128$. At $d=4$ distances vary wildly from pair to
+      pair, so "nearest" means something. At $d = 128$ every pair of cells is within a few percent
+      of the same distance, and which one comes out nearest is decided by noise.</p>
+      <p class="muted">Note the direction of the effect at low $\lambda$: sparse count data has a
+      <em>larger</em> constant than Gaussian data, so the curse arrives, if anything, slightly
+      earlier for single-cell counts than the textbook Gaussian version suggests. That is worth one
+      sentence in your Week 14 discussion, because it is a place where the standard machine-learning
+      story and the counting-statistics story reinforce rather than merely coexist.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 8.6</span><span class="stars">★★★</span></div>
+  <div class="ex-body">Suppose you scale gene $j$'s column by a factor $c_j$ before running kNN — that is, you use the weighted distance $R^2 = \sum_j c_j^2 (x_j - x'_j)^2$. (a) Show that with the right choice of $c_j$, weighted kNN can be made to ignore uninformative genes entirely. (b) What is the "right choice", in terms of the quantities the theory already gives you? (c) Explain why doing this is legitimate research when done one way and cheating when done another. (d) In one sentence, what does the existence of this fix say about the claim "the classifier is not the bottleneck"?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) Setting $c_j = 0$ for a gene deletes its contribution from the distance exactly, so the
+      neighbours are computed as though the gene had never been measured. With $c_j = 0$ on all $d-k$
+      uninformative coordinates, the concentration calculation runs with $d$ replaced by $k$ and the
+      relative spread stops shrinking: the curse is gone, because the dimension the metric sees is
+      $k$, not $d$.</p>
+      <p>(b) The natural choice is $c_j \propto |d'_j|$, the per-gene separation index — or,
+      equivalently up to a monotone reparameterisation, $c_j \propto |\log(\lambda_{1j}/\lambda_{2j})|$,
+      the magnitude of the optimal linear weight. Both are zero exactly when the gene is
+      uninformative and grow with how informative it is. In other words: the fix for kNN is to hand
+      it the linear rule's weights.</p>
+      <p>(c) <strong>Legitimate</strong> if the weights are estimated from the training split only,
+      stated in advance, and reported as "weighted kNN, weights from training-set $d'$" — a
+      different, clearly labelled classifier, evaluated once. <strong>Cheating</strong> if the
+      weights come from the true simulation rates (which a real experiment would not have), or from
+      the full dataset including the test cells, or if you try several weightings and report the best
+      one. The dividing line is not the algorithm; it is whether the test cells influenced anything
+      before they were used to test.</p>
+      <p>(d) It says the claim is about <em>information</em>, not about effort: the reason weighted
+      kNN can be rescued is that you gave it the information the linear rule already had, and having
+      done so it converges to the same ceiling $\Phi(d'/2)$ rather than exceeding it — so no
+      classifier escapes counting noise, and the ones that look worse are the ones throwing
+      information away.</p>
+      <p class="muted">This is the deepest exercise of the week, and it is the one to bring up
+      yourself if a reviewer suggests kNN was treated unfairly. Yes, it can be fixed; the fix is to
+      make it more like the rule that the theory already describes; and the fixed version still
+      cannot beat the ceiling. That is three sentences and it turns an apparent weakness of the
+      project into an illustration of its central claim.</p>
+    </div>
+  </details>
+</div>
+
+<h2>11 &nbsp;Research notebook</h2>
+
+<p>This week's entries:</p>
+
+<ul>
+  <li>The gradient derivation of Section 3 in full, from memory, ending with the boxed line
+  $\partial\ell_i/\partial z_i = p_i - y_i$ and one sentence saying which step needed
+  $\sigma' = \sigma(1-\sigma)$.</li>
+  <li>The two-branch sigmoid, with the algebraic identity $\frac{1}{1+e^{-z}} = \frac{e^{z}}{1+e^{z}}$
+  shown in one line and a note of which branch is used where and why.</li>
+  <li>The three rules of Section 6, written as three imperative sentences you could hand to someone
+  else. Under them, the label-convention trap (<code>z = 1 - y</code>) in your own words.</li>
+  <li>The concentration calculation: $E[R^2] = 2d\sigma^2$, relative spread $\sqrt2/\sqrt d$, and the
+  two-line argument for why a linear rule is immune. Exercise 8.5 alongside it.</li>
+  <li>The Lab 2 numbers you measured, plus the corresponding numbers from
+  <code>week08_curse.png</code>, and one sentence on whether they agree.</li>
+  <li>An addition to your <strong>"assumptions I am making"</strong> list: <em>the training cells and
+  the test cells are drawn from the same distribution</em>. It is true by construction in simulation
+  and it is exactly what Week 10 has to worry about on real data, where the cells were not shuffled
+  by you.</li>
+</ul>
+
+<p>Scan to <code>notebook/week08/</code> and fill in <code>progress/week08.md</code>, including both printed tables from the experiment script and the seed.</p>
+
+<div class="box verify">
+  <span class="box-tag">Verification this week (with mentor)</span>
+  <ul>
+    <li><strong>At the whiteboard, without notes:</strong> derive $\nabla_w\mathcal{L} = X^{\mathsf T}(p-y)/n$, and say out loud where the sigmoid went.</li>
+    <li><strong>Explain the two-branch sigmoid</strong> — the identity, and which branch is used for which sign of $z$ — and say what specifically goes wrong with the one-branch version, in the loss and not just in the sigmoid.</li>
+    <li><strong>State the three train/test rules</strong> and point at the line in your own <code>train_test_split</code> where the single permutation is drawn.</li>
+    <li><strong>Show <code>figures/week08_classifiers.png</code></strong> and say, before your mentor asks, which curve is the ceiling, how big the logistic-to-Bayes gap is, and what that gap measures.</li>
+    <li><strong>Show <code>figures/week08_curse.png</code></strong> and state the theoretical prediction for the linear curves (flat, at $\Phi(d'/2)$ with $d'$ independent of $k$) and the measured kNN endpoint. Then answer the question "why not tune $k$?" in two sentences.</li>
+    <li><strong><code>pytest tests/test_classify.py</code> fully green</strong>, on your machine, and you can name what <code>test_knn_is_beaten_by_the_linear_rule_in_high_dimensions</code> is protecting.</li>
+  </ul>
+</div>
+
+<h2>12 &nbsp;Going deeper</h2>
+<ul>
+  <li>Bishop, <em>Pattern Recognition and Machine Learning</em> (2006), §4.3.2. <span class="muted">Logistic regression done properly, including the second-derivative (Newton/IRLS) method that converges in a handful of steps instead of hundreds. Read it after you have written gradient descent, so you can see what the extra machinery buys.</span></li>
+  <li>Ng &amp; Jordan (2001), <em>On discriminative vs. generative classifiers</em>, NeurIPS. <span class="muted">The naive-Bayes-versus-logistic-regression comparison, as a research question rather than a homework exercise: generative models converge faster with little data, discriminative ones win with a lot. Exactly Section 2's middle row, with the asymptotics worked out.</span></li>
+  <li>Hastie, Tibshirani &amp; Friedman, <em>The Elements of Statistical Learning</em> (2nd ed.), §2.5, "Local Methods in High Dimensions". <span class="muted">The canonical treatment of the curse of dimensionality, with the sampling-density argument ($n^{1/d}$) that complements Section 7's concentration argument. Four pages, and worth all four.</span></li>
+  <li>Beyer, Goldstein, Ramakrishnan &amp; Shaft (1999), <em>When is "nearest neighbor" meaningful?</em>, ICDT. <span class="muted">The paper that made the concentration-of-distances result precise, including the condition under which it does <em>not</em> apply. <span class="claim cited">cited</span></span></li>
+  <li>Course extras: <a href="../extras/notation.html">notation card</a> · <a href="../extras/glossary.html">glossary</a> · <a href="../extras/problem-bank.html">problem bank</a> · <a href="../extras/unstuck.html">how to get unstuck</a></li>
+</ul>
+
+</div>
+
+<footer class="site">How Much Data Does It Take to Tell Two Cell Types Apart? · Week 8 · <a href="../index.html">Course home</a></footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  /* ---------------- Lab 1: logistic regression, trained live -------------- */
+  (function () {
+    const STEPS = [1, 2, 5, 10, 20, 50, 100, 200, 400, 800];
+    const NCELLS = [20, 40, 80, 150, 400];
+    const DEPTH = 500, MASS = 0.06, FOLD = 1.6;
+    let si = 6, ni = 3;
+
+    function build(n) {
+      const pr = CD.markerProfiles(2, FOLD, MASS);
+      const r = CD.rng(8100 + n);
+      const X = [], y = [];
+      for (let i = 0; i < n; i++) { X.push(CD.sampleCell(pr[0], DEPTH, r)); y.push(1); }
+      for (let i = 0; i < n; i++) { X.push(CD.sampleCell(pr[1], DEPTH, r)); y.push(0); }
+      const idx = X.map((_, i) => i);
+      for (let i = idx.length - 1; i > 0; i--) {          // one permutation, both arrays
+        const j = Math.floor(r() * (i + 1)); const t = idx[i]; idx[i] = idx[j]; idx[j] = t;
+      }
+      const nTest = Math.round(0.3 * idx.length);
+      const te = idx.slice(0, nTest), tr = idx.slice(nTest);
+      return { X: X, y: y, tr: tr, te: te, pr: pr };
+    }
+
+    function run() {
+      const n = NCELLS[ni], iters = STEPS[si], D = build(n);
+      const Xtr = D.tr.map(i => D.X[i]), ytr = D.tr.map(i => D.y[i]);
+      const mu = [0, 1].map(j => Xtr.reduce((s, x) => s + x[j], 0) / Xtr.length);
+      const sd = [0, 1].map(j => Math.sqrt(Xtr.reduce((s, x) => s + (x[j] - mu[j]) * (x[j] - mu[j]), 0) / Xtr.length) || 1);
+      const Z = x => [(x[0] - mu[0]) / sd[0], (x[1] - mu[1]) / sd[1]];
+      const fit = CD.logisticFit(Xtr.map(Z), ytr, { lr: 0.5, iters: iters });
+      const acc = ids => ids.reduce((s, i) => s + (fit.predict(Z(D.X[i])) === D.y[i] ? 1 : 0), 0) / ids.length;
+      const accTr = acc(D.tr), accTe = acc(D.te);
+
+      const hi = Math.max.apply(null, D.X.map(x => Math.max(x[0], x[1]))) + 3;
+      const P = CD.plot("w8lab1", { xmin: 0, xmax: hi, ymin: 0, ymax: hi,
+                                    xlabel: "counts, gene 1", ylabel: "counts, gene 2" });
+      P.clear(); P.axes();
+      P.scatter(D.tr.filter(i => D.y[i] === 1).map(i => D.X[i]), { color: "rgba(37,99,235,0.75)", r: 3.5 });
+      P.scatter(D.tr.filter(i => D.y[i] === 0).map(i => D.X[i]), { color: "rgba(124,58,237,0.75)", r: 3.5 });
+      P.ctx.lineWidth = 1.6;
+      D.te.forEach(i => {                                   // held-out cells drawn hollow
+        P.ctx.strokeStyle = D.y[i] === 1 ? CD.C.blue : CD.C.purple;
+        P.ctx.beginPath(); P.ctx.arc(P.X(D.X[i][0]), P.Y(D.X[i][1]), 4.5, 0, 2 * Math.PI); P.ctx.stroke();
+      });
+      // learned boundary: w.((x-mu)/sd) + b = 0, solved for gene 2
+      const w = fit.w, b = fit.b;
+      if (Math.abs(w[1]) > 1e-9) {
+        P.funcPlot(x1 => mu[1] - sd[1] / w[1] * (w[0] * (x1 - mu[0]) / sd[0] + b),
+                   { color: CD.C.navy, width: 2.5 });
+      }
+      // optimal boundary from the true rates: sum_g [x_g log(l1/l2)] = sum_g (l1-l2)
+      const l1 = D.pr[0].map(p => DEPTH * p), l2 = D.pr[1].map(p => DEPTH * p);
+      const wo = [Math.log(l1[0] / l2[0]), Math.log(l1[1] / l2[1])];
+      const bo = -(l1[0] - l2[0]) - (l1[1] - l2[1]);
+      P.funcPlot(x1 => -(wo[0] * x1 + bo) / wo[1], { color: CD.C.orange, width: 2.5, dash: [7, 5] });
+      P.label(hi * 0.03, hi * 0.95, "dashed orange: optimal boundary (true rates)", { color: CD.C.orange });
+      P.label(hi * 0.03, hi * 0.89, "solid navy: learned boundary", { color: CD.C.navy });
+
+      CD.table("w8lab1out", ["quantity", "value"],
+        [["training cells / type", "" + n + "  (30% of all cells held out)"],
+         ["gradient steps", "" + iters + "   (lr = 0.5)"],
+         ["learned w, b (standardized)", "[" + w[0].toFixed(3) + ", " + w[1].toFixed(3) + "], " + b.toFixed(3)],
+         ["<b>train accuracy</b>", (accTr * 100).toFixed(1) + "%"],
+         ["<b>test accuracy</b>", (accTe * 100).toFixed(1) + "%"],
+         ["theory ceiling &Phi;(d'/2)",
+          (CD.accuracyFromDPrime(CD.combineDPrime([CD.dPrime(l1[0], l2[0]), CD.dPrime(l1[1], l2[1])])) * 100).toFixed(1) + "%"]]);
+    }
+
+    CD.slider("w8lab1ctl", { label: "gradient steps", min: 0, max: STEPS.length - 1, step: 1,
+                             value: si, fmt: i => STEPS[i] }, i => { si = i; run(); });
+    CD.slider("w8lab1ctl", { label: "training cells / type", min: 0, max: NCELLS.length - 1, step: 1,
+                             value: ni, fmt: i => NCELLS[i] }, i => { ni = i; run(); });
+  })();
+
+  /* ---------------- Lab 2: three classifiers vs the dimension ------------- */
+  (function () {
+    const KS = [2, 4, 8, 16, 32, 64, 128];
+    const DEPTH = 3000, MASS = 0.032, FOLD = 1.5, NPER = 300, KNN = 15;
+    const PER_GENE = 0.004;
+    let noiseMode = false;
+
+    function profiles(k) {
+      if (!noiseMode) return CD.markerProfiles(k, FOLD, MASS);          // split the same signal
+      const m = Math.min(4, k);                                         // up to 4 real markers ...
+      const pr = CD.markerProfiles(m, FOLD, PER_GENE * m);
+      const p1 = pr[0].slice(), p2 = pr[1].slice();
+      for (let g = m; g < k; g++) { p1.push(PER_GENE); p2.push(PER_GENE); }
+      return [p1, p2];                                                  // ... plus noise genes
+    }
+
+    function run() {
+      const rows = [], curves = { nb: [], lg: [], kn: [], th: [] };
+      KS.forEach(k => {
+        const kk = k;
+        const pr = profiles(kk), r = CD.rng(8200 + kk);
+        const l1 = pr[0].map(p => DEPTH * p), l2 = pr[1].map(p => DEPTH * p);
+        const X = [], y = [];
+        for (let i = 0; i < NPER; i++) { X.push(CD.sampleCell(pr[0], DEPTH, r)); y.push(1); }
+        for (let i = 0; i < NPER; i++) { X.push(CD.sampleCell(pr[1], DEPTH, r)); y.push(0); }
+        const idx = X.map((_, i) => i);
+        for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); const t = idx[i]; idx[i] = idx[j]; idx[j] = t; }
+        const nTe = Math.round(0.3 * idx.length), te = idx.slice(0, nTe), tr = idx.slice(nTe);
+        const mu = [], sd = [];
+        for (let g = 0; g < kk; g++) {
+          const m = tr.reduce((s, i) => s + X[i][g], 0) / tr.length;
+          const v = tr.reduce((s, i) => s + (X[i][g] - m) * (X[i][g] - m), 0) / tr.length;
+          mu.push(m); sd.push(Math.sqrt(v) || 1);
+        }
+        const Z = x => x.map((v, g) => (v - mu[g]) / sd[g]);
+        const fit = CD.logisticFit(tr.map(i => Z(X[i])), tr.map(i => y[i]), { lr: 0.5, iters: 300 });
+        const Xtr = tr.map(i => X[i]), ytr = tr.map(i => y[i]);
+        let nb = 0, lg = 0, kn = 0;
+        te.forEach(i => {
+          if ((CD.nbLogRatio(X[i], l1, l2) > 0 ? 1 : 0) === y[i]) nb++;
+          if (fit.predict(Z(X[i])) === y[i]) lg++;
+          if (CD.knnPredict(Xtr, ytr, X[i], KNN) === y[i]) kn++;
+        });
+        const ds = [];
+        for (let g = 0; g < kk; g++) ds.push(CD.dPrime(l1[g], l2[g]));
+        const th = CD.accuracyFromDPrime(CD.combineDPrime(ds));
+        curves.nb.push([k, nb / te.length]); curves.lg.push([k, lg / te.length]);
+        curves.kn.push([k, kn / te.length]); curves.th.push([k, th]);
+        rows.push([k, th.toFixed(3), (nb / te.length).toFixed(3), (lg / te.length).toFixed(3), (kn / te.length).toFixed(3)]);
+      });
+
+      const P = CD.plot("w8lab2", { xmin: 0, xmax: KS.length - 1, ymin: 0.4, ymax: 1.02,
+                                    xlabel: "number of genes", ylabel: "test accuracy",
+                                    xfmt: t => (KS[Math.round(t)] === undefined ? "" : KS[Math.round(t)]) });
+      P.clear(); P.axes([0, 1, 2, 3, 4, 5, 6]);
+      const toX = c => c.map((p, i) => [i, p[1]]);
+      P.line(toX(curves.th), { color: CD.C.orange, width: 2.5 });
+      [["nb", CD.C.blue], ["lg", CD.C.teal], ["kn", CD.C.purple]].forEach(pair => {
+        P.line(toX(curves[pair[0]]), { color: pair[1], width: 2 });
+        P.scatter(toX(curves[pair[0]]), { color: pair[1], r: 3.5 });
+      });
+      P.label(0.1, 0.47, "orange Φ(d'/2) · blue naive Bayes · teal logistic · purple kNN(k=15)", { color: CD.C.navy });
+
+      CD.table("w8lab2out", ["genes", "Φ(d'/2)", "naive Bayes", "logistic", "kNN"], rows);
+    }
+
+    CD.toggle("w8lab2ctl", "add pure-noise genes instead of splitting the signal", false,
+              v => { noiseMode = v; run(); });
+    CD.button("w8lab2ctl", "Re-run", () => { run(); }, true);
+    run();
+  })();
+});
+</script>
+</body>
+</html>

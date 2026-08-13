@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 3 — The Separation Index d′</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="week02.html">← Week 2</a><a href="week04.html">Week 4 →</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Week 3</span>
+      <span class="badge mile">MILESTONE M1</span>
+      <span class="badge aim1">Aim 1 · Theory</span>
+    </div>
+    <h1 class="chapter-title">The Separation Index d′</h1>
+    <div class="chapter-sub">Two hypotheses, one observation · the number that measures how far apart they are · and the first real law of the project</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<h2>Objectives</h2>
+<ul class="objectives">
+  <li>State cell-type classification as a detection problem: two hypotheses, one noisy observation, one decision.</li>
+  <li>Define $d' = |\lambda_1 - \lambda_2| / \sqrt{\bar\lambda}$ and explain, in one sentence, why the denominator is a square root.</li>
+  <li>Point at the exact line of the derivation that uses "Poisson variance = mean", and say what happens to the law if that line is false.</li>
+  <li>Derive $d' \propto \sqrt{\text{depth}}$ from scratch, at a whiteboard, without notes, and name the three assumptions it used.</li>
+  <li>State the 4× rule with real numbers and explain what it costs in dollars of sequencing.</li>
+  <li>Explain why the two variances are pooled rather than one being chosen, and why $d'$ is symmetric under swapping the cell types.</li>
+  <li>Say what $d'$ is <em>not</em>: not an accuracy, and not a fold change.</li>
+  <li>Produce <code>week03_dprime_depth.png</code> with a fitted slope printed on it, and defend the slope.</li>
+</ul>
+
+<h2>1 &nbsp;One observation, two hypotheses</h2>
+
+<p>Everything so far has been description: counts are Poisson, the noise has a law, thinning does not break it. This week we start <em>deciding</em>.</p>
+
+<p>Here is the situation, stripped to nothing. A cell arrives. You measure a single marker gene and get a single number, say $x = 14$. The cell is either type 1, in which case that count came from $\mathrm{Poisson}(\lambda_1)$, or type 2, in which case it came from $\mathrm{Poisson}(\lambda_2)$. You must say which. You will sometimes be wrong. The question of this project is: <em>how often, and what does it cost to do better?</em></p>
+
+<div class="box definition">
+  <span class="box-tag">Definition · the two-hypothesis detection problem</span>
+  <p>You observe one realization $x$ of a random variable whose distribution is one of two known
+  candidates:</p>
+  $$H_1: X \sim \mathrm{Poisson}(\lambda_1), \qquad H_2: X \sim \mathrm{Poisson}(\lambda_2).$$
+  <p>A <strong>decision rule</strong> is a function that maps each possible $x$ to a verdict. Its
+  quality is measured by how often the verdict is wrong, averaged over both hypotheses (we take them
+  equally likely throughout; unequal priors are exercise 4.5).</p>
+  <p>Notice what is <em>not</em> in this setup: no training data, no model fitting, no
+  hyperparameters. The two distributions are given. Everything that follows is a statement about the
+  information in the observation itself, and no classifier — none, not one you invent, not one
+  Google invents — can beat it.</p>
+</div>
+
+<p>The framing is not new, and it is worth knowing whose it is.</p>
+
+<div class="box example">
+  <span class="box-tag">Where this comes from · radar, 1954 &nbsp;<span class="claim cited">cited</span></span>
+  <p>A radar receiver in 1950 faced exactly our problem. A blip appears on the scope. Either there is
+  an aircraft out there and the blip is signal plus noise, or there is no aircraft and the blip is
+  noise alone. The operator must call it. Call too eagerly and you scramble fighters at thunderstorms;
+  call too cautiously and you miss the bomber.</p>
+  <p>Peterson, Birdsall and Fox, in <em>The theory of signal detectability</em> (IRE Transactions on
+  Information Theory, 1954), made the decisive move: they separated the <strong>information</strong>
+  in the signal from the <strong>criterion</strong> the operator adopts. A nervous operator and a
+  calm operator, given the same receiver, trade false alarms against misses differently — but the
+  receiver's quality is a single number that does not depend on which operator is sitting at it.
+  That number is what we are about to define. Their paper also introduced the ROC curve, which is
+  Week 4.</p>
+  <p class="muted">The same mathematics was picked up by psychophysics (Green &amp; Swets, 1966) to
+  measure whether a listener can hear a tone in noise, and it is from that literature that the
+  notation $d'$, read "d-prime", comes. So when you write $d'$ on a poster you are using a radar
+  engineer's idea with a psychologist's notation to describe a sequencer. That is not a coincidence;
+  it is what happens when a problem is really about sampling.</p>
+</div>
+
+<div class="box biology">
+  <span class="box-tag">Why this reframing is the point of the project</span>
+  <p>The standard way to talk about cell-type classification is in the language of machine learning:
+  pick a classifier, tune it, report accuracy on held-out data. That framing invites the question
+  "which classifier is best?", and the honest answer for our problem turns out to be "it does not
+  matter much" (Week 8 measures exactly how much).</p>
+  <p>The detection framing invites a different and better question: <em>how much information about
+  cell type is in a library of $D$ molecules at all?</em> That question has an answer that no amount
+  of engineering can improve, it depends on quantities a biologist controls (depth, choice of
+  markers), and it tells you when to stop optimizing software and start buying reads.</p>
+</div>
+
+<h2>2 &nbsp;The separation index</h2>
+
+<p>How far apart are two distributions? "The means differ by 4.5" is not an answer, because 4.5 is enormous if the distributions are each a tenth of a unit wide and invisible if they are each thirty units wide. The only meaningful statement is a comparison of the gap to the noise.</p>
+
+<div class="box definition">
+  <span class="box-tag">Definition · the separation index $d'$</span>
+  For two Poisson counts with rates $\lambda_1$ and $\lambda_2$, write the pooled mean
+  $\bar\lambda = \dfrac{\lambda_1 + \lambda_2}{2}$. The <strong>separation index</strong> is
+  $$\boxed{\;d' \;=\; \frac{|\lambda_1 - \lambda_2|}{\sqrt{\bar\lambda}}\;}$$
+  <p>It is dimensionless: counts on top, counts on the bottom (a standard deviation is in counts).
+  It is zero when the two types are identical and grows without bound as they separate. Read it as
+  <strong>"how many noise-widths apart the two cell types are"</strong>.</p>
+  <p>In code: <code>d_prime(lam1, lam2)</code> in <code>celldetect/detection.py</code>, and
+  <code>CD.dPrime(l1, l2)</code> in the labs on this page.</p>
+</div>
+
+<p>The numerator needs no defence: it is the signal, the distance between where the two types put their counts. The denominator is where the whole project lives, so let us be slow about it.</p>
+
+<div class="box theorem">
+  <span class="box-tag">Why the denominator is $\sqrt{\bar\lambda}$, and why that is not arbitrary</span>
+  <p>We need to divide the gap by "the width of the noise" in order to get a dimensionless comparison.
+  The natural width is a standard deviation. For a general pair of distributions you would have to go
+  and measure that standard deviation, and it would be a second, independent parameter.</p>
+  <p>For Poisson counts you do not, because:</p>
+  $$\mathrm{Var}(X) = \lambda \quad\Longrightarrow\quad \mathrm{sd}(X) = \sqrt{\lambda}.$$
+  <p>The noise scale is <em>already determined</em> by the mean. There is no second parameter to
+  measure, estimate, or fit. That is the line — <strong>this line, right here</strong> — that gives
+  $d'$ its square root, and every square root downstream of it. It was proved twice in Week 2: once
+  as the limit $Dp(1-p) \to \lambda$ and once by direct summation over the Poisson pmf.</p>
+  <p>If Poisson variance were not the mean — if it were $\lambda + \varphi\lambda^2$, as real data
+  will insist in Week 11 — then this denominator would be wrong, and every consequence in this
+  chapter would be wrong with it. Mark the line. You will come back to it.</p>
+</div>
+
+<div class="box example">
+  <span class="box-tag">A number to hold on to</span>
+  <p>Take the marker gene the Week 3 experiment uses: $p_1 = 0.0040$ and $p_2 = 0.0055$ (a 1.375-fold
+  difference — modest, and entirely typical of a real marker). At depth $D = 3000$:</p>
+  $$\lambda_1 = 12, \quad \lambda_2 = 16.5, \quad \bar\lambda = 14.25,$$
+  $$d' = \frac{|12 - 16.5|}{\sqrt{14.25}} = \frac{4.5}{3.775} = 1.19.$$
+  <p>The two cell types are 1.19 noise-widths apart on this gene. Week 4 will convert that into an
+  accuracy of $\Phi(d'/2) = \Phi(0.596) = 72.4\%$ — which is well above chance, and nowhere near good
+  enough to publish a cell-type call on.</p>
+</div>
+
+<h2>3 &nbsp;Lab: what $d'$ actually looks like</h2>
+
+<p>Before deriving anything, build the intuition. Move the sliders and watch the shaded region: that is the mass the two distributions share, and it is the part of the problem no decision rule can fix.</p>
+
+<div class="lab">
+  <div class="lab-title">Lab 1 · Two cell types, one gene, and the overlap you cannot argue with</div>
+  <div class="lab-desc">Blue: the count distribution for type 1 at rate $\lambda_1 = D p_1$. Teal: type 2. The dark shaded region is $\min\big(P_1(k), P_2(k)\big)$ at every count — the probability mass the two types genuinely share. Raise the depth and watch it drain away. Note that $p_1$ and $p_2$ never change: the biology is fixed, only the amount of data moves.</div>
+  <canvas id="w3lab1" height="340"></canvas>
+  <div class="controls" id="w3lab1ctl"></div>
+  <div class="readout" id="w3lab1out"></div>
+</div>
+
+<p>Three observations worth writing down.</p>
+
+<p>First, at low depth the two histograms sit almost on top of each other. This is not a failure of any algorithm — it is a statement that the data does not contain the answer. No classifier can recover information that was never sampled.</p>
+
+<p>Second, as you raise the depth both distributions get <em>wider in absolute terms</em> (the standard deviation $\sqrt{\lambda}$ grows) and yet they separate. The gap grows like $D$ and the width like $\sqrt{D}$, so the gap wins. That race is the entire content of the next section.</p>
+
+<p>Third, the shaded overlap area is not decoration. The error probability of the best possible decision rule is exactly half of it, a fact you will prove in Week 4 and implement as <code>bayes_error_exact</code>. Right now, just notice that the overlap is what $d'$ is trying to summarize in a single number.</p>
+
+<h2>4 &nbsp;The depth law</h2>
+
+<p>Now the derivation this week is named for. It is four lines long and it is the first genuinely new result in the project.</p>
+
+<div class="box theorem">
+  <span class="box-tag">Theorem · $d'$ grows as the square root of depth &nbsp;<span class="claim proved">proved</span></span>
+  Let two cell types express a gene at per-molecule fractions $p_1$ and $p_2$, and let both be
+  sequenced to the same depth $D$, so that $\lambda_i = D p_i$. Then
+  $$d'(D) \;=\; \sqrt{D}\;\cdot\;\frac{|p_1 - p_2|}{\sqrt{\bar p}}, \qquad
+    \bar p = \frac{p_1 + p_2}{2}.$$
+  The second factor depends only on the biology. So $d' \propto \sqrt{D}$: <strong>the separation
+  between two cell types grows as the square root of the sequencing depth.</strong>
+</div>
+
+<div class="box proof">
+  <span class="box-tag">Proof</span>
+  <p>Substitute $\lambda_1 = Dp_1$ and $\lambda_2 = Dp_2$ into the definition and watch the two
+  powers of $D$ fail to cancel.</p>
+  <p><strong>Numerator.</strong> The gap between the expected counts is linear in depth:</p>
+  $$|\lambda_1 - \lambda_2| = |Dp_1 - Dp_2| = D\,|p_1 - p_2|.$$
+  <p><strong>Denominator.</strong> The pooled mean is also linear in depth,</p>
+  $$\bar\lambda = \frac{Dp_1 + Dp_2}{2} = D\,\bar p,$$
+  <p>but the noise scale is its <em>square root</em> — and it is a square root because Poisson
+  variance equals mean (section 2). This is the load-bearing step:</p>
+  $$\sqrt{\bar\lambda} = \sqrt{D\,\bar p} = \sqrt{D}\,\sqrt{\bar p}.$$
+  <p><strong>Divide.</strong></p>
+  $$d' = \frac{D\,|p_1-p_2|}{\sqrt{D}\,\sqrt{\bar p}}
+       = \frac{D}{\sqrt{D}}\cdot\frac{|p_1-p_2|}{\sqrt{\bar p}}
+       = \sqrt{D}\;\frac{|p_1-p_2|}{\sqrt{\bar p}}. \qquad \blacksquare$$
+  <p>The whole theorem is $D/\sqrt{D} = \sqrt{D}$. Signal grows linearly, noise grows as a square
+  root, and the ratio therefore grows as a square root.</p>
+  <p><strong>Assumptions used.</strong> Three, and you must be able to recite them:</p>
+  <ol>
+    <li><strong>The counts are Poisson</strong> — specifically, that $\mathrm{Var} = \lambda$, which
+    is what made the denominator $\sqrt{D\bar p}$ rather than something with its own depth
+    dependence. <em>This is the one that fails in Week 11.</em></li>
+    <li><strong>Both cell types are sequenced at the same depth $D$.</strong> The single symbol $D$
+    appears in both $\lambda_1$ and $\lambda_2$. If the depths differ, the algebra does not go
+    through (exercise 3.5), and worse, $d'$ starts reporting a difference in library size as though
+    it were biology.</li>
+    <li><strong>The pooled variance $\bar\lambda$ is the right noise scale.</strong> This is a
+    modelling choice, not a theorem, and section 6 defends it honestly.</li>
+  </ol>
+  <p>Note also what is <em>not</em> assumed: nothing about the classifier, nothing about training
+  data, nothing about how many cells you have. This is a statement about one cell.</p>
+</div>
+
+<div class="box win">
+  <span class="box-tag">The 4× rule, with real money attached</span>
+  <p>Because $d' \propto \sqrt{D}$, doubling $d'$ requires <strong>quadrupling</strong> the depth.
+  Turn that into the sequencing budget, using the marker gene from section 2
+  ($p_1 = 0.0040$, $p_2 = 0.0055$) and Week 4's conversion $\text{accuracy} = \Phi(d'/2)$:</p>
+  <table class="simple">
+    <tr><th>Depth $D$ (molecules per cell)</th><th>$\lambda_1$, $\lambda_2$</th><th>$d'$</th><th>Accuracy from this one gene</th><th>Cost</th></tr>
+    <tr><td>3,000</td><td>12.0, 16.5</td><td>1.19</td><td>72.4%</td><td>$1\times$</td></tr>
+    <tr><td>12,000</td><td>48.0, 66.0</td><td>2.38</td><td>88.3%</td><td>$4\times$</td></tr>
+    <tr><td>48,000</td><td>192.0, 264.0</td><td>4.77</td><td>99.1%</td><td>$16\times$</td></tr>
+  </table>
+  <p><strong>Say it like this:</strong> going from 72% to 88% costs four times the sequencing.
+  Going from 88% to 99% costs four times again — sixteen times the original run. On a 10x experiment
+  where the original run costs a few thousand dollars, that last step is a five-figure decision made
+  by a square root.</p>
+  <p>This is the claim the entire rest of the project exists to test, three independent ways. It is
+  also the claim that Week 11 will show has a ceiling.</p>
+</div>
+
+<h2>5 &nbsp;Lab: measure the exponent</h2>
+
+<p>A proportionality claim is a claim about a <em>slope</em>. Taking logs of $d' = c\sqrt{D}$ gives</p>
+
+$$\log_{10} d' \;=\; \tfrac{1}{2}\log_{10} D \;+\; \log_{10} c,$$
+
+<p>a straight line of slope exactly $1/2$. So the way to test "$d' \propto \sqrt{D}$" is not to look at a curve and nod; it is to plot $\log_{10} d'$ against $\log_{10} D$, fit a line, and report the number. If the slope comes out $0.50$, the law holds. If it comes out $0.31$, you have found something.</p>
+
+<div class="lab">
+  <div class="lab-title">Lab 2 · The slope is the claim</div>
+  <div class="lab-desc">At each depth, this lab draws cells of both types, measures $\hat d' = |\bar x_1 - \bar x_2| / \sqrt{\tfrac{1}{2}(s_1^2 + s_2^2)}$ from the samples — no formula used, only data — and plots $\log_{10}\hat d'$ against $\log_{10} D$. Blue points: measurement. Orange: a reference line of slope exactly $1/2$. Gray dashed: the least-squares fit through the measurements. Raise the cells-per-point slider and watch the fitted slope settle onto $0.5$.</div>
+  <canvas id="w3lab2" height="340"></canvas>
+  <div class="controls" id="w3lab2ctl"></div>
+  <div class="readout" id="w3lab2out"></div>
+</div>
+
+<div class="box pitfall">
+  <span class="box-tag">Why the axes are labelled "log₁₀ d′", not "d′"</span>
+  <p>The plotting library on this site has no logarithmic axes, so these labs plot the logarithm and
+  say so on the axis. Your matplotlib figure in <code>experiments/week03_dprime_depth.py</code> uses
+  <code>ax.loglog</code> instead, which does the same thing with prettier tick labels. Either is
+  fine; silently plotting $d'$ against $D$ on linear axes and asserting a square root from the shape
+  of the curve is not. On linear axes, $\sqrt{D}$, $D^{0.4}$ and $\log D$ all look like "bends over
+  to the right".</p>
+  <p>And at small numbers of cells the fitted slope will not be $0.500$. The lowest depths are the
+  worst offenders: at $D = 100$ the expected counts are $0.4$ and $0.55$, so most cells return a zero
+  and the measured $\hat d'$ is dominated by sampling error. That is a property of your estimate, not
+  of the law — and knowing the difference is what Week 13 is for.</p>
+</div>
+
+<h2>6 &nbsp;Why pool the variances?</h2>
+
+<p>Time for the uncomfortable question. The two distributions have <em>different</em> variances: $\lambda_1$ and $\lambda_2$. So which one belongs in the denominator of $d'$?</p>
+
+<p>There is no theorem that answers this. It is a choice, and a chapter that pretended otherwise would be lying to you. Here are the candidates, evaluated on a deliberately extreme case, $\lambda_1 = 4$ against $\lambda_2 = 16$:</p>
+
+<table class="simple">
+  <tr><th>Denominator</th><th>Value</th><th>$d'$</th><th>Implied accuracy $\Phi(d'/2)$</th></tr>
+  <tr><td>$\sqrt{\lambda_1}$ (the quieter type)</td><td>2.00</td><td>6.00</td><td>99.87%</td></tr>
+  <tr><td>$\sqrt{\lambda_2}$ (the noisier type)</td><td>4.00</td><td>3.00</td><td>93.32%</td></tr>
+  <tr><td>$\sqrt{\bar\lambda}$ (pooled) — <em>our choice</em></td><td>3.16</td><td>3.79</td><td>97.11%</td></tr>
+  <tr><td colspan="3">the exact answer, by summing the pmfs (Week 4)</td><td><strong>97.83%</strong></td></tr>
+</table>
+
+<p>Three arguments for pooling, in increasing order of honesty.</p>
+
+<p><strong>It is symmetric.</strong> $\bar\lambda = (\lambda_1+\lambda_2)/2$ is unchanged if you swap the labels of the two cell types, so $d'(\lambda_1,\lambda_2) = d'(\lambda_2,\lambda_1)$ by construction. Choosing $\sqrt{\lambda_1}$ would mean that "how well can I tell T cells from monocytes" and "how well can I tell monocytes from T cells" had different answers, which is absurd. The test <code>test_d_prime_is_symmetric_and_non_negative</code> pins this down in code.</p>
+
+<p><strong>It is the pooled variance, not an arbitrary average.</strong> The standard two-sample pooled variance is the average of the two variances, $\tfrac{1}{2}(\sigma_1^2 + \sigma_2^2)$. For Poisson counts $\sigma_i^2 = \lambda_i$, so the pooled variance is $\tfrac{1}{2}(\lambda_1 + \lambda_2) = \bar\lambda$ and the pooled standard deviation is $\sqrt{\bar\lambda}$. Our denominator is therefore the textbook choice, not an invention — and it is exactly what <code>experiments/week03_dprime_depth.py</code> computes from data as <code>np.sqrt(0.5 * (x1.var(ddof=1) + x2.var(ddof=1)))</code>. Theory and measurement use the same formula, which is what makes the comparison meaningful.</p>
+
+<p><strong>It is the least wrong.</strong> In the table above, pooling lands closest to the exact answer, and it errs on the conservative side (97.11% predicted against 97.83% true) rather than the flattering side. But note the size of the disagreement: with rates as lopsided as 4 against 16, the three choices differ by six percentage points of accuracy. $d'$ is a summary, and summaries lose information.</p>
+
+<div class="box warning">
+  <span class="box-tag">What this means for how you report results</span>
+  <p>$d'$ is a <em>one-parameter</em> description of a <em>two-parameter</em> situation, and it is
+  therefore exact only when the two distributions have the same width. Ours never do exactly, and the
+  approximation degrades as $\lambda_1/\lambda_2$ moves away from 1.</p>
+  <p>The honest protocol, which this project follows throughout: use $d'$ as the theoretical scaling
+  quantity — it is what makes $\sqrt{D}$ and $\sqrt{k}$ visible — and check it against
+  <code>bayes_error_exact</code>, which sums the actual pmfs and makes no Gaussian or equal-variance
+  assumption, whenever the numbers matter. Week 4 builds that check. In the Week 14 limitations
+  section, "the pooled-variance $d'$ is a same-width approximation" is one of the entries.</p>
+</div>
+
+<h2>7 &nbsp;What $d'$ is not</h2>
+
+<p>Two misreadings will cost you a month if you do not stamp them out now.</p>
+
+<h3>$d'$ is not an accuracy</h3>
+
+<p>$d'$ is unbounded: it runs from 0 to infinity. An accuracy runs from 0.5 to 1. They are not the same quantity and they do not even have the same shape — as $d'$ marches from 4 to 8 to 16, the accuracy crawls from 97.7% to 100.0% to 100.0%.</p>
+
+<p>That saturation is precisely why this project does all of its comparisons in $d'$ space. Two methods that both report "99.4% accurate" may differ by a factor of two in $d'$, and the accuracy number hides it. Week 4 supplies the conversion $\text{accuracy} = \Phi(d'/2)$ in one direction and <code>d_prime_from_auc</code> in the other, so that a measured performance can be turned back into a $d'$ and put on the same axis as a prediction. Until then, resist the urge to translate.</p>
+
+<h3>$d'$ is not the fold change</h3>
+
+<p>This is the one that catches biologists, and it is worth an example with numbers.</p>
+
+<div class="box example">
+  <span class="box-tag">A 5-fold marker that is worse than a 1.4-fold marker</span>
+  <p>Two candidate marker genes, both at depth $D = 3000$:</p>
+  <table class="simple">
+    <tr><th>Gene</th><th>$p_1$</th><th>$p_2$</th><th>Fold change</th><th>$\lambda_1$, $\lambda_2$</th><th>$d'$</th></tr>
+    <tr><td>A (rare, dramatic)</td><td>$1\times10^{-5}$</td><td>$5\times10^{-5}$</td><td><strong>5.0×</strong></td><td>0.03, 0.15</td><td>0.40</td></tr>
+    <tr><td>B (common, modest)</td><td>0.0040</td><td>0.0055</td><td>1.375×</td><td>12.0, 16.5</td><td><strong>1.19</strong></td></tr>
+  </table>
+  <p>Gene A has nearly four times the fold change and one third of the separation. The reason is
+  visible in the counts: gene A produces a count of zero in 97% of type-1 cells and 86% of type-2
+  cells. A five-fold difference between two numbers that are both almost always zero is not
+  information you can act on for a single cell.</p>
+  <p>The algebra behind it: with $\lambda_2 = f\lambda_1$ for fold change $f$,
+  $$d' = \frac{\lambda_1|f - 1|}{\sqrt{\lambda_1(1+f)/2}}
+       = \sqrt{\lambda_1}\cdot\frac{|f-1|}{\sqrt{(1+f)/2}}.$$</p>
+  <p>The fold change $f$ sets one factor; the <em>absolute expression level</em> $\lambda_1$ sets the
+  other, and it enters as a square root that no amount of fold change can substitute for.</p>
+</div>
+
+<p>Differential-expression pipelines rank genes by fold change (usually with a significance filter attached). That ranking answers the question "for which genes can I establish, across many cells, that the population means differ?" It does not answer "which gene helps me classify <em>this</em> cell?" — and those two questions have different winners. Week 10 makes the comparison on real PBMC 3k data, ranks the same gene list both ways, and finds that they disagree; that disagreement is one of the project's results.</p>
+
+<div class="box pitfall">
+  <span class="box-tag">The mistake, in the form you will actually make it</span>
+  You will find a gene with a beautiful fold change in a paper's marker table, put it in your
+  classifier, and get nothing. Then you will suspect your code. The code will be fine. Before
+  debugging anything, compute $\lambda_1 = Dp_1$ and $\lambda_2 = Dp_2$ at your actual depth and look
+  at whether both are below 1. If they are, the gene carries almost no per-cell information no matter
+  how large the ratio between them is, and $d'$ told you so in one line.
+</div>
+
+<h2>8 &nbsp;Your Python laboratory</h2>
+
+<div class="box python">
+  <span class="box-tag">This week in the celldetect project</span>
+  <p>Open <code>python/celldetect/detection.py</code> and implement the one function that matters
+  most in the entire package:</p>
+  <ul>
+    <li><code>d_prime(lam1, lam2)</code> — $|\lambda_1-\lambda_2|/\sqrt{\bar\lambda}$, vectorized
+    elementwise over arrays of genes.</li>
+  </ul>
+  <p>It is three lines, and one of them is subtle. A gene that is silent in both cell types has
+  $\bar\lambda = 0$, and $0/0$ is <code>nan</code> — which would then poison every sum over genes in
+  Week 5. Its $d'$ should be $0$ (no difference, no information). The trap is that
+  <code>np.where</code> evaluates <em>both</em> branches before selecting, so writing
+  <code>np.where(lbar &gt; 0, diff / np.sqrt(lbar), 0.0)</code> still computes the division, still
+  warns, and still creates the <code>nan</code> before discarding it. Build a safe denominator first,
+  as the docstring shows.</p>
+  <p>Check yourself with <code>pytest tests/test_detection.py -k d_prime</code>. Read three of those
+  tests before running them, because they <em>are</em> this chapter:</p>
+  <ul>
+    <li><code>test_d_prime_known_value</code> — $\lambda = 100$ against $121$ must give
+    $21/\sqrt{110.5} = 1.9977$. Do this one on paper first.</li>
+    <li><code>test_d_prime_is_symmetric_and_non_negative</code> — section 6's symmetry argument, in
+    code.</li>
+    <li><code>test_d_prime_scales_as_sqrt_depth</code> — fits $\log d'$ against $\log D$ and asserts
+    the slope is $1/2$ <em>to within $10^{-9}$</em>. Not "approximately", not "on a plot". The
+    relationship is exact, so the test is exact.</li>
+  </ul>
+  <p>Then run <code>python experiments/week03_dprime_depth.py</code>. It uses
+  <strong>SEED = 103</strong>, the rates $p_1 = 0.0040$ and $p_2 = 0.0055$, and nine depths from 100
+  to 25,600. It writes:</p>
+  <ul>
+    <li><code>week03_dprime_depth.png</code> — predicted $d'$ (orange), measured $d'$ from samples
+    (blue), and the fitted power law with its slope printed in the legend. <strong>The claim is the
+    slope, not the picture.</strong></li>
+    <li><code>week03_overlap.png</code> — the two count distributions at $D = 200$, $1600$ and
+    $12800$, so you can see what $d' = 0.31$, $d' = 0.87$ and $d' = 2.46$ look like.</li>
+  </ul>
+  <p>The script also prints a table of predicted against measured $d'$ for every depth. Paste that
+  table into <code>progress/week03.md</code>; it is the evidence for M1, and the mentor will ask you
+  to explain the largest discrepancy in it (hint: look at the smallest depth, and see the pitfall in
+  section 5).</p>
+</div>
+
+<h2>9 &nbsp;Exercises</h2>
+<p class="muted">Stars mark difficulty: ★ routine · ★★ requires an idea · ★★★ challenge. Write full sentences; every claim needs a reason. Solutions are provided — attempt first, then compare.</p>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 3.1</span><span class="stars">★</span></div>
+  <div class="ex-body">Compute $d'$ by hand for $\lambda_1 = 100$ and $\lambda_2 = 121$. Then compute it for $\lambda_1 = 10$ and $\lambda_2 = 12.1$ (the same ratio, one tenth the depth) and state the relationship between the two answers. Does it match the theorem?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>First pair: $\bar\lambda = 110.5$, so
+      $d' = 21/\sqrt{110.5} = 21/10.512 = 1.998$.</p>
+      <p>Second pair: $\bar\lambda = 11.05$, so
+      $d' = 2.1/\sqrt{11.05} = 2.1/3.324 = 0.6317$.</p>
+      <p>The ratio is $1.998/0.6317 = 3.162 = \sqrt{10}$. Ten times the depth gives $\sqrt{10}$ times
+      the $d'$, exactly as $d' \propto \sqrt{D}$ requires.</p>
+      <p class="muted">The first pair is <code>test_d_prime_known_value</code> in
+      <code>tests/test_detection.py</code>. Having done it on paper, you now know that a failing test
+      means your code is wrong, not the test — which is the only frame of mind in which tests are
+      useful.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 3.2</span><span class="stars">★</span></div>
+  <div class="ex-body">A marker gene has $p_1 = 0.0040$, $p_2 = 0.0055$. (a) Write $d'$ as an explicit function of $D$. (b) What depth is needed for $d' = 2$? (c) Your funding lets you triple the depth from 3,000 to 9,000. By what factor does $d'$ improve, and how many <em>more</em> percentage points is that on the 4× rule's ladder?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p><strong>(a)</strong> $\bar p = 0.00475$, $|p_1-p_2| = 0.0015$, so
+      $$\frac{|p_1-p_2|}{\sqrt{\bar p}} = \frac{0.0015}{0.068920} = 0.021764,
+        \qquad d'(D) = 0.021764\sqrt{D}.$$</p>
+      <p>Sanity check at $D = 3000$: $0.021764 \times 54.77 = 1.192$. ✓</p>
+      <p><strong>(b)</strong> Set $0.021764\sqrt{D} = 2$, so $\sqrt{D} = 91.90$ and
+      $D = 8{,}445$ molecules per cell.</p>
+      <p><strong>(c)</strong> Tripling the depth multiplies $d'$ by $\sqrt{3} = 1.732$, giving
+      $d' = 2.065$ and (using Week 4's $\Phi(d'/2)$) an accuracy of $84.9\%$ against $72.4\%$ — a gain
+      of 12.5 points. Contrast that with the full 4× step, which buys $15.9$ points. The last quarter
+      of the quadrupling buys only a fifth of the improvement.</p>
+      <p class="muted">Part (b) is the shape of every experimental-design question in the project: you
+      are given a target separation and asked what it costs. Week 6 does exactly this for the bead
+      experiment, and Week 14's methods section will contain a sentence of this form.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 3.3</span><span class="stars">★★</span></div>
+  <div class="ex-body">Both cell types are subjected to the same thinning: each molecule survives with probability $q$. Using Week 2's thinning theorem, show that $d'$ is multiplied by $\sqrt{q}$. Then answer a practical question: a protocol with 32% capture efficiency, run at depth 4,000, gives what $d'$ on the gene of exercise 3.2 — and what depth would a <em>perfect</em> protocol need to match it?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p><strong>The claim.</strong> After thinning, type $i$'s count is $\mathrm{Poisson}(q\lambda_i)$
+      — exactly Poisson, by the thinning theorem, so $d'$ is still the right formula to apply. Then</p>
+      $$d'_{\text{thinned}} = \frac{|q\lambda_1 - q\lambda_2|}{\sqrt{(q\lambda_1+q\lambda_2)/2}}
+        = \frac{q\,|\lambda_1-\lambda_2|}{\sqrt{q}\,\sqrt{\bar\lambda}}
+        = \sqrt{q}\;d'. \qquad \blacksquare$$
+      <p>It is the same $D/\sqrt{D} = \sqrt{D}$ manoeuvre with $q$ in place of $D$, which is exactly
+      what you should expect: thinning by $q$ <em>is</em> reducing the depth to $qD$.</p>
+      <p><strong>The numbers.</strong> Effective depth $= 0.32 \times 4000 = 1280$, so
+      $d' = 0.021764\sqrt{1280} = 0.7787$. A perfect protocol ($q = 1$) would need depth $1280$ to
+      match it — which is the same statement, said twice.</p>
+      <p class="muted">This exercise is why Week 9 can claim "dropout is just less depth" as a
+      theorem rather than an analogy: thinning multiplies $\lambda$ by $q$, $d'$ by $\sqrt{q}$, and
+      changes nothing else at all. Week 9's actual work is finding the low-$\lambda$ regime where the
+      <em>Gaussian</em> step in Week 4 breaks down, which is a different failure from this one.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 3.4</span><span class="stars">★★</span></div>
+  <div class="ex-body">Fix the depth at $D = 3000$ and the fold change at $f = 2$ exactly, so $p_2 = 2p_1$. Write $d'$ as a function of $\lambda_1$ alone. How much expression must the gene have (what $\lambda_1$) for a 2-fold marker to reach $d' = 1$? Compare that to the 1.375-fold gene B of section 7 and say which you would rather have.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>With $\lambda_2 = 2\lambda_1$: $|\lambda_1-\lambda_2| = \lambda_1$ and
+      $\bar\lambda = 1.5\lambda_1$, so</p>
+      $$d' = \frac{\lambda_1}{\sqrt{1.5\lambda_1}} = \frac{\sqrt{\lambda_1}}{\sqrt{1.5}}
+           = 0.8165\,\sqrt{\lambda_1}.$$
+      <p>Setting $d' = 1$ gives $\sqrt{\lambda_1} = 1.2247$, so $\lambda_1 = 1.5$ counts, meaning
+      $p_1 = 1.5/3000 = 5\times10^{-4}$.</p>
+      <p><strong>Comparison.</strong> Gene B (1.375-fold, $\lambda_1 = 12$) achieves $d' = 1.19$. A
+      2-fold gene needs only $\lambda_1 = 1.5$ to hit $d' = 1$, so at equal expression the 2-fold gene
+      is far better — at $\lambda_1 = 12$ it would give $d' = 0.8165\sqrt{12} = 2.83$. The point is
+      not that fold change is worthless; it is that fold change alone is not enough information to
+      rank genes. You need both factors, and $d'$ is the thing that combines them correctly.</p>
+      <p class="muted">Keep the formula $d' = \sqrt{\lambda_1}\,|f-1|/\sqrt{(1+f)/2}$ in your
+      notebook. It is the cleanest way to see the two-factor structure, and in Week 10 you will use it
+      to build a marker-ranking that beats the fold-change ranking on real data — which is a result,
+      and a small one you can genuinely claim as your own.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 3.5</span><span class="stars">★★</span></div>
+  <div class="ex-body">Assumption 2 of the theorem says both types are sequenced at the same depth. Suppose instead that type 1 cells happen to yield $D_1 = 2000$ molecules and type 2 cells $D_2 = 4000$. Take a gene with <em>identical</em> biology in both types, $p_1 = p_2 = 0.003$. Compute $d'$. What has your detector detected? What is the fix, and which week implements it?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>$\lambda_1 = 2000 \times 0.003 = 6$ and $\lambda_2 = 4000 \times 0.003 = 12$, so
+      $\bar\lambda = 9$ and</p>
+      $$d' = \frac{|6-12|}{\sqrt{9}} = \frac{6}{3} = 2.00.$$
+      <p>A separation of 2.00 — equivalent to 84% classification accuracy — from a gene whose
+      expression is <em>exactly the same</em> in the two cell types. The detector has detected library
+      size. If type 2 cells happen to be bigger, or to have been captured on a better day, you will
+      "classify" them beautifully and learn nothing about biology.</p>
+      <p><strong>The fix</strong> is to put every cell on a common depth before comparing: downsample
+      each cell's counts to a fixed $D$ using <code>downsample_counts</code>. This is legitimate
+      precisely because of Week 2's thinning theorem — the downsampled cell is distributed exactly as
+      a genuinely shallower cell, so nothing is being faked. Week 10 does this to the real PBMC 3k
+      matrix, and Week 11's depth-ceiling result depends on it having been done correctly.</p>
+      <p class="muted">This is not a hypothetical failure mode. Library size is the single largest
+      source of variation in most scRNA-seq datasets, and "we found a marker that turned out to be
+      library size" is a genuine, published category of error. Write this exercise out in full; it is
+      the strongest sentence you can put in the Week 14 limitations section.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 3.6</span><span class="stars">★★★</span></div>
+  <div class="ex-body">Redo the depth derivation with overdispersed counts. Assume $\mathrm{Var}(X_i) = \lambda_i + \varphi\lambda_i^2$ for a fixed $\varphi > 0$ (this is the negative binomial of Week 11), and keep the pooled variance as the noise scale. Show that $d'$ no longer grows as $\sqrt{D}$, find its limit as $D \to \infty$, and evaluate that limit for $p_1 = 0.0040$, $p_2 = 0.0055$, $\varphi = 0.5$. What accuracy does it cap out at?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p><strong>Setup.</strong> With $\lambda_i = Dp_i$, the pooled variance is</p>
+      $$\bar\sigma^{2} = \tfrac{1}{2}\Big[(\lambda_1 + \varphi\lambda_1^{2})
+                                        + (\lambda_2 + \varphi\lambda_2^{2})\Big]
+                       = D\bar p + \varphi D^{2}\,\frac{p_1^{2}+p_2^{2}}{2},$$
+      <p>so that</p>
+      $$d'(D) = \frac{D|p_1-p_2|}{\sqrt{D\bar p + \varphi D^{2}(p_1^{2}+p_2^{2})/2}}.$$
+      <p><strong>The two regimes.</strong> Factor $D$ out of the square root:</p>
+      $$d'(D) = \frac{D|p_1-p_2|}{\sqrt{D}\sqrt{\bar p + \varphi D (p_1^2+p_2^2)/2}}.$$
+      <p>When $D$ is small the $\varphi$ term is negligible, the bracket is $\approx\bar p$, and we
+      recover $d' \approx \sqrt{D}|p_1-p_2|/\sqrt{\bar p}$ — the Poisson law. When $D$ is large the
+      $\varphi$ term dominates, the denominator becomes proportional to $D$ rather than $\sqrt{D}$,
+      and the $D$'s cancel completely:</p>
+      $$\lim_{D\to\infty} d'(D) = \frac{|p_1-p_2|}{\sqrt{\varphi\,(p_1^{2}+p_2^{2})/2}}.$$
+      <p><strong>The number.</strong> $|p_1-p_2| = 0.0015$;
+      $(p_1^2+p_2^2)/2 = (1.6\times10^{-5} + 3.025\times10^{-5})/2 = 2.3125\times10^{-5}$; times
+      $\varphi = 0.5$ gives $1.1563\times10^{-5}$, whose square root is $3.400\times10^{-3}$. So</p>
+      $$d'_{\max} = \frac{0.0015}{0.003400} = 0.441,$$
+      <p>and the accuracy ceiling is $\Phi(0.441/2) = \Phi(0.2206) = 58.7\%$.</p>
+      <p><strong>Read that again.</strong> With this much overdispersion, <em>infinite</em> sequencing
+      depth on this gene buys you 58.7% accuracy. At $D = 3000$ you already have $d' = 0.414$, which
+      is 94% of everything the gene will ever give you. Sequencing ten times deeper would move the
+      accuracy from 58.2% to 58.7%.</p>
+      <p class="muted">This is Week 11, done early and in one exercise. It is also the most important
+      single calculation in the project, because it converts "real data is overdispersed" from an
+      annoyance into a <em>quantitative prediction with a ceiling in it</em> — and a prediction with a
+      ceiling is something you can go and test. When you measure $\varphi$ on PBMC 3k in Week 11, this
+      formula is what turns that measurement into a claim about how much deeper sequencing is worth
+      buying. Bring this derivation to the M1 check-in; it is the answer to "what breaks?".</p>
+    </div>
+  </details>
+</div>
+
+<h2>10 &nbsp;Research notebook</h2>
+
+<p>This is a milestone week, so the notebook has to carry more than usual. Dated entries:</p>
+
+<ul>
+  <li>The $d'$ definition, with a one-sentence justification of the denominator that contains the
+  words "variance equals mean".</li>
+  <li>The full $d' \propto \sqrt{D}$ derivation, written from memory, ending with the three
+  assumptions listed explicitly. Practise it until it takes under three minutes at a whiteboard.</li>
+  <li>The 4× rule table from section 4, in your own hand, with the depths and accuracies filled in.</li>
+  <li>The two "what $d'$ is not" statements, each with its counterexample: the saturation of accuracy,
+  and the 5-fold gene with $d' = 0.40$.</li>
+  <li>Exercises 3.5 and 3.6 in full. 3.6 is the single most valuable page you will write this month.</li>
+  <li>Add to the <strong>"assumptions I am making"</strong> list: both cell types sequenced at the
+  same depth; pooled variance is the right noise scale; a single gene is being used. Next to each,
+  write which week attacks it (10, 14, 5 respectively).</li>
+</ul>
+
+<p>Scan to <code>notebook/week03/</code>, fill in <code>progress/week03.md</code> including the seed (103), the two figure filenames, and the printed table of predicted against measured $d'$.</p>
+
+<div class="box verify">
+  <span class="box-tag">MILESTONE M1 — verification with mentor</span>
+  <p>M1 certifies that the first real derivation of the project is yours. It is defended out loud, at
+  a whiteboard, with the notebook closed. Every item below is pass or fail; a partial pass means you
+  repeat it next week, which is normal and costs nothing.</p>
+  <ul>
+    <li><strong>Derive $d' \propto \sqrt{\text{depth}}$ from scratch, without notes.</strong> Start
+    from the definition of $d'$, substitute $\lambda_i = Dp_i$, and reach
+    $d' = \sqrt{D}\,|p_1-p_2|/\sqrt{\bar p}$. Then, unprompted, point at the step where
+    $\sqrt{\bar\lambda} = \sqrt{D\bar p}$ and say why the noise scale is a square root.</li>
+    <li><strong>Name the three assumptions</strong> the derivation used, and say which week of the
+    course attacks each one.</li>
+    <li><strong>Name the assumption that fails under overdispersion</strong> — that
+    $\mathrm{Var} = \lambda$ — and explain, with the structure of exercise 3.6 if not its full
+    algebra, why its failure makes $d'$ saturate instead of growing. You must be able to say what
+    "saturate" means quantitatively: there is a finite $d'_{\max}$ that no depth exceeds.</li>
+    <li><strong>The figure is committed with its seed.</strong> <code>week03_dprime_depth.png</code>
+    is in the repository, produced by <code>experiments/week03_dprime_depth.py</code> at SEED = 103,
+    the fitted slope is printed on the figure, and you can open the script and point at the line where
+    the seed is set. A figure without a recorded seed does not count as evidence in this project.</li>
+    <li><strong>State the 4× rule with numbers</strong> — 3,000 to 12,000 molecules per cell moves
+    this gene from 72% to 88% — and say what it implies about when to stop improving a classifier and
+    start buying reads.</li>
+    <li><strong>Say what $d'$ is not,</strong> with the rare-gene counterexample: 5-fold change,
+    $d' = 0.40$.</li>
+    <li><code>pytest tests/test_detection.py -k d_prime</code> is green, and you can explain what
+    <code>test_d_prime_scales_as_sqrt_depth</code> asserts and why its tolerance is $10^{-9}$ rather
+    than something loose.</li>
+  </ul>
+</div>
+
+<h2>11 &nbsp;Going deeper</h2>
+<ul>
+  <li>Peterson, Birdsall &amp; Fox (1954), <em>The theory of signal detectability</em>, IRE Transactions on Information Theory 4(4):171–212. <span class="muted">The source. Read the first four pages for the framing; the rest is radar engineering. Cite this in your Week 14 introduction — it is the paper that makes your project part of a seventy-year-old tradition rather than an ad-hoc calculation.</span></li>
+  <li>Green &amp; Swets (1966), <em>Signal Detection Theory and Psychophysics</em>, chapter 1. <span class="muted">Where $d'$ gets its name and its psychophysical interpretation. The equal-variance assumption discussed in section 6 above is treated at length here, under the name "the equal-variance Gaussian model".</span></li>
+  <li>Wikipedia, <a href="https://en.wikipedia.org/wiki/Sensitivity_index">Sensitivity index</a> — a compact summary of $d'$ and its variants, including the unequal-variance corrections. <span class="muted">Useful as a cross-check on section 6; not a citable source for the report.</span></li>
+  <li>Kimmerling et al. (2016), <em>A single-cell physical bioassay reveals inter-cellular variation</em>, Nature Communications — for a sense of how large genuine cell-to-cell variability is. <span class="muted">Optional, and read it as motivation for exercise 3.6 rather than for its methods.</span></li>
+  <li>Course extras: <a href="../extras/notation.html">notation card</a> · <a href="../extras/big-picture.html">the big picture</a> · <a href="../extras/problem-bank.html">problem bank</a> (§detection) · <a href="../extras/unstuck.html">how to get unstuck</a></li>
+</ul>
+
+</div>
+
+<footer class="site">How Much Data Does It Take to Tell Two Cell Types Apart? · Week 3 · <a href="../index.html">Course home</a></footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  /* ---------------- Lab 1: two Poissons and their overlap ----------------- */
+  (function () {
+    const PS = [0.0010, 0.0015, 0.0020, 0.0030, 0.0040, 0.0055, 0.0080];
+    const DS = [300, 1000, 3000, 6000, 12000];
+    let i1 = 4, i2 = 5, di = 2;
+
+    /* pmf by upward recursion: p(0) = e^-lam, p(k+1) = p(k)*lam/(k+1).
+       No factorials, so nothing overflows — the JS twin of poisson_logpmf. */
+    function pmf(lam, K) {
+      const out = []; let pk = Math.exp(-lam);
+      for (let k = 0; k <= K; k++) { out.push(pk); pk = pk * lam / (k + 1); }
+      return out;
+    }
+
+    function run() {
+      const p1 = PS[i1], p2 = PS[i2], D = DS[di];
+      const l1 = D * p1, l2 = D * p2;
+      const big = Math.max(l1, l2), small = Math.min(l1, l2);
+      const lo = Math.max(0, Math.floor(small - 4.5 * Math.sqrt(small) - 2));
+      const hi = Math.ceil(big + 4.5 * Math.sqrt(big) + 3);
+      const a = pmf(l1, hi), b = pmf(l2, hi);
+      let overlap = 0;
+      for (let k = lo; k <= hi; k++) overlap += Math.min(a[k], b[k]);
+      let ymax = 0;
+      for (let k = lo; k <= hi; k++) ymax = Math.max(ymax, a[k], b[k]);
+      ymax *= 1.3;
+
+      const P = CD.plot("w3lab1", { xmin: lo - 0.6, xmax: hi + 0.6, ymin: 0, ymax: ymax,
+                                    xlabel: "count of the marker gene in one cell",
+                                    ylabel: "probability" });
+      P.clear(); P.axes();
+      const ctx = P.ctx, w = 0.46;
+      function bars(arr, fill, edge) {
+        ctx.fillStyle = fill; ctx.strokeStyle = edge; ctx.lineWidth = 1;
+        for (let k = lo; k <= hi; k++) {
+          const x0 = P.X(k - w), x1 = P.X(k + w), y = P.Y(arr[k]);
+          ctx.fillRect(x0, y, x1 - x0, P.Y(0) - y);
+          ctx.strokeRect(x0, y, x1 - x0, P.Y(0) - y);
+        }
+      }
+      bars(a, "rgba(37,99,235,0.40)", "rgba(37,99,235,0.75)");
+      bars(b, "rgba(13,148,136,0.40)", "rgba(13,148,136,0.75)");
+      ctx.fillStyle = "rgba(31,58,95,0.62)";
+      for (let k = lo; k <= hi; k++) {
+        const m = Math.min(a[k], b[k]);
+        const x0 = P.X(k - w), x1 = P.X(k + w), y = P.Y(m);
+        ctx.fillRect(x0, y, x1 - x0, P.Y(0) - y);
+      }
+      P.label(lo + (hi - lo) * 0.60, ymax * 0.94, "type 1", { color: CD.C.blue });
+      P.label(lo + (hi - lo) * 0.60, ymax * 0.86, "type 2", { color: CD.C.teal });
+      P.label(lo + (hi - lo) * 0.60, ymax * 0.78, "shared mass", { color: CD.C.navy });
+
+      const dp = CD.dPrime(l1, l2);
+      document.getElementById("w3lab1out").innerHTML =
+        "p₁ = " + p1.toFixed(4) + " &nbsp;·&nbsp; p₂ = " + p2.toFixed(4) +
+        " &nbsp;·&nbsp; D = " + D +
+        "<br>λ₁ = " + l1.toFixed(2) + " &nbsp;·&nbsp; λ₂ = " + l2.toFixed(2) +
+        " &nbsp;·&nbsp; λ̄ = " + (0.5 * (l1 + l2)).toFixed(2) +
+        " &nbsp;·&nbsp; √λ̄ = " + Math.sqrt(0.5 * (l1 + l2)).toFixed(3) +
+        "<br><b>d′ = |λ₁−λ₂| / √λ̄ = " + dp.toFixed(3) + "</b>" +
+        " &nbsp;·&nbsp; shared mass = " + overlap.toFixed(4) +
+        " &nbsp;·&nbsp; best possible error = half of that = " + (0.5 * overlap).toFixed(4);
+    }
+
+    CD.slider("w3lab1ctl", { label: "p₁ (type 1)", min: 0, max: PS.length - 1, step: 1,
+                             value: i1, fmt: i => PS[i].toFixed(4) }, i => { i1 = i; run(); });
+    CD.slider("w3lab1ctl", { label: "p₂ (type 2)", min: 0, max: PS.length - 1, step: 1,
+                             value: i2, fmt: i => PS[i].toFixed(4) }, i => { i2 = i; run(); });
+    CD.slider("w3lab1ctl", { label: "depth D", min: 0, max: DS.length - 1, step: 1,
+                             value: di, fmt: i => DS[i] }, i => { di = i; run(); });
+  })();
+
+  /* ---------------- Lab 2: the slope IS the claim ------------------------- */
+  (function () {
+    const DEPTHS = [100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600];
+    const NS = [200, 500, 1000, 2000, 4000];
+    const P1 = 0.0040, P2 = 0.0055;
+    let ni = 3, bump = 0;
+
+    function run() {
+      const n = NS[ni];
+      const r = CD.rng(103000 + 17 * ni + 911 * bump);
+      const pts = [];
+      DEPTHS.forEach(D => {
+        let s1 = 0, q1 = 0, s2 = 0, q2 = 0;
+        for (let i = 0; i < n; i++) {
+          const x = CD.poisson(D * P1, r), y = CD.poisson(D * P2, r);
+          s1 += x; q1 += x * x; s2 += y; q2 += y * y;
+        }
+        const m1 = s1 / n, m2 = s2 / n;
+        const v1 = (q1 - n * m1 * m1) / (n - 1), v2 = (q2 - n * m2 * m2) / (n - 1);
+        const dp = Math.abs(m1 - m2) / Math.sqrt(0.5 * (v1 + v2));
+        pts.push([Math.log10(D), Math.log10(dp)]);
+      });
+
+      /* Least-squares slope of log d' on log D — the number being claimed. */
+      const N = pts.length;
+      const mx = pts.reduce((a, p) => a + p[0], 0) / N;
+      const my = pts.reduce((a, p) => a + p[1], 0) / N;
+      let sxy = 0, sxx = 0;
+      pts.forEach(p => { sxy += (p[0] - mx) * (p[1] - my); sxx += (p[0] - mx) * (p[0] - mx); });
+      const slope = sxy / sxx, icept = my - slope * mx;
+
+      const P = CD.plot("w3lab2", { xmin: 1.8, xmax: 4.6, ymin: -1.2, ymax: 0.8,
+                                    xlabel: "log₁₀ (sequencing depth D)",
+                                    ylabel: "log₁₀ d′" });
+      P.clear(); P.axes();
+      P.line([[1.8, my + 0.5 * (1.8 - mx)], [4.6, my + 0.5 * (4.6 - mx)]],
+             { color: CD.C.orange, width: 2.5 });
+      P.line([[1.8, icept + slope * 1.8], [4.6, icept + slope * 4.6]],
+             { color: CD.C.gray, width: 2, dash: [6, 4] });
+      P.scatter(pts, { color: CD.C.blue, r: 4.5 });
+      P.label(2.0, 0.62, "slope 1/2 (theory)", { color: CD.C.orange });
+      P.label(2.0, 0.50, "least-squares fit", { color: CD.C.gray });
+      P.label(2.0, 0.38, "measured from samples", { color: CD.C.blue });
+
+      const i32 = DEPTHS.indexOf(3200), i128 = DEPTHS.indexOf(12800);
+      const ratio = Math.pow(10, pts[i128][1] - pts[i32][1]);
+      document.getElementById("w3lab2out").innerHTML =
+        n + " cells per type per depth &nbsp;·&nbsp; p₁ = " + P1 + ", p₂ = " + P2 +
+        "<br><b>fitted slope = " + slope.toFixed(4) + "</b>" +
+        " &nbsp;·&nbsp; theory = 0.5000" +
+        " &nbsp;·&nbsp; error = " + (slope - 0.5).toFixed(4) +
+        "<br>the 4× check: d′(12800) / d′(3200) = " + ratio.toFixed(3) + " (theory 2.000)";
+    }
+
+    CD.slider("w3lab2ctl", { label: "cells per point", min: 0, max: NS.length - 1, step: 1,
+                             value: ni, fmt: i => NS[i] }, i => { ni = i; run(); });
+    CD.button("w3lab2ctl", "Resample", () => { bump++; run(); }, true);
+  })();
+});
+</script>
+</body>
+</html>

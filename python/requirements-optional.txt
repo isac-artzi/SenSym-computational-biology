@@ -1,0 +1,11 @@
+# Only needed ONCE, for the Week 10-11 real-data half:
+#   python experiments/fetch_pbmc3k.py
+# downloads the 10x PBMC 3k dataset and writes a compact cache to
+# python/data/pbmc3k_cache.npz. After that, nothing here is needed again —
+# the rest of the project runs on numpy alone.
+scanpy>=1.9
+anndata>=0.9
+# Optional cross-check for Week 8 only: compare your from-scratch logistic
+# regression against a library implementation. The course does NOT depend on
+# this, and the report's numbers must come from your own code.
+scikit-learn>=1.3

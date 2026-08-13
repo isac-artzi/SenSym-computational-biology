@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 7 — The Simulator</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="week06.html">← Week 6</a><a href="week08.html">Week 8 →</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Week 7</span>
+      <span class="badge aim2">Aim 2 · Simulation</span>
+      <span class="badge win">WIN: simulation and theory on one pair of axes</span>
+    </div>
+    <h1 class="chapter-title">The Simulator</h1>
+    <div class="chapter-sub">A second, independent implementation of your beliefs · synthetic cells from three explicit assumptions · and the first accuracy-vs-depth curve with the Week 5 prediction drawn through it</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<h2>Objectives</h2>
+<ul class="objectives">
+  <li>Say why a simulator is worth writing when you already have a closed-form answer — in terms of independent implementations, not in terms of "seeing it".</li>
+  <li>State the generative model as three explicit assumptions, and for each one name a way it is false about real cells and the week that attacks it.</li>
+  <li>Derive the <code>marker_mass</code> convention: $a = 2\,\text{base}\,f/(1+f)$, $b = 2\,\text{base}/(1+f)$, and explain why both types cannot each carry exactly <code>marker_mass</code>.</li>
+  <li>Read a counts matrix: say why the entries are small integers, when they are mostly zeros, and why two genes plotted against each other look hopelessly overlapping even when the full panel classifies almost perfectly.</li>
+  <li>Implement <code>marker_profiles</code>, <code>simulate_cells</code> and <code>simulate_dataset</code>, and get <code>tests/test_simulate.py</code> green.</li>
+  <li>Produce the figure of the semester so far: measured accuracy (points) against $\Phi(d'/2)$ (lines), at three values of $k$, over a factor of 64 in depth.</li>
+  <li>State what agreement licenses you to do for the next five weeks, and what you would have done if the two had disagreed.</li>
+</ul>
+
+<h2>1 &nbsp;Why simulate when you already have the formula?</h2>
+
+<p>Aim 1 is finished. You can compute the accuracy of the optimal classifier for any depth, any set of rates, any number of genes, in one line, exactly. So why spend a week writing a program that draws random numbers and counts how often it gets the answer right, when you can just evaluate $\Phi(d'/2)$?</p>
+
+<p>The bad answer is "to check that the theory works". It sounds reasonable and it is a trap: if the simulator is written by the person who derived the theory, from the same mental model, in the same afternoon, then it will usually agree with the theory even when both are wrong. Agreement between two things you built from the same belief is not evidence about the world.</p>
+
+<p>The good answer is sharper.</p>
+
+<div class="box definition">
+  <span class="box-tag">What a simulator actually is</span>
+  <p>A simulator is a <strong>second, independent implementation of your beliefs</strong> — one written in the language of <em>procedures</em> (draw a Poisson count, then another, then classify) rather than the language of <em>formulas</em> (integrate, approximate, take a limit).</p>
+  <p>The two implementations use different machinery. The formula uses the Gaussian approximation, quadrature, and the assumption that the pooled variance is the right noise scale. The simulator uses none of these — it just draws numbers and counts. So when they agree, they agree <em>despite</em> travelling by different routes, and that agreement is informative in a way that re-deriving the same formula twice is not.</p>
+  <p>And when they disagree, you have learned something you could not have learned any other way: <strong>one of them is wrong, and you now have to find out which.</strong> That question — not the agreement — is where most of the value is.</p>
+</div>
+
+<p>There is a practical corollary that shapes the whole week. A simulator earns its keep exactly to the extent that it is <em>not</em> a translation of the formula into code. If you were to write a "simulator" that computed $d'$ and returned $\Phi(d'/2)$, it would agree perfectly and tell you nothing. So the rule for this week is: <strong>the simulator must go through the counts.</strong> Draw Poisson numbers, form a count matrix, run a classifier on it, tally the mistakes. Nowhere in <code>simulate.py</code> does the word $\Phi$ appear, and that is deliberate.</p>
+
+<div class="box example">
+  <span class="box-tag">Three things the simulator has already caught, in projects like this one</span>
+  <ul>
+    <li><strong>An off-by-one in the decision rule.</strong> Ties at $\mathrm{LLR} = 0$ assigned to the wrong class shift accuracy by a percent or two at low depth, where the count distribution has real mass at the tie. The formula cannot see this because it treats the score as continuous; the simulator sees it immediately.</li>
+    <li><strong>A convention mismatch.</strong> A theory curve computed at fixed per-gene marker mass compared against a simulation at fixed total mass — the Week 5 pitfall — which produces a clean, believable, entirely wrong disagreement by a factor of $\sqrt{k}$.</li>
+    <li><strong>A genuine limitation of the theory.</strong> At depth 250 with a single gene, the Gaussian approximation is optimistic by about half a percentage point. That is not a bug in either implementation; it is the approximation doing what Week 4 said it would, and the simulator is how you find out that it matters.</li>
+  </ul>
+  <p>Two of those three are bugs and one is physics. Telling them apart is the skill this week develops.</p>
+</div>
+
+<h2>2 &nbsp;The generative model, in three assumptions</h2>
+
+<p>Everything the simulator does is contained in three sentences. Write them in your notebook; they are the model that Weeks 9 through 11 exist to break.</p>
+
+<div class="box definition">
+  <span class="box-tag">The generative model</span>
+  <ol>
+    <li><strong>A cell type is a probability vector over genes.</strong> Type $c$ is a vector $p^{(c)}$, where $p^{(c)}_g$ is the probability that any given transcript in a cell of that type belongs to gene $g$. Every cell of type $c$ has the same vector.</li>
+    <li><strong>Counts are independent Poisson at depth times probability.</strong> Sequencing a cell of type $c$ to depth $D$ gives $x_g \sim \mathrm{Poisson}(D\,p^{(c)}_g)$, independently for each gene $g$.</li>
+    <li><strong>Dropout thins independently.</strong> Each captured molecule is lost, independently of every other, with probability $q$.</li>
+  </ol>
+</div>
+
+<p>Now the honest part. Each of those is false about real cells, in a specific way, and this project measures the failure of two of them.</p>
+
+<table class="simple">
+  <tr><th>Assumption</th><th>How it is false about real cells</th><th>Which week attacks it</th></tr>
+  <tr><td>1. One vector per type; all cells of a type identical</td>
+      <td>Cells of the "same type" differ from one another — cell cycle stage, activation state, size, ambient contamination. The vector varies from cell to cell, which adds variance <em>on top of</em> the counting noise.</td>
+      <td><strong>Week 11.</strong> The extra variance shows up as a Fano factor above 1 and is modelled as a negative binomial, $\mathrm{Var} = m + \varphi m^2$. This is the project's headline negative result.</td></tr>
+  <tr><td>2. Independent Poisson counts</td>
+      <td>Genes are co-regulated, so counts are correlated across genes within a cell; and the total library size varies per cell, which correlates <em>everything</em>. Independence is what quadrature needs.</td>
+      <td><strong>Week 5's exercise 5.6</strong> quantifies the cost (a correlation of $\rho$ caps $d'$ at $d'_1/\sqrt\rho$); <strong>Week 10</strong> sees it on real marker panels; <strong>Week 14</strong> names it in the limitations.</td></tr>
+  <tr><td>3. Independent, gene-blind dropout</td>
+      <td>Real dropout is not gene-blind: lowly expressed genes are lost preferentially, and capture efficiency varies between droplets. A single global $q$ is a caricature.</td>
+      <td><strong>Week 9</strong> proves that gene-blind dropout is exactly reduced depth (so it cannot break the law), and then finds where the <em>low-depth</em> regime breaks $\Phi(d'/2)$ anyway.</td></tr>
+</table>
+
+<div class="box biology">
+  <span class="box-tag">Why write down a model you already know is wrong</span>
+  <p>Because "wrong" is not a useful category for a model; "wrong in a way I can measure" is. A model that is stated precisely enough to be simulated is stated precisely enough to be falsified, and each of the three rows above turns into a specific experiment later in this project.</p>
+  <p>The alternative — using a black-box simulator, or a real dataset, without ever writing the assumptions down — does not make the assumptions go away. It only makes them impossible to test, and it guarantees that when the answer looks strange you will not know which belief to revise. This is why <code>simulate.py</code>'s module docstring lists all three assumptions before a single function is defined, and why the first thing you should do this week is read that docstring.</p>
+</div>
+
+<h2>3 &nbsp;The <code>marker_mass</code> convention</h2>
+
+<p>Here is a small piece of bookkeeping that causes more confusion than anything else in the simulator, and that has a genuinely interesting reason behind it.</p>
+
+<p>You want two cell types that differ by a fold change $f$ on each of $k$ marker genes, and you want to control how much of the transcriptome those markers account for — call that total the <strong>marker mass</strong> $m$. The obvious thing to write is "each type puts mass $m$ on the marker set". But look at what that demands: if both types spend exactly $m$ across $k$ genes, and the genes are symmetric, then both types put $m/k$ on each gene — and then they are identical, and the fold change is 1.</p>
+
+<div class="box warning">
+  <span class="box-tag">The constraint, stated plainly</span>
+  <p>Two types <strong>cannot</strong> each carry exactly <code>marker_mass</code> on the marker set <strong>and</strong> differ by a fold change on every marker in it. The two requirements contradict each other. Something has to give, and the convention you choose is a decision you must make explicitly and then never quietly change.</p>
+</div>
+
+<p><code>marker_profiles</code> resolves it by pinning the <em>average</em>: the two types put an average of <code>marker_mass</code> on the marker set. Per gene, writing $\text{base} = m/k$ for the average rate and $a, b$ for the two types' rates on one marker:</p>
+
+<div class="box example">
+  <span class="box-tag">Derivation · the two rates <span class="claim proved">proved</span> (this is exercise 7.1)</span>
+  <p>Two conditions, two unknowns:</p>
+  $$\frac{a}{b} = f \qquad\text{and}\qquad \frac{a+b}{2} = \text{base}.$$
+  <p>Substitute $a = fb$ into the second: $\,(fb + b)/2 = \text{base}$, so $b(f+1) = 2\,\text{base}$, giving</p>
+  $$\boxed{\;b = \frac{2\,\text{base}}{1+f}, \qquad a = \frac{2\,\text{base}\,f}{1+f}\;}$$
+  <p>Check the two conditions: $a/b = f$ immediately, and $a + b = 2\,\text{base}(f+1)/(1+f) = 2\,\text{base}$. Also check a limit: at $f = 1$ both become $\text{base}$, the types coincide, and $d' = 0$ — which is what <code>test_marker_profiles_fold_change_one_is_indistinguishable</code> asserts.</p>
+  <p>The signal per gene is</p>
+  $$\delta = a - b = 2\,\text{base}\,\frac{f-1}{f+1},$$
+  <p>a formula you have already met: it is the expression from Week 5, Section 7, and the factor $2(f-1)/(f+1)$ is what turns a fold change into a usable signal. Note how slowly it grows: $f = 1.5$ gives $0.40$, $f = 2$ gives $0.67$, $f = 5$ gives $1.33$, and $f = \infty$ gives only $2$. A gene that is on in one type and completely off in the other is worth just five times a 1.5-fold gene, not infinitely more.</p>
+</div>
+
+<p>Two consequences to notice, both of which are load-bearing later.</p>
+
+<p><strong>The convention keeps $d'$ symmetric in the two types.</strong> Because $\bar\lambda_g = D\,\text{base}$ exactly, neither type is privileged: swap the labels and every number is unchanged. Pin type 1's mass instead and the pooled rate becomes type-dependent, so $d'$ acquires a spurious asymmetry. Exercise 7.2 works out what the alternatives actually do.</p>
+
+<p><strong>The leftover mass is absorbed by the genes the simulation does not model.</strong> The two profiles sum to $m\,f\cdot 2/(1+f)$ and $m\cdot 2/(1+f)$, which are not equal — type 1 spends more of its transcriptome on markers. In a real cell that difference would be made up elsewhere, across the eighteen thousand genes we are not simulating. This is a real simplification and it belongs in the limitations section: the simulator models a marker panel, not a transcriptome.</p>
+
+<div class="box pitfall">
+  <span class="box-tag">The mass argument that trips everyone</span>
+  <p><code>marker_profiles(n_genes, fold_change, marker_mass)</code> takes the mass of the <em>whole panel</em>, not of one gene. So <code>marker_profiles(16, 1.5, 0.02)</code> spreads 2% of the transcriptome over sixteen genes ($\text{base} = 0.00125$ each), while <code>marker_profiles(16, 1.5, 0.02*16)</code> gives each gene 2%.</p>
+  <p>These are the two conventions of Week 5's Lab 2, and they answer different questions: the first holds the biological difference fixed and re-describes it with more genes (no gain, $d'$ independent of $k$); the second claims the types differ in more places (genuine gain, $d' \propto \sqrt{k}$). <code>week07_simulator.py</code> uses the second — it passes <code>MASS_PER_GENE * k</code> — precisely so that the $\sqrt{k}$ law is visible in the figure. If your $k$ curves lie on top of each other, this is why.</p>
+</div>
+
+<h2>4 &nbsp;Lab: the simulator, live</h2>
+
+<p>Before writing any Python, get the picture. This lab is the whole simulator in miniature: two profiles, Poisson counts, the log-likelihood ratio, and the tally.</p>
+
+<div class="lab">
+  <div class="lab-title">Lab 1 · Cells in, decisions out</div>
+  <div class="lab-desc">Two thousand cells of each type are drawn afresh whenever you move a slider. <strong>One gene</strong> shows the two count distributions for a single marker — the view you would get from looking at one column of the matrix. <strong>All genes</strong> shows the distribution of the log-likelihood ratio, which is the number the classifier actually thresholds at zero. Watch how much better separated the second view is, and check the measured accuracy against $\Phi(d'/2)$ in the readout.</div>
+  <canvas id="lab1" height="350"></canvas>
+  <div class="controls" id="lab1ctl"></div>
+  <div class="readout" id="lab1out"></div>
+</div>
+
+<p>What to look for, in this order:</p>
+<ul>
+  <li>At $k = 1$, the two count histograms overlap heavily and the measured accuracy is barely above chance. Nothing about that view suggests the problem is solvable.</li>
+  <li>Switch to the LLR view and raise $k$. The two LLR distributions pull apart as $\sqrt{k}$ — the same evidence, viewed along the one direction in count space that contains all of it.</li>
+  <li>The measured and predicted accuracies should agree to about $\pm 0.01$ everywhere (2000 cells per type gives a standard error near $0.008$). If you find a corner where they disagree by much more than that, you have found something: note the settings before you move the sliders.</li>
+</ul>
+
+<h2>5 &nbsp;What the simulated data actually looks like</h2>
+
+<p>Running <code>week07_simulator.py</code> produces <code>figures/week07_cells.png</code>: a heatmap of 30 cells of each type over 20 marker genes at depth 3000, and beside it a scatter of two of those genes. Look at that figure for longer than feels necessary, because the intuitions it corrects are the ones that cause trouble in Week 10.</p>
+
+<div class="box data">
+  <span class="box-tag">Three properties of a counts matrix <span class="claim observed">observed</span></span>
+  <p><strong>The entries are small integers.</strong> At depth 3000 with 20 markers carrying $0.004$ each, the expected counts are $\lambda_1 = 14.4$ and $\lambda_2 = 9.6$, with standard deviations $3.8$ and $3.1$. So the matrix is full of numbers like 8, 12, 15, 11 — and the relative noise on a count of 10 is $1/\sqrt{10} = 32\%$. There is no smooth "expression level" anywhere in the data; there are tallies.</p>
+  <p><strong>At low depth it is mostly zeros.</strong> Drop the depth to 250 and the expected counts become $1.2$ and $0.8$. Then $P(x = 0) = e^{-1.2} = 0.30$ for type 1 and $e^{-0.8} = 0.45$ for type 2: about 38% of the entries in the matrix are zero, for no reason other than Poisson sampling. Nothing was "dropped out". This is worth internalising before Week 9, where you will meet people who assume every zero is a technical failure.</p>
+  <p><strong>Real matrices are more extreme still.</strong> A real 10x matrix has ~20,000 genes and ~3,000 counts per cell, so the average gene has $\lambda = 0.15$ and over 90% of the entries are zero. The simulator does not reproduce that, because it models only the marker panel — every gene in it is a well-expressed marker. Say so when you present the figure; it is exactly the sort of thing a good question in Week 15 will go after.</p>
+</div>
+
+<p>Now the scatter, which is the part that surprises people.</p>
+
+<div class="box example">
+  <span class="box-tag">Two genes look hopeless. Twenty genes are nearly perfect.</span>
+  <p>Same parameters: 20 markers, $f = 1.5$, depth 3000. Per gene, $\delta = 4.8$ and $\bar\lambda = 12$, so</p>
+  $$d'_g = \frac{4.8}{\sqrt{12}} = 1.386.$$
+  <p>Plot gene 1 against gene 2 and you see two clouds whose centres are at $(14.4, 14.4)$ and $(9.6, 9.6)$, each about 3.5 units wide in every direction. They visibly overlap. And yet, in quadrature, those two genes alone give $d' = \sqrt2 \times 1.386 = 1.96$ and an accuracy of $\Phi(0.98) = 84\%$ — already far better than the picture suggests.</p>
+  <p>All twenty give $d' = \sqrt{20}\times 1.386 = 6.20$, hence $\Phi(3.10) = 99.9\%$. The scatter has not changed. Your eye has simply never been able to see a 20-dimensional diagonal.</p>
+  <p class="muted">This is the single most useful piece of intuition in the whole simulation week: <strong>overlap in a low-dimensional projection tells you almost nothing about separability in the full space.</strong> Evidence that is invisible one gene at a time accumulates along a direction no two-dimensional plot can display. Keep it for Week 10, when you will look at a real PBMC scatter and be tempted to conclude that the cell types are inseparable.</p>
+</div>
+
+<h2>6 &nbsp;The first real comparison</h2>
+
+<p>Now the week's actual result. Sweep the depth over a factor of 64, at $k = 1, 4$ and $16$ genes; at each setting simulate 5,000 cells of each type, classify every one of them with the exact log-likelihood ratio, and count the mistakes. Then, on the same axes, draw $\Phi(d'/2)$ computed from the true rates.</p>
+
+<p>The theory has no fitted parameters. There is no scaling constant, no offset, nothing tuned. The lines are drawn before the points are measured, and either they pass through them or they do not.</p>
+
+<div class="box win">
+  <span class="box-tag">The deliverable · <code>figures/week07_simulator.png</code></span>
+  <p>Measured accuracy (points) against the Week 5 prediction (lines), at three panel sizes, over depths 250 to 16,000. Some anchor values you can check by hand before you run anything, using $d'_g = 0.0253\sqrt{D}$ for these parameters ($f = 1.5$, $0.004$ mass per marker gene):</p>
+  <table class="simple">
+    <tr><th>depth $D$</th><th>$d'$ per gene</th><th>$k=1$</th><th>$k=4$</th><th>$k=16$</th></tr>
+    <tr><td>250</td><td>0.40</td><td>0.579</td><td>0.655</td><td>0.788</td></tr>
+    <tr><td>1000</td><td>0.80</td><td>0.655</td><td>0.788</td><td>0.945</td></tr>
+    <tr><td>4000</td><td>1.60</td><td>0.788</td><td>0.945</td><td>0.9993</td></tr>
+    <tr><td>16000</td><td>3.20</td><td>0.945</td><td>0.9993</td><td>&gt; 0.99999</td></tr>
+  </table>
+  <p>Read that table along its diagonals. The $k=1$ column at depth 4000, the $k=4$ column at depth 1000, and the $k=16$ column at depth 250 are all $0.788$ — because $d' \propto \sqrt{Dk}$ and $4000\times1 = 1000\times4 = 250\times16$. <strong>Depth and gene count are interchangeable at the same product.</strong> That is the Week 5 symmetry, visible as a fact about a figure, and it is a good thing to point at when you show it to someone.</p>
+  <p>This is a WIN week: the figure is the thing you can hand to a person who has not read any of this and say "the line is a prediction made from first principles, the dots are what happened, and nothing was adjusted to make them meet."</p>
+</div>
+
+<p><strong>What agreement licenses.</strong> If the points sit on the lines to within the sampling error of the measurement — with 5,000 cells per type per point the standard error of a proportion is at most $\sqrt{0.25/10000} = 0.005$ — then you have earned the right to do something you will do constantly for the next five weeks: <em>draw the theory curve as a reference line on every subsequent plot.</em> When Week 9 adds dropout, or Week 10 uses real data, the theory line is no longer a hypothesis under test at every point; it is a calibrated ruler, and any deviation from it is attributable to the new ingredient rather than to a mistake in the machinery. You cannot borrow that authority. You have to earn it once, here, with the simplest possible data.</p>
+
+<p><strong>What disagreement would have meant.</strong> This is worth writing down <em>before</em> you run the script, so that you are not deciding what counts as a good outcome after you have seen one. There are exactly three possibilities, and they can be told apart:</p>
+
+<ol>
+  <li><strong>The simulator does not implement the model.</strong> A shape error, a dropout applied twice, a label mismatch. Diagnosed with unit tests on the pieces — does <code>simulate_cells</code> produce a Fano factor of 1? does the mean equal $D p$? — which is exactly what <code>test_simulate.py</code> checks before it checks any accuracy.</li>
+  <li><strong>The theory has an algebra error.</strong> Diagnosed by comparing against <code>bayes_error_exact</code>, which is a completely separate route to the same number for the one-gene case and uses no approximation at all. If the simulation matches the exact Bayes error but not $\Phi(d'/2)$, the algebra between them is where to look.</li>
+  <li><strong>The theory is right and its approximation is failing.</strong> Diagnosed the same way, but with the opposite outcome: the simulation matches <code>bayes_error_exact</code>, and <em>that</em> differs from $\Phi(d'/2)$. Then nothing is broken — you have measured the Gaussian approximation's error, which is a result, not a bug. Expect this at the low-depth, small-$k$ corner: at $D = 250$ with $k = 1$ the exact answer is $0.5741$ while $\Phi(d'/2)$ says $0.5793$, a systematic gap of $0.005$ that is right at the edge of what 5,000 cells can resolve.</li>
+</ol>
+
+<p class="muted">Notice that all three diagnoses are available in advance, and that two of the three are settled by a function you wrote in Week 4 for exactly this purpose. That is what it looks like when a project has been built in the right order.</p>
+
+<h2>7 &nbsp;Lab: accuracy against depth, built live</h2>
+
+<div class="lab">
+  <div class="lab-title">Lab 2 · The figure of the week, interactive</div>
+  <div class="lab-desc">Blue points: measured accuracy from simulated cells, at seven depths spanning a factor of 64. Orange line: $\Phi(d'/2)$ computed from the true rates, with nothing fitted. Move the $k$ slider and watch both move together. The horizontal axis is $\log_{10}$ of the depth, so the square-root law appears as the same curve shifted left by $\log_{10} k$ when you multiply $k$ — depth and gene count trading off, exactly as the theory says they must.</div>
+  <canvas id="lab2" height="350"></canvas>
+  <div class="controls" id="lab2ctl"></div>
+  <div class="readout" id="lab2out"></div>
+</div>
+
+<p>Press "Resample" a few times at the small cell count and watch the points jitter around the line; then raise the cell count and watch the jitter shrink as $1/\sqrt{N}$. The points are never <em>exactly</em> on the line, and they should not be — a measured proportion has an error bar. Week 13 will put that error bar on explicitly; for now, the useful mental check is whether the deviations look like noise (scattered both ways, shrinking with $N$) or like a trend (all one sign, or growing at one end). Noise is fine. A trend is a finding.</p>
+
+<h2>8 &nbsp;Two ways to ruin this week</h2>
+
+<div class="box pitfall">
+  <span class="box-tag">The label-order bug, which raises no error and destroys everything</span>
+  <p>In <code>simulate_dataset</code> you build the matrix $X$ by stacking blocks of cells, and the label vector $y$ by concatenating blocks of labels. If those two get built in different orders — or if you later shuffle the rows and the labels independently, which is the classic version, usually written while trying to randomise a train/test split — then every row is paired with somebody else's label.</p>
+  <p><strong>Nothing raises an exception.</strong> The shapes still match. The matrix is still full of perfectly good Poisson counts. Every test that checks a mean or a variance still passes. The only symptom is that your accuracy is 0.5 at every depth and every $k$, forever, and since a broken classifier also gives 0.5, you can spend two days debugging the classifier.</p>
+  <p><strong>How to check, in ninety seconds.</strong> Build a tiny dataset in which the label is <em>obviously</em> recoverable from the row, and demand near-perfect accuracy:</p>
+  <ul>
+    <li><code>p1, p2 = marker_profiles(4, fold_change=50.0, marker_mass=0.02)</code> — that is $\text{base} = 0.005$, so $a = 0.00980$ and $b = 0.000196$.</li>
+    <li><code>X, y = simulate_dataset([p1, p2], depth=5000.0, n_cells_per_type=50, rng=rng)</code> — expected counts of $49.0$ against $0.98$, a $d'$ per gene of $9.6$ and a total of $19.2$.</li>
+    <li>Now <code>X[y == 0].mean()</code> must be about fifty times <code>X[y == 1].mean()</code>, and any classifier must score essentially 1.000.</li>
+  </ul>
+  <p>If that returns 0.5, the labels are scrambled and no amount of staring at the classifier will help. Keep this four-line check somewhere you can paste it; you will want it again in Week 8 (train/test splits), Week 9 (five types), and Week 10 (real data, where the labels come from a file and the rows from another).</p>
+</div>
+
+<div class="box warning">
+  <span class="box-tag">Do not tune until it agrees</span>
+  <p>Suppose the points miss the line. The temptation — and it is a strong one, at eleven at night, with a check-in tomorrow — is to change something: nudge the marker mass, adjust the fold change, drop the awkward low-depth point, switch the pooled variance to the type-1 variance because "that looks closer".</p>
+  <p>Every one of those moves converts a measurement into a decoration. And they work: with two or three free knobs you can make almost any curve pass through almost any points, and you will never find out that your simulator applied dropout twice.</p>
+  <p><strong>The rule: when simulation and theory disagree, do not adjust parameters until they agree. Find out which one is wrong.</strong> Use the three-way diagnosis of Section 6. The tools are already written — <code>bayes_error_exact</code> settles it for one gene, and the unit tests settle it for the simulator's pieces.</p>
+  <p>And if you genuinely cannot resolve it: <em>report the disagreement.</em> A figure with a visible, honestly labelled gap and a paragraph explaining what has been ruled out is a far stronger piece of work than a clean figure obtained by fiddling. Week 9's milestone is worded to allow exactly this: "simulation matches theory, <em>or the disagreement is characterized</em>."</p>
+</div>
+
+<h2>9 &nbsp;Your Python laboratory</h2>
+
+<div class="box python">
+  <span class="box-tag">This week in the celldetect project</span>
+  <p>Open <code>python/celldetect/simulate.py</code> and read the module docstring first — it states the three assumptions of Section 2. Then three functions:</p>
+  <ul>
+    <li><code>marker_profiles(n_genes, fold_change, marker_mass=0.02)</code> — the algebra of Section 3. Validate <code>n_genes >= 1</code> and <code>fold_change > 0</code>, compute <code>base = marker_mass / n_genes</code>, then $a$ and $b$, and return two <code>np.full</code> arrays. Four lines of real code.</li>
+    <li><code>simulate_cells(profile, depth, n_cells, rng, dropout=0.0)</code> — the $(n_{\text{cells}}, n_{\text{genes}})$ count matrix. Sample it in one call by broadcasting the rate vector over rows: <code>rng.poisson(np.broadcast_to(lam, (n_cells, profile.size)))</code>. Write the explicit loop first if that helps you see it, confirm the two agree, then delete the loop — it is about fifty times slower and this function is called thousands of times.</li>
+    <li><code>simulate_dataset(profiles, depth, n_cells_per_type, rng, dropout=0.0)</code> — stack the per-type blocks and their labels, <em>in the same order</em>. Read the pitfall above before writing this one.</li>
+  </ul>
+  <p><code>apply_dropout</code> is Week 9's; <code>expected_rates</code> and <code>multi_type_profiles</code> are <code>[PROVIDED]</code>, and reading <code>expected_rates</code> is worth thirty seconds because it is the ground truth the theory consumes.</p>
+  <p>Then:</p>
+  <p><code>pytest tests/test_simulate.py</code></p>
+  <p>Two tests deserve a look before you run them. <code>test_simulate_cells_shape_mean_and_variance</code> checks that 20,000 simulated cells have a mean of 10.0 and a Fano factor within 0.06 of 1 — that is Week 1's measurement, now applied to your own generator, and it is what makes the counts genuinely Poisson rather than merely plausible. And <code>test_simulation_accuracy_matches_theory</code> simulates 6,000 cells of each type over 12 genes, classifies them, and demands that the measured accuracy sit within 0.02 of $\Phi(d'/2)$. That test is this week in one line. (Two tests in the file — <code>test_dropout_equals_reduced_depth</code> and <code>test_apply_dropout_never_increases_counts</code> — need Week 9's <code>apply_dropout</code>; <code>simulate_cells</code>'s own <code>dropout</code> argument routes through <code>downsample_counts</code>, which you already wrote in Week 2, so the first of the two may well pass early.)</p>
+  <p>Then the figures:</p>
+  <p><code>python experiments/week07_simulator.py</code></p>
+  <p>with <strong>SEED 107</strong>. Runtime is about 20 seconds; pass <code>fast=True</code> from a Python prompt if you want a rough version in two. It writes:</p>
+  <ul>
+    <li><code>figures/week07_simulator.png</code> — the deliverable: measured accuracy against depth at $k = 1, 4, 16$, with the theory curve through each.</li>
+    <li><code>figures/week07_cells.png</code> — what the data looks like: the counts heatmap and the two-gene scatter of Section 5.</li>
+  </ul>
+  <p>The script prints a table of measured against predicted for all 21 points and then <code>max |measured - predicted|</code>. <strong>Record that number in <code>progress/week07.md</code></strong>. Expect it to come out around 0.01, with the largest single deviation at the small-$k$, low-depth corner for the reason given in Section 6. If any point is off by more than about 0.02, do not average it away — go and find out which of the three diagnoses applies.</p>
+</div>
+
+<h2>10 &nbsp;Exercises</h2>
+<p class="muted">Stars mark difficulty: ★ routine · ★★ requires an idea · ★★★ challenge. Write full sentences; every claim needs a reason. Solutions are provided — attempt first, then compare.</p>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 7.1</span><span class="stars">★</span></div>
+  <div class="ex-body">Derive $a = 2\,\text{base}\,f/(1+f)$ and $b = 2\,\text{base}/(1+f)$ from the two conditions $a/b = f$ and $(a+b)/2 = \text{base}$. Then evaluate them for the simulator's defaults: $\text{base} = 0.004$ and $f = 1.5$. Give $\lambda_1$, $\lambda_2$, $\delta$, $\bar\lambda$ and $d'_g$ at depth 1000, and confirm $d'_g$ against the shortcut $\sqrt{D\,\text{base}}\cdot 2(f-1)/(f+1)$.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>From $a = fb$: $(fb+b)/2 = \text{base} \Rightarrow b(f+1) = 2\,\text{base} \Rightarrow b = 2\,\text{base}/(1+f)$, and $a = fb = 2\,\text{base}\,f/(1+f)$.</p>
+      <p>With $\text{base} = 0.004$, $f = 1.5$: $b = 0.008/2.5 = 0.0032$ and $a = 0.012/2.5 = 0.0048$. Check: $a/b = 1.5$ ✓, $(a+b)/2 = 0.004$ ✓.</p>
+      <p>At $D = 1000$: $\lambda_1 = 4.8$, $\lambda_2 = 3.2$, $\delta = 1.6$, $\bar\lambda = 4.0$, so
+      $$d'_g = \frac{1.6}{\sqrt{4}} = 0.80.$$</p>
+      <p>Shortcut: $\sqrt{1000 \times 0.004}\times 2(0.5)/2.5 = \sqrt{4}\times 0.4 = 0.80$ ✓.</p>
+      <p class="muted">Keep the number $d'_g = 0.0253\sqrt{D}$ for these parameters; it lets you predict every point of this week's figure in your head, which is exactly the state you want to be in before running the script rather than after.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 7.2</span><span class="stars">★</span></div>
+  <div class="ex-body">Two alternatives to the average-mass convention. (a) Pin type 1: let type 1 spend exactly $m$ on the markers and type 2 spend $m/f$. (b) Pin the geometric mean: $\sqrt{ab} = \text{base}$. For each, give $a$, $b$, $\delta$ and $\bar\lambda$, and say what changes about $d'$. Which is symmetric under swapping the two type labels?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p><strong>(a) Pin type 1.</strong> $a = \text{base}$, $b = \text{base}/f$. Then $\delta = \text{base}(1 - 1/f)$ and $\bar\lambda = D\,\text{base}(1 + 1/f)/2$, so
+      $$d'_g = \sqrt{D\,\text{base}}\;\frac{1 - 1/f}{\sqrt{(1+1/f)/2}}.$$
+      At $f = 1.5$, $\text{base} = 0.004$, $D = 1000$: $a = 0.004$, $b = 0.002667$, $\delta = 0.001333$, $\bar\lambda = 3.333$, $d'_g = 1.3333/1.826 = 0.730$ — about 9% smaller than the 0.80 of the average convention, because the pooled rate has been pulled up towards type 1.</p>
+      <p><strong>(b) Geometric mean.</strong> $a = \text{base}\sqrt f$, $b = \text{base}/\sqrt f$, so $\delta = \text{base}(\sqrt f - 1/\sqrt f)$ and $\bar\lambda = D\,\text{base}(\sqrt f + 1/\sqrt f)/2$. At the same numbers: $a = 0.004899$, $b = 0.003266$, $\delta = 0.001633$, $\bar\lambda = 4.082$, $d'_g = 1.633/2.020 = 0.808$ — within about 1% of the arithmetic convention at this fold change.</p>
+      <p><strong>Symmetry.</strong> Conventions (a) fails: swapping the labels turns "type 1 has mass $m$" into "type 2 has mass $m$" and gives different rates. Both the arithmetic-average convention and the geometric one are symmetric — swapping the labels swaps $a$ and $b$ and leaves $\delta$, $\bar\lambda$ and $d'$ alone.</p>
+      <p class="muted">The lesson is not that one convention is correct. It is that at $f = 1.5$ the three differ by under 10%, and at $f = 10$ they differ by a lot — so a $d'$ quoted without its convention is not a number anyone else can reproduce. Put the convention in the figure caption, every time.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 7.3</span><span class="stars">★★</span></div>
+  <div class="ex-body">Predict this week's figure before you produce it. Using $d'_g = 0.0253\sqrt{D}$ (from exercise 7.1), fill in the predicted accuracy for every combination of $D \in \{250, 1000, 4000, 16000\}$ and $k \in \{1, 4, 16\}$. Then (a) state the general rule relating the entries, (b) say which entries the simulation can actually test with 5,000 cells per type, and why the rest are useless.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>$d'_{\text{tot}} = \sqrt{k}\,d'_g = 0.0253\sqrt{Dk}$, then accuracy $= \Phi(d'_{\text{tot}}/2)$:</p>
+      <table class="simple">
+        <tr><th>$D$</th><th>$k=1$</th><th>$k=4$</th><th>$k=16$</th></tr>
+        <tr><td>250</td><td>0.579</td><td>0.655</td><td>0.788</td></tr>
+        <tr><td>1000</td><td>0.655</td><td>0.788</td><td>0.945</td></tr>
+        <tr><td>4000</td><td>0.788</td><td>0.945</td><td>0.99931</td></tr>
+        <tr><td>16000</td><td>0.945</td><td>0.99931</td><td>1 − 8×10⁻¹¹</td></tr>
+      </table>
+      <p>(a) The table depends only on the product $Dk$. Moving one step right (×4 in $k$) is identical to moving one step down (×4 in $D$), so the entries are constant along the anti-diagonals. That is $d' \propto \sqrt{Dk}$ made visible.</p>
+      <p>(b) With $N = 5000$ per type, the standard error of a measured accuracy is at most $\sqrt{0.25/10000} = 0.005$. Entries between about $0.55$ and $0.98$ are therefore testable: a $0.005$ error bar can distinguish them from their neighbours. The entries at $0.99931$ and beyond are not — you expect between 6 and 7 errors out of 10,000 cells, and Poisson fluctuation in that count swamps any comparison. The last entry, $1 - 8\times10^{-11}$, would need $10^{11}$ cells to distinguish from 1.</p>
+      <p class="muted">This is why every experiment in this project deliberately works at depths where the answer is <em>not</em> already 1. A regime where the theory predicts perfection is a regime where no measurement can disagree with it, and therefore a regime where you learn nothing. When you choose the axes of a figure, you are choosing what your experiment is able to find out.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 7.4</span><span class="stars">★★</span></div>
+  <div class="ex-body">(a) Explain why the label-order bug produces exactly 0.5 accuracy rather than something random. (b) Design a four-line check that catches it, and say what makes a good check here as opposed to a bad one. (c) A friend suggests instead asserting that accuracy is above 0.5 on the real dataset. Why is that a much weaker test?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) If the labels are permuted independently of the rows, then the label attached to a row carries no information about that row: for a balanced two-class dataset, the probability that a randomly attached label matches the row's true class is exactly $1/2$, whatever the classifier does. The classifier may be working perfectly — it is predicting the <em>true</em> class of each row correctly — but it is being scored against labels drawn independently of the truth, so the score converges to 0.5. That is why the symptom is so precisely uninformative.</p>
+      <p>(b) Use a dataset where the answer is not in doubt: <code>marker_profiles(4, 50.0, 0.02)</code> at depth 5000 gives expected counts of $49.0$ against $0.98$ per gene, a total $d'$ of $19.2$, and a true accuracy indistinguishable from 1. Assert accuracy $> 0.99$. What makes it a good check is that the <em>expected</em> and <em>failure</em> values are far apart (1.0 versus 0.5), so the test cannot pass by luck and cannot fail by noise. A bad check compares against a value the bug could also produce.</p>
+      <p>(c) Because at any reasonable setting the true accuracy is well above 0.5 anyway, so "accuracy $> 0.5$" passes with a partially broken pipeline, a mislabelled subset, or a classifier that is only using one of sixteen genes. A test whose passing condition is much weaker than the correct behaviour will not fail when the code degrades — and silent degradation is precisely the failure mode you are guarding against.</p>
+      <p class="muted">The general principle is worth a line in the notebook: <strong>a test is only as good as the distance between "correct" and "broken" in the quantity it measures.</strong> This is the reasoning behind almost every tolerance in <code>tests/</code>, and it is worth re-reading a few of them with this in mind.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 7.5</span><span class="stars">★★</span></div>
+  <div class="ex-body">A real 10x matrix has about 20,000 genes and about 3,000 counts per cell, and is typically over 90% zeros. (a) Under the pure Poisson model with uniform expression, what fraction of entries would be zero? (b) Real expression is highly skewed — a few hundred genes carry most of the mass. Does that push the zero fraction up or down? (c) Someone tells you the zeros are "dropout", a technical failure that must be corrected before analysis. What is your reply?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) If all 20,000 genes were equally expressed, each would have $\lambda = 3000/20000 = 0.15$, and $P(x = 0) = e^{-0.15} = 0.861$. So <strong>86% zeros from counting statistics alone</strong>, with no technical failure of any kind.</p>
+      <p>(b) Up. Skew moves mass onto a few genes, so the great majority of genes have $\lambda$ far below 0.15 and are essentially always zero, while the few high ones are almost never zero. Since $e^{-\lambda}$ is convex, redistributing a fixed total $\sum_g \lambda_g$ unequally increases $\sum_g e^{-\lambda_g}$ — the average zero probability rises. A realistic skew takes you from 86% to well over 90%, which is the observed figure.</p>
+      <p>(c) That most of them are not a failure at all: they are what a small random sample looks like. You did not fail to detect the transcript; you sampled 3,000 molecules out of hundreds of thousands and this gene's molecules were not among them. There <em>are</em> technical losses on top of that — capture efficiency is well under 100% — but by the thinning theorem of Week 2 those are mathematically equivalent to having sequenced at a lower depth, and they produce Poisson counts too. The claim that requires evidence is that there are <em>more</em> zeros than Poisson sampling predicts, and for UMI-based data that claim has largely not survived scrutiny. <span class="claim cited">cited</span> (Svensson 2020, <em>Droplet scRNA-seq is not zero-inflated</em>.)</p>
+      <p class="muted">This is one of the most useful things you will be able to say in a conversation with a working biologist, and it descends directly from Week 1's first sentence: the output of a sequencer is a sample. An entire subfield of "imputation" methods exists to fill in zeros that, for the most part, were never missing.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 7.6</span><span class="stars">★★★</span></div>
+  <div class="ex-body">At $D = 250$ with $k = 1$ ($\lambda_1 = 1.2$, $\lambda_2 = 0.8$) the Gaussian formula gives $\Phi(d'/2) = 0.5793$. (a) Compute the exact optimal accuracy by hand, using $\text{accuracy}^\star = 1 - \tfrac12\sum_j\min(P_1(j), P_2(j))$. (b) Which is bigger, and by how much? (c) Show that the optimal rule here is "call type 1 if $x \ge 1$", and confirm your answer from part (a) a second way. (d) With 5,000 cells per type, could you detect this discrepancy? Give a number.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) Tabulate both pmfs ($e^{-1.2} = 0.301194$, $e^{-0.8} = 0.449329$):</p>
+      <table class="simple">
+        <tr><th>$j$</th><td>0</td><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>≥6</td></tr>
+        <tr><th>$P_1$ ($\lambda=1.2$)</th><td>0.3012</td><td>0.3614</td><td>0.2169</td><td>0.0867</td><td>0.0260</td><td>0.0062</td><td>0.0015</td></tr>
+        <tr><th>$P_2$ ($\lambda=0.8$)</th><td>0.4493</td><td>0.3595</td><td>0.1438</td><td>0.0383</td><td>0.0077</td><td>0.0012</td><td>0.0002</td></tr>
+        <tr><th>min</th><td>0.3012</td><td>0.3595</td><td>0.1438</td><td>0.0383</td><td>0.0077</td><td>0.0012</td><td>0.0002</td></tr>
+      </table>
+      <p>The minima sum to $0.85187$, so $\varepsilon^\star = 0.42593$ and $\text{accuracy}^\star = 0.57407$.</p>
+      <p>(b) The Gaussian formula gives $0.57926$ — <strong>optimistic by $0.0052$</strong>. It claims the classifier does about half a percentage point better than is possible.</p>
+      <p>(c) The LLR for one gene is $\mathrm{LLR}(x) = x\log(1.2/0.8) - (1.2-0.8) = 0.40546\,x - 0.4$, which is positive iff $x > 0.9865$, i.e. iff $x \ge 1$. Checking against the pmfs: at $j = 0$, $P_2 > P_1$ so type 2 is correct; at $j = 1$, $P_1 = 0.36143$ against $P_2 = 0.35946$, so type 1 wins by a whisker; and for $j \ge 2$, $P_1$ dominates. The threshold rule and the pmf comparison agree. Second route to the accuracy:
+      $$\tfrac12\big[P(x \ge 1 \mid 1) + P(x = 0\mid 2)\big] = \tfrac12\big[(1 - 0.30119) + 0.44933\big] = \tfrac12(1.14814) = 0.57407 \ \checkmark$$</p>
+      <p>(d) With 5,000 cells per type, $n = 10{,}000$ scored cells and the standard error of the measured accuracy is $\sqrt{0.574 \times 0.426/10000} = 0.0049$. The discrepancy is $0.0052$, or about $1.05$ standard errors. So <strong>no</strong>: a single run cannot distinguish them. You would need roughly $(1.96/1.05)^2 \approx 3.5$ times as many cells for a two-sided detection, i.e. about 18,000 per type.</p>
+      <p class="muted">Part (d) is the point of the exercise. The gap is real, it is systematic, it is in a known direction, and it is <em>invisible at this sample size</em> — so the honest report of this week's figure is "agreement to within measurement error", not "the theory is exact". Week 9 goes after this corner deliberately, with more cells and lower depths, precisely because it is the only place the theory is known to be wrong.</p>
+    </div>
+  </details>
+</div>
+
+<h2>11 &nbsp;Research notebook</h2>
+
+<ul>
+  <li>The three assumptions of Section 2, written from memory, each with your own one-line statement of how it fails and which week attacks it.</li>
+  <li>The <code>marker_profiles</code> derivation (exercise 7.1) in full, with the numbers $a = 0.0048$, $b = 0.0032$ boxed, and a note of which convention you are using.</li>
+  <li>Your prediction table from exercise 7.3, <strong>written before you ran the script</strong>, dated. Then, beside it, the measured values, and the <code>max |measured - predicted|</code> the script printed.</li>
+  <li>One paragraph answering: <em>what would I have concluded if the points had missed the lines?</em> Write it in the past conditional and be specific about which diagnosis you would have run first.</li>
+  <li>A printed copy of <code>figures/week07_simulator.png</code>, taped in, with the caption you would use in the report — including the convention, the seed, and the number of cells per point.</li>
+  <li>Your updated <strong>"assumptions I am making"</strong> list. It should now include the simulator-specific ones: only the marker panel is modelled, all cells of a type share one profile, and the rates are known exactly rather than estimated.</li>
+</ul>
+
+<p>Scan to <code>notebook/week07/</code> and fill in <code>progress/week07.md</code>, recording SEED 107 and the maximum discrepancy.</p>
+
+<div class="box verify">
+  <span class="box-tag">Verification this week (with mentor)</span>
+  <ul>
+    <li><strong>You show <code>figures/week07_simulator.png</code></strong> and explain, without notes, what the lines are, what the points are, and why nothing in the figure was fitted.</li>
+    <li><strong>You state the three assumptions</strong> of the generative model and name a way each is false, plus the week that measures it.</li>
+    <li><strong>You derive the <code>marker_mass</code> algebra at the whiteboard</strong> and explain in one sentence why both types cannot each carry exactly <code>marker_mass</code>.</li>
+    <li><strong>You point at the anti-diagonal</strong> of the accuracy table and explain why $D = 4000, k = 1$ and $D = 250, k = 16$ give the same number.</li>
+    <li><strong><code>pytest tests/test_simulate.py</code></strong> is green apart from anything that needs Week 9's <code>apply_dropout</code>, which you can name; and you can say what <code>test_simulation_accuracy_matches_theory</code> is asserting and why its tolerance is 0.02.</li>
+    <li><strong>You quote <code>max |measured - predicted|</code></strong> and say whether it is small compared with the sampling error of the measurement itself — and where the largest deviation was, and why you expected it to be there.</li>
+  </ul>
+</div>
+
+<h2>12 &nbsp;Going deeper</h2>
+<ul>
+  <li>Zappia, Phipson &amp; Oshlack (2017), <em>Splatter: simulation of single-cell RNA sequencing data</em>, <em>Genome Biology</em> 18. <span class="muted">The standard simulator in the field. Read the model section and compare its generative story with your three assumptions: you will find the same Poisson core wrapped in a gamma-distributed per-cell mean (which is a negative binomial — Week 11) plus library-size and outlier terms. Seeing a published simulator as "yours plus four named complications" is a good half hour.</span></li>
+  <li>Svensson (2020), <em>Droplet scRNA-seq is not zero-inflated</em>, <em>Nature Biotechnology</em> 38. <span class="muted">Four pages, and the direct source for exercise 7.5(c). A model paper for how to argue that a widely believed effect is an artifact of the wrong null model.</span></li>
+  <li>Grimes &amp; Schulz (2002), <em>An overview of clinical research: the lay of the land</em>, <em>The Lancet</em> 359. <span class="muted">Not about biology at all: about why a study's design determines what it can conclude. Section on "the study question" is the general form of Section 6's "what would disagreement have meant".</span></li>
+  <li>Wilson (2014), <em>Best practices for scientific computing</em>, <em>PLoS Biology</em> 12(1). <span class="muted">On testing, seeds, and the discipline of making computational work reproducible. The section on writing tests before code is exactly the argument behind Week 6's <code>validate_tally</code> and this week's tiny-dataset label check.</span></li>
+  <li>Course extras: <a href="../extras/notation.html">notation card</a> · <a href="../extras/glossary.html">glossary</a> · <a href="../extras/unstuck.html">how to get unstuck</a> · <a href="../extras/big-picture.html">the big picture</a></li>
+</ul>
+
+</div>
+
+<footer class="site">How Much Data Does It Take to Tell Two Cell Types Apart? · Week 7 · <a href="../index.html">Course home</a></footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  const MASS_PER_GENE = 0.004;        // matches experiments/week07_simulator.py
+
+  /* Theory: total d' for k genes at depth D and fold change f, under the
+     fixed-per-gene-mass convention. Uses only CD primitives. */
+  function theoryDp(k, depth, fold) {
+    const pr = CD.markerProfiles(k, fold, MASS_PER_GENE * k);
+    const ds = [];
+    for (let g = 0; g < k; g++) ds.push(CD.dPrime(depth * pr[0][g], depth * pr[1][g]));
+    return CD.combineDPrime(ds);
+  }
+
+  /* ---------------- Lab 1: cells in, decisions out ----------------------- */
+  (function () {
+    const DEPTHS = [125, 250, 500, 1000, 2000, 4000, 8000];
+    const KS = [1, 2, 4, 8, 16];
+    const FOLDS = [1.2, 1.5, 2.0, 3.0];
+    const N = 2000;
+    let di = 3, ki = 0, fi = 1, showLLR = false, seedBump = 0;
+
+    function run() {
+      const depth = DEPTHS[di], k = KS[ki], fold = FOLDS[fi];
+      const pr = CD.markerProfiles(k, fold, MASS_PER_GENE * k);
+      const l1 = pr[0].map(p => depth * p), l2 = pr[1].map(p => depth * p);
+      const r = CD.rng(7000 + 13 * di + 101 * ki + 37 * fi + 9973 * seedBump);
+
+      const g1 = [], g2 = [], s1 = [], s2 = [];
+      let correct = 0;
+      for (let i = 0; i < N; i++) {
+        const xa = CD.sampleCell(pr[0], depth, r), xb = CD.sampleCell(pr[1], depth, r);
+        g1.push(xa[0]); g2.push(xb[0]);
+        const la = CD.nbLogRatio(xa, l1, l2), lb = CD.nbLogRatio(xb, l1, l2);
+        s1.push(la); s2.push(lb);
+        if (la > 0) correct++;
+        if (lb <= 0) correct++;
+      }
+      const measured = correct / (2 * N);
+      const dp = CD.combineDPrime(l1.map((v, g) => CD.dPrime(v, l2[g])));
+      const predicted = CD.accuracyFromDPrime(dp);
+
+      /* Axis limits and bin count, chosen before anything is drawn. */
+      const A = showLLR ? s1 : g1, B = showLLR ? s2 : g2;
+      let xlo, xhi, nb, xlab;
+      if (!showLLR) {
+        xlo = -0.5;
+        xhi = Math.max(8, Math.ceil(l1[0] + 4.5 * Math.sqrt(l1[0]) + 3));
+        nb = Math.max(8, Math.round(xhi - xlo));
+        xlab = "count for marker gene 1, in one cell";
+      } else {
+        const all = s1.concat(s2);
+        const lo = Math.min.apply(null, all), up = Math.max.apply(null, all);
+        const pad = 0.08 * (up - lo) + 1e-9;
+        xlo = lo - pad; xhi = up + pad; nb = 48;
+        xlab = "log-likelihood ratio for one cell";
+      }
+      const bw = (xhi - xlo) / nb;
+
+      /* Bin by hand so the y-axis can be scaled before any drawing happens. */
+      function binned(data) {
+        const bins = new Array(nb).fill(0);
+        data.forEach(v => { const j = Math.floor((v - xlo) / bw); if (j >= 0 && j < nb) bins[j]++; });
+        return bins;
+      }
+      const peak = Math.max.apply(null, binned(A).concat(binned(B))) / (N * bw);
+
+      const Q = CD.plot("lab1", { xmin: xlo, xmax: xhi, ymin: 0, ymax: 1.25 * peak,
+                                  xlabel: xlab,
+                                  ylabel: showLLR ? "density" : "fraction of cells" });
+      Q.clear(); Q.axes();
+      Q.histogram(A, nb, { normalize: "density", color: "rgba(37,99,235,0.45)", edge: "rgba(37,99,235,0.9)" });
+      Q.histogram(B, nb, { normalize: "density", color: "rgba(13,148,136,0.40)", edge: "rgba(13,148,136,0.9)" });
+      if (showLLR) Q.vline(0, "decide here", { color: CD.C.orange, width: 2.5 });
+      Q.label(xlo + 0.62 * (xhi - xlo), 1.16 * peak, "type 1", { color: CD.C.blue });
+      Q.label(xlo + 0.62 * (xhi - xlo), 1.06 * peak, "type 2", { color: CD.C.teal });
+
+      CD.table("lab1out", ["quantity", "value"], [
+        ["depth D", "" + depth],
+        ["genes k, fold change f", k + "  ,  " + fold.toFixed(1)],
+        ["rates on one marker (λ1, λ2)", l1[0].toFixed(2) + " , " + l2[0].toFixed(2)],
+        ["d' per gene", CD.dPrime(l1[0], l2[0]).toFixed(3)],
+        ["d' total (quadrature over k)", dp.toFixed(3)],
+        ["predicted accuracy Φ(d'/2)", predicted.toFixed(4)],
+        ["measured accuracy (" + (2 * N) + " cells)", measured.toFixed(4)],
+        ["measured − predicted", (measured - predicted >= 0 ? "+" : "") +
+          (measured - predicted).toFixed(4) + "   (1 s.e. ≈ " +
+          Math.sqrt(predicted * (1 - predicted) / (2 * N)).toFixed(4) + ")"]]);
+    }
+
+    CD.slider("lab1ctl", { label: "depth D", min: 0, max: DEPTHS.length - 1, step: 1,
+                           value: di, fmt: i => DEPTHS[i] }, i => { di = i; run(); });
+    CD.slider("lab1ctl", { label: "genes k", min: 0, max: KS.length - 1, step: 1,
+                           value: ki, fmt: i => KS[i] }, i => { ki = i; run(); });
+    CD.slider("lab1ctl", { label: "fold change", min: 0, max: FOLDS.length - 1, step: 1,
+                           value: fi, fmt: i => FOLDS[i].toFixed(1) }, i => { fi = i; run(); });
+    CD.button("lab1ctl", "One gene / all genes (LLR)", () => { showLLR = !showLLR; run(); });
+    CD.button("lab1ctl", "Resample", () => { seedBump++; run(); }, true);
+  })();
+
+  /* ---------------- Lab 2: accuracy against depth ------------------------ */
+  (function () {
+    const DEPTHS = [250, 500, 1000, 2000, 4000, 8000, 16000];
+    const KS = [1, 2, 4, 8, 16];
+    const CELLS = [200, 500, 1000, 2000];
+    const FOLD = 1.5;
+    let ki = 0, ci = 1, seedBump = 0;
+
+    function run() {
+      const k = KS[ki], N = CELLS[ci];
+      const pts = [], rows = [];
+      DEPTHS.forEach((depth, j) => {
+        const pr = CD.markerProfiles(k, FOLD, MASS_PER_GENE * k);
+        const l1 = pr[0].map(p => depth * p), l2 = pr[1].map(p => depth * p);
+        const r = CD.rng(7700 + 61 * j + 907 * ki + 8641 * seedBump);
+        let correct = 0;
+        for (let i = 0; i < N; i++) {
+          if (CD.nbLogRatio(CD.sampleCell(pr[0], depth, r), l1, l2) > 0) correct++;
+          if (CD.nbLogRatio(CD.sampleCell(pr[1], depth, r), l1, l2) <= 0) correct++;
+        }
+        const acc = correct / (2 * N);
+        const w = CD.wilson(correct, 2 * N);
+        pts.push([Math.log10(depth), acc, w[0], w[1]]);
+        const pred = CD.accuracyFromDPrime(theoryDp(k, depth, FOLD));
+        rows.push([depth, acc.toFixed(4), pred.toFixed(4),
+                   (acc - pred >= 0 ? "+" : "") + (acc - pred).toFixed(4)]);
+      });
+
+      const P = CD.plot("lab2", { xmin: 2.3, xmax: 4.35, ymin: 0.45, ymax: 1.02,
+                                  xlabel: "sequencing depth D (log scale)",
+                                  ylabel: "accuracy",
+                                  xfmt: t => Math.round(Math.pow(10, t)) });
+      P.clear(); P.axes();
+      P.funcPlot(t => CD.accuracyFromDPrime(theoryDp(k, Math.pow(10, t), FOLD)),
+                 { color: CD.C.orange, width: 2.5 });
+      P.line([[2.3, 0.5], [4.35, 0.5]], { color: CD.C.gray, width: 1, dash: [3, 3] });
+      P.errorbars(pts, { color: CD.C.blue, r: 4 });
+      P.label(2.38, 0.98, "line: theory Φ(d'/2), nothing fitted", { color: CD.C.orange });
+      P.label(2.38, 0.93, "points: simulated cells, k = " + k, { color: CD.C.blue });
+
+      let worst = 0;
+      rows.forEach(row => { worst = Math.max(worst, Math.abs(parseFloat(row[3]))); });
+      CD.table("lab2out", ["depth", "measured", "predicted", "difference"], rows);
+      document.getElementById("lab2out").innerHTML +=
+        "<p>k = " + k + " &nbsp;·&nbsp; " + N + " cells per type per point &nbsp;·&nbsp; " +
+        "1 s.e. ≈ " + (0.5 / Math.sqrt(2 * N)).toFixed(4) +
+        " &nbsp;·&nbsp; <b>max |measured − predicted| = " + worst.toFixed(4) + "</b></p>";
+    }
+
+    CD.slider("lab2ctl", { label: "genes k", min: 0, max: KS.length - 1, step: 1,
+                           value: ki, fmt: i => KS[i] }, i => { ki = i; run(); });
+    CD.slider("lab2ctl", { label: "cells per type", min: 0, max: CELLS.length - 1, step: 1,
+                           value: ci, fmt: i => CELLS[i] }, i => { ci = i; run(); });
+    CD.button("lab2ctl", "Resample", () => { seedBump++; run(); }, true);
+  })();
+});
+</script>
+</body>
+</html>

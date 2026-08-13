@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The big picture: why this project?</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="how-to-use.html">How to use this course →</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Orientation · read before Week 1</span>
+    </div>
+    <h1 class="chapter-title">The big picture: why this project?</h1>
+    <div class="chapter-sub">One idea that reappears in five fields · a measurement limit that is real and expensive · and what a semester can honestly buy</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<p>This page is for two people. The first is you, on day one, wondering whether a semester spent on two jars of beads and a Poisson distribution is a semester well spent. The second is whoever you eventually show this repository to — a teacher, a competition judge, an admissions reader, a future collaborator — who has thirty seconds to decide whether there is anything here. Both of them deserve the same answer, so this page gives it once, plainly.</p>
+
+<h2>1 &nbsp;The question, restated without any jargon</h2>
+
+<div class="box definition">
+  <span class="box-tag">The central question</span>
+  How does the accuracy of cell-type classification scale with (a) sequencing depth per cell
+  and (b) the number of informative marker genes? And where — precisely — does that scaling
+  law stop being true?
+</div>
+
+<p>Strip the biology out and it is this: <em>you get to look at a small random sample of a thing, and you have to say which of two things it is. How much looking do you need?</em></p>
+
+<p>That question has an exact answer under stated assumptions, and the answer has a shape you can carry around in your head. Discriminability grows as a square root, so <strong>doubling how well you can tell two possibilities apart costs four times the data</strong>. Weeks 1 through 5 derive that. Weeks 7 through 12 test it three independent ways. Week 11 finds the place where it stops being true, and that failure is the most interesting thing the project produces.</p>
+
+<p>Notice what the question is <em>not</em>. It is not "can I classify cells?" — you can, and doing it takes an afternoon with a downloaded library. It is not "which classifier is best?" — Week 5 proves the optimal rule for this model is linear, so the answer is "it does not matter much, and here is the proof". The question is about the <strong>data</strong>: how much of it a decision needs, and what buys you more.</p>
+
+<h2>2 &nbsp;Signal detection theory: the same idea, in five fields</h2>
+
+<p>The mathematical core of this project is <strong>signal detection theory</strong>. It was built in the late 1940s and 1950s by radar engineers who needed to decide whether a blip on a screen was an aircraft or noise, and by psychophysicists who needed to decide whether a listener had actually heard a faint tone. Both groups arrived at the same object: a single number measuring how far apart two noisy distributions are, in units of their own noise.</p>
+
+<p>That number is $d'$ ("d-prime"), and this project's version of it is</p>
+
+$$d' \;=\; \frac{|\lambda_1 - \lambda_2|}{\sqrt{\bar\lambda}},$$
+
+<p>a difference of means divided by a noise width. The name is not ours; it comes straight from the psychophysics literature, and using it is a deliberate choice, because it means the vocabulary you learn here is the vocabulary a physicist or an audiologist already speaks.</p>
+
+<table class="simple">
+  <tr><th>Field</th><th>The two hypotheses</th><th>What plays the role of noise</th><th>What the threshold decides</th></tr>
+  <tr><td>Radar (1940s–)</td><td>aircraft present / absent</td><td>thermal noise in the receiver</td><td>miss an aircraft, or scramble a jet for a cloud</td></tr>
+  <tr><td>Medical diagnostics</td><td>disease / no disease</td><td>biological and assay variability</td><td>a false negative, or a healthy person in a scanner</td></tr>
+  <tr><td>Particle physics</td><td>new particle / background only</td><td>Poisson counting of collision events</td><td>the famous "five sigma" discovery threshold</td></tr>
+  <tr><td>Spam filtering</td><td>spam / not spam</td><td>word-frequency variation between messages</td><td>a missed advert, or a lost job offer</td></tr>
+  <tr><td>Psychophysics</td><td>tone present / absent</td><td>neural variability in the listener</td><td>where a subject's "yes" becomes a "no"</td></tr>
+  <tr><td><strong>This project</strong></td><td>cell type 1 / cell type 2</td><td><strong>counting noise: you sampled 2,000 molecules out of 10<sup>5</sup></strong></td><td>which type this particular cell is called</td></tr>
+</table>
+
+<p>Two things are worth noticing in that table. First, the row about particle physics has exactly the same noise source as ours: <strong>counting</strong>. A detector counts events; a sequencer counts molecules. Both obey the Poisson law, and both therefore obey the same square-root scaling — which is why "five sigma" and "$\sqrt{\text{depth}}$" are cousins.</p>
+
+<p>Second, every row has an ROC curve, an AUC, and a $d'$, and they mean the same thing in every row. You will build all three in Week 4. This is what people mean when they call an idea <em>transferable</em>: not that it is vaguely applicable, but that the same formula, with the same symbols, is used unchanged by people who have never met.</p>
+
+<div class="box win">
+  <span class="box-tag">The transfer, made concrete</span>
+  <p>After Week 4, if someone hands you a medical test with a sensitivity of 0.90 and a specificity
+  of 0.85, you can convert it to a $d'$, place it on an ROC curve, and say what the test would look
+  like if you ran it twice and averaged. That is a genuinely useful skill and it takes one chapter
+  to acquire, because it is the same chapter that teaches the cells.</p>
+</div>
+
+<h2>3 &nbsp;Why single-cell genomics is the right place to meet the idea</h2>
+
+<p>You could teach detection theory with coin flips. This project does not, for a reason: in single-cell RNA sequencing the sampling limit is <strong>real, current, and expensive</strong>, and that changes what the answer means.</p>
+
+<p><strong>Real.</strong> A human cell holds something like $10^5$ mRNA molecules. A standard droplet experiment counts a couple of thousand of them per cell. That is not a rounding error or a nuisance to be cleaned up by better software; it is the dominant source of uncertainty in the measurement, and no algorithm can restore molecules that were never counted. In PBMC 3k, the dataset you will use in Week 10, the median library size is a couple of thousand UMIs, so a well-expressed marker gene at $p = 0.002$ arrives with an expected count of $\lambda = 4$ and a relative noise of $1/\sqrt{4} = 50\%$. Every conclusion anyone draws about those cells is drawn through that.</p>
+
+<p><strong>Current.</strong> This is not a solved historical problem. Papers are published every month whose headline claim rests on per-cell counts of this size, and "how deep do I need to sequence?" is a question working biologists ask their core facility with real money attached.</p>
+
+<p><strong>Expensive.</strong> A sequencing run produces a fixed number of reads, and you decide how to spend them: more cells at shallower depth, or fewer cells sequenced deeper. That is a genuine design trade-off with a budget behind it, and the $\sqrt{\text{depth}\times k}$ law is exactly the kind of statement that informs it. In Week 5 you will derive that depth and gene count enter with the <em>same exponent</em>, which has a practical corollary: adding markers to your panel is free (you already sequenced them) and buys the same thing as sequencing deeper, which is not. That is a design recommendation a real laboratory could act on.</p>
+
+<div class="box biology">
+  <span class="box-tag">The honest scope of that recommendation</span>
+  The recommendation holds under the assumptions the derivation names: Poisson counts, independent
+  genes, known rates. Week 10 finds that extra "markers" stop being independent, and Week 11 finds
+  that counts are not Poisson. So by Week 12 the recommendation has acquired conditions, which is
+  what happens to real recommendations. Watching that happen to your own result, over ten weeks, is
+  the part of the project you cannot get from a textbook.
+</div>
+
+<h2>4 &nbsp;Lab: what accuracy actually costs</h2>
+
+<p>Before any argument about what kind of project this is, get a feel for the size of the effect. The lab below computes the theoretical accuracy (orange) from the formula $\Phi(d'/2)$ with $d' = \sqrt{Dk}\,|p_1-p_2|/\sqrt{\bar p}$, and independently <em>measures</em> it (blue) by simulating 400 cells at each depth and classifying them with the optimal rule. Nothing is fitted. The two curves either agree or they do not.</p>
+
+<div class="lab">
+  <div class="lab-title">Lab · the price of a decision</div>
+  <div class="lab-desc">Two cell types whose marker genes sit at $p_1 = 0.0030$ and $p_2 = 0.0020$ — a 1.5-fold difference, a modest marker rather than a spectacular one. Move the slider to change how many such markers you use. Watch the readout: the depth needed for 90% accuracy, and the depth needed for 99%. The ratio between those two numbers is the whole point of the project.</div>
+  <canvas id="lab1" height="340"></canvas>
+  <div class="controls" id="lab1ctl"></div>
+  <div class="readout" id="lab1out"></div>
+</div>
+
+<p>The lab holds each gene's expression fixed as you add genes, so every extra marker brings signal that was not already there. That is a claim about biology, not a theorem, and Week 5 examines the other convention — a fixed total marker budget cut into ever smaller pieces — under which the gain from more genes vanishes exactly. Knowing which of those two situations you are in is the difference between a design rule and a slogan.</p>
+
+<p>Play with it for a minute and then read these three numbers, which follow from $\text{accuracy} = \Phi(d'/2)$ alone and do not depend on the biology at all:</p>
+
+<table class="simple">
+  <tr><th>Improvement</th><th>Required $d'$</th><th>Multiple of the data</th></tr>
+  <tr><td>80% → 90%</td><td>$1.683 \to 2.563$</td><td>$(2.563/1.683)^2 = 2.3\times$</td></tr>
+  <tr><td>90% → 99%</td><td>$2.563 \to 4.653$</td><td>$(4.653/2.563)^2 = 3.3\times$</td></tr>
+  <tr><td>80% → 99%</td><td>$1.683 \to 4.653$</td><td>$7.6\times$</td></tr>
+</table>
+
+<p>The last row is the sentence to remember: <strong>the last few percent cost more than everything before them.</strong> That is not a fact about sequencers. It is a fact about square roots, and it is why the same shape shows up in poll margins, in telescope exposure times, and in how long a physics experiment must run.</p>
+
+<h2>5 &nbsp;What makes this a research project and not a class exercise</h2>
+
+<p>A class exercise has a known answer, one line of evidence, and a grade at the end. This has none of those. Three specific differences are worth naming, because they change how you should work.</p>
+
+<h3>5.1 &nbsp;The answer is not in a textbook in this form</h3>
+
+<p>Every <em>ingredient</em> is known. The Poisson limit of the binomial is in every probability text. $d'$ and $\Phi(d'/2)$ are in every detection-theory text. The negative binomial model of overdispersed counts is standard in the single-cell literature, and so is the observation that sequencing deeper eventually stops helping.</p>
+
+<p>What is not in a textbook is the <em>assembly</em>: a parameter-free prediction for how classification accuracy scales with depth and panel size, derived from scratch at Calculus AB level, then checked against a simulator you wrote, against a real dataset you downsampled, and against a physical experiment you ran with your hands — with the three compared quantitatively on one axis and their disagreements characterized.</p>
+
+<div class="box warning">
+  <span class="box-tag">Is this "new"? Answer this honestly, and rehearse the answer</span>
+  <p>Somebody will ask. The honest answer is: <em>the components are established and I cite them;
+  the synthesis and the measurements are mine.</em> There is published work on sequencing-depth
+  requirements for single-cell experiments and on power analysis for scRNA-seq, and part of the
+  Week 14 job is to <strong>find that work and cite it</strong> rather than to hope nobody looks.
+  A project that says "here is a known theory, here is my independent test of it, here is where my
+  data disagrees with it" is a completely respectable piece of science. A project that pretends to
+  have invented detection theory is not, and is also very easy to catch.</p>
+  <p class="muted">This is the same instinct behind the claim labels
+  <span class="claim proved">proved</span> <span class="claim cited">cited</span>
+  <span class="claim observed">observed</span> <span class="claim conjectured">conjectured</span>
+  that the whole course uses. Knowing exactly which of your sentences is which <em>is</em> the
+  research skill.</p>
+</div>
+
+<h3>5.2 &nbsp;Three independent lines of evidence have to be reconciled</h3>
+
+<p>Most student projects have one line of evidence: they run some code and report what it printed. This project has three, and they are chosen so that their weaknesses do not overlap.</p>
+
+<table class="simple">
+  <tr><th>Line</th><th>Weeks</th><th>Where the truth comes from</th><th>Its characteristic weakness</th></tr>
+  <tr><td>Derivation</td><td>1–5</td><td>an argument from stated assumptions</td><td>the assumptions can be false about the world</td></tr>
+  <tr><td>Simulation</td><td>7–9</td><td>you chose each cell's type when you generated it</td><td>it was built from the same beliefs as the theory, so agreement proves little</td></tr>
+  <tr><td>Real data</td><td>10–11</td><td>cluster annotations on 10x PBMC 3k</td><td>the labels are an <em>inference</em>, not a measurement</td></tr>
+  <tr><td>Beads</td><td>6, 12</td><td>a pre-randomized tally sheet on a table</td><td>it is an analogy for sampling, not for biology</td></tr>
+</table>
+
+<p>Read the last column downwards. Simulation cannot check the theory's assumptions, because it shares them. Real data can, but its labels are themselves computed from the counts, so a cell with unusual counts can be mislabelled <em>and</em> misclassified, and the two errors cancel in your favour. The beads have no such problem — nobody's software can be wrong about which jar a bead came from — but beads are not cells.</p>
+
+<p>No single arm is convincing. The claim in Week 12 is convincing precisely because the three arms fail differently and still agree on the exponent. Constructing an argument out of imperfect evidence, and being explicit about the imperfections, is the thing that makes this research.</p>
+
+<h3>5.3 &nbsp;The most likely outcome is a partial failure</h3>
+
+<p>Here is the schedule's honest prediction, written down in Week 1 so it cannot be retrofitted later:</p>
+
+<ul>
+  <li>The theory will be clean and will match the simulation closely. <span class="claim conjectured">conjectured</span></li>
+  <li>The bead experiment will have error bars wide enough that the fitted exponent is <em>consistent with</em> $0.5$ rather than <em>equal to</em> it. Week 6's power calculation says so in advance, before a single bead is drawn.</li>
+  <li>The real data will disagree with the theory somewhere, and the current best guess is overdispersion: real counts have a Fano factor above 1, so $d'$ saturates and deeper sequencing stops paying. <span class="claim conjectured">conjectured</span> until Week 11 measures it.</li>
+</ul>
+
+<p>That is a partial failure of the model, and it is the good outcome. A prediction that survives every test you can afford to run is one you probably did not test hard enough. The report has a section reserved for exactly this, and the difference between a strong project and a weak one is whether the failure is <em>characterized</em> — with a number, a mechanism, and an error bar — or merely admitted in the last paragraph.</p>
+
+<div class="box pitfall">
+  <span class="box-tag">The failure mode this course is most worried about</span>
+  Not that you get a wrong answer. That you get a right-looking answer and cannot say why, or
+  quietly drop the run that disagreed. The claim ledger of Week 13, the seeds in every figure, and
+  the "what I tried that failed" sections of the notebook all exist to make that specific mistake
+  hard to commit by accident.
+</div>
+
+<h2>6 &nbsp;What would falsify this?</h2>
+
+<p>A claim that nothing could contradict is not a scientific claim. So here, in advance, is what would show the project's central thesis to be wrong — stated as things you could actually see on a plot you will actually make.</p>
+
+<table class="simple">
+  <tr><th>#</th><th>Observation that would falsify</th><th>What it would mean</th><th>Where it is tested</th></tr>
+  <tr><td>F-a</td><td>The measured $d'$ from simulated cells does not rise as $\sqrt{D}$: the log–log slope settles somewhere clearly away from $0.5$ with enough cells to be sure.</td><td>Either the derivation is wrong or the simulator does not implement it. Both are fatal and both are findable.</td><td>Weeks 3, 7</td></tr>
+  <tr><td>F-b</td><td>Simulated accuracy differs from $\Phi(d'/2)$ by more than Monte-Carlo error at moderate depth.</td><td>The Gaussian step in Week 4 is not licensed where we use it.</td><td>Week 9, the M3 gate</td></tr>
+  <tr><td>F-c</td><td>The bead experiment's accuracy-versus-$n$ curve is flat, or its fitted exponent excludes $0.5$ with a tight interval.</td><td>The square-root law is not a property of sampling at all. This is the arm no software bug can rescue.</td><td>Week 12</td></tr>
+  <tr><td>F-d</td><td>Downsampled PBMC accuracy keeps climbing like $\sqrt{D}$ all the way to full depth, with a measured Fano factor of 1.</td><td>The overdispersion story is wrong, and the pure Poisson model survives on real data. That would be a genuine surprise.</td><td>Week 11</td></tr>
+  <tr><td>F-e</td><td>A flexible classifier (logistic regression, kNN) reliably beats the Poisson naive-Bayes rule on simulated data.</td><td>Week 5's proof that the optimal rule is linear would be contradicted — so either the proof or the simulator is broken.</td><td>Week 8</td></tr>
+</table>
+
+<div class="box theorem">
+  <span class="box-tag">The answer, stated in advance</span>
+  <p>Our expectation is that F-a, F-b, F-c and F-e will <strong>not</strong> occur, and that
+  <strong>F-d will half-occur</strong>: the Fano factor on real PBMC counts will come out above 1,
+  and the real-data depth curve will bend below the $\sqrt{D}$ prediction at high depth. Week 11
+  turns that expectation into a quantity — a ceiling
+  $$d'_\infty = \frac{|p_1-p_2|}{\bar p \sqrt{\varphi}}$$
+  with a knee at mean count $\bar\lambda = 1/\varphi$ — so that "the model breaks" becomes
+  "the model breaks <em>here</em>, by <em>this much</em>, for <em>this reason</em>".</p>
+  <p>That is the difference between a negative result and a null result. A null result says nothing
+  happened. A negative result says the theory failed at a stated place, with a stated number, and
+  is therefore itself a measurement.</p>
+</div>
+
+<p>Also worth writing down: things that would <em>not</em> falsify anything. Getting 99% accuracy on PBMC 3k falsifies nothing — the pair of cell types was chosen to be easy, and Week 5's worked example shows twenty ordinary markers at ordinary depth already give 99.3%. A single bead run that goes the wrong way falsifies nothing either; Week 6's lab shows you what pure noise looks like at 40 trials per point, precisely so that you are not fooled by one.</p>
+
+<h2>7 &nbsp;What a semester is, and is not, enough for</h2>
+
+<p>Fifteen weeks at six to ten hours a week is 90 to 150 hours. That is a real amount of time and it is also not very much. Being realistic about it in advance is what stops Week 13 from being a crisis.</p>
+
+<table class="simple">
+  <tr><th>Enough for</th><th>Not enough for</th></tr>
+  <tr><td>A complete derivation you can reproduce at a whiteboard, closed-book, in about twenty minutes.</td><td>A derivation of anything requiring measure theory, stochastic processes, or optimization theory.</td></tr>
+  <tr><td>A simulator of a few hundred lines that you wrote and can defend line by line.</td><td>A software package other people could use, with an API, documentation and versioning.</td></tr>
+  <tr><td>One real dataset, one pair of cell types, one preprocessing path understood in detail.</td><td>A benchmark across datasets, protocols, tissues or species. Also: any claim about which method is generally best.</td></tr>
+  <tr><td>About 400 bead trials, giving 95% intervals roughly $\pm 0.15$ wide at each draw size.</td><td>The ~3,500 trials that would resolve the predicted curve to $\pm 0.05$ per point. Week 6 does that arithmetic and rejects it explicitly.</td></tr>
+  <tr><td>One clean negative result, characterized with a mechanism and a number.</td><td>Fixing the negative result. Modelling overdispersion properly, or estimating $\varphi$ per gene with a shrinkage prior, is a project of its own.</td></tr>
+  <tr><td>A 6–8 page report, a poster, and a twelve-minute talk you can survive hostile questions about.</td><td>A publishable paper. Say so plainly; it costs you nothing and it buys credibility.</td></tr>
+</table>
+
+<p>The schedule is built around those limits rather than in denial of them. There are only about thirteen weeks of material in fifteen weeks: Weeks 6 and 13 are buffer, deliberately, because something always goes wrong and a plan with no slack converts an ordinary bad week into a missed deadline in Week 14. The scope also contracts in a pre-planned way if a milestone slips; the fallback ladder F1–F4 in <code>plans/</code> says how, in advance, so the decision is not made under pressure.</p>
+
+<h2>8 &nbsp;What this project will not teach you</h2>
+
+<p>An honest advertisement lists the exclusions. Three big ones:</p>
+
+<div class="box warning">
+  <span class="box-tag">Not in this course</span>
+  <ul>
+    <li><strong>Wet-lab technique.</strong> You will never pipette anything, load a chip, prepare a
+    library, or touch a sequencer. You will learn what those steps <em>do to the counts</em> —
+    which is what a computational person needs — but if someone hands you a 10x chip you will not
+    know what to do with it, and you should say so rather than bluff. The
+    <a href="biology-background.html">biology background page</a> is explicit about which steps are
+    described and which are only named.</li>
+    <li><strong>Deep learning.</strong> There is no neural network anywhere in this project, and
+    that is a considered choice, not an omission. Week 5 <em>proves</em> the optimal decision rule
+    for this model is linear, so a network could at best match it. The bottleneck is the data, not
+    the model class, and demonstrating that is more valuable than adding a model that cannot help.
+    If you want deep learning, this course will make you better at knowing when it is beside the
+    point — which is genuinely useful — but it will not teach you to build one.</li>
+    <li><strong>Genomics as a field.</strong> You will meet one dataset, two cell types, one
+    protocol family, and roughly a dozen gene names. You will not learn differential expression
+    pipelines, trajectory inference, batch correction, spatial methods, ATAC, or how to design a
+    biological experiment. You will have a small, solid, defensible piece of one corner, and the
+    right way to describe it is exactly that.</li>
+  </ul>
+</div>
+
+<p>What you will have instead: the ability to derive a result rather than cite it, the habit of labelling every claim by how you know it, a working sense of what a sample size buys, and one finished piece of research with its failures written down. Those transfer to essentially any quantitative field. The cell types are a vehicle.</p>
+
+<h2>9 &nbsp;Where to go next</h2>
+<ul>
+  <li><a href="how-to-use.html">How to use this course</a> — the weekly rhythm, the time budget, what to do when a week runs long. Read this before Week 1 starts.</li>
+  <li><a href="biology-background.html">Biology background</a> — everything about RNA, sequencing and cell types that the chapters assume, and nothing more.</li>
+  <li><a href="notation.html">Notation card</a> — every symbol, its meaning, and its Python name. Print it.</li>
+  <li><a href="unstuck.html">How to get unstuck</a> — read it now, while nothing is wrong, so you recognize the protocol when something is.</li>
+  <li><a href="../s/week01.html">Week 1: Counting Noise and the Question</a> — where the work starts.</li>
+</ul>
+
+</div>
+
+<footer class="site">How Much Data Does It Take to Tell Two Cell Types Apart? · Course extras · <a href="../index.html">Course home</a></footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  /* ------- Lab: theory (orange) versus simulated measurement (blue) ------- */
+  (function () {
+    const DEPTHS = [125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+    const KS = [1, 2, 4, 8, 16, 32];
+    // Per-gene rates are held FIXED at p1 = 0.0030, p2 = 0.0020 (Week 5's
+    // worked example): each extra marker brings genuinely new signal.
+    // markerProfiles splits `mass` over k genes, so scale mass with k.
+    const FOLD = 1.5, MASS_PER_GENE = 0.0025, NCELLS = 400;
+    const Z90 = 1.2816, Z99 = 2.3263;      // Phi-inverse at 0.90 and 0.99
+    let ki = 2, bump = 0;                  // start at k = 4 markers
+
+    function run() {
+      const k = KS[ki];
+      const pr = CD.markerProfiles(k, FOLD, MASS_PER_GENE * k);
+      const p1 = pr[0], p2 = pr[1];
+      const r = CD.rng(31415 + 100 * ki + bump);   // seeded, and reproducible
+      const theory = [], measured = [];
+
+      for (let i = 0; i < DEPTHS.length; i++) {
+        const D = DEPTHS[i];
+        const l1 = p1.map(p => D * p), l2 = p2.map(p => D * p);
+        const dps = l1.map((v, g) => CD.dPrime(v, l2[g]));
+        theory.push([Math.log10(D), CD.accuracyFromDPrime(CD.combineDPrime(dps))]);
+
+        let ok = 0;
+        for (let c = 0; c < NCELLS; c++) {
+          const type = c % 2;                                  // half of each type
+          const x = CD.sampleCell(type === 0 ? p1 : p2, D, r);
+          const guess = CD.nbLogRatio(x, l1, l2) > 0 ? 0 : 1;   // optimal rule
+          if (guess === type) ok++;
+        }
+        measured.push([Math.log10(D), ok / NCELLS]);
+      }
+
+      // d' at depth 1 with this panel, so that D_needed = (2z / A)^2.
+      const A = CD.combineDPrime(p1.map((p, g) => CD.dPrime(p, p2[g])));
+      const need = z => Math.pow(2 * z / A, 2);
+
+      const P = CD.plot("lab1", { xmin: 2, xmax: 4.3, ymin: 0.4, ymax: 1.02,
+                                  xlabel: "log10 ( molecules sequenced per cell )",
+                                  ylabel: "accuracy" });
+      P.clear(); P.axes();
+      P.line(theory, { color: CD.C.orange, width: 2.5 });
+      P.scatter(measured, { color: CD.C.blue, r: 4 });
+      P.label(2.15, 0.98, "orange: theory  Phi(d'/2)", { color: CD.C.orange });
+      P.label(2.15, 0.93, "blue: simulated cells, classified", { color: CD.C.blue });
+
+      document.getElementById("lab1out").innerHTML =
+        "<b>" + k + "</b> marker gene" + (k === 1 ? "" : "s") +
+        " at p = 0.0030 vs 0.0020 &nbsp;·&nbsp; " + NCELLS + " cells per point" +
+        " &nbsp;·&nbsp; depth for 90% = <b>" + Math.round(need(Z90)) + "</b> molecules" +
+        " &nbsp;·&nbsp; for 99% = <b>" + Math.round(need(Z99)) + "</b>" +
+        " &nbsp;·&nbsp; ratio = " + (need(Z99) / need(Z90)).toFixed(1) + "x";
+    }
+
+    CD.slider("lab1ctl", { label: "marker genes k", min: 0, max: KS.length - 1,
+                           step: 1, value: ki, fmt: i => KS[i] },
+              i => { ki = i; run(); });
+    CD.button("lab1ctl", "Resample the cells", () => { bump++; run(); }, true);
+  })();
+});
+</script>
+</body>
+</html>

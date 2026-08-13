@@ -1,0 +1,30 @@
+# Python caches and tooling
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# OS noise
+.DS_Store
+
+# Session-local notes, never published
+SESSION_HANDOFF.md
+
+# Large downloaded datasets — the loader re-downloads them on demand.
+# The DERIVED, committed artefacts (marker matrices, downsampling tables)
+# live in python/data/ and are NOT ignored: they are what makes the
+# real-data figures reproducible without a 100 MB download.
+python/data/raw/
+*.h5ad
+*.h5
+*.mtx
+*.tar.gz
+
+# NOTE: figures/ is deliberately NOT ignored — generated figures are course
+# deliverables and are committed alongside the code and seeds that made them.
+# NOTE: python/data/beads/ is NOT ignored — the bead tallies are primary data.

@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Biology background</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="notation.html">Notation card →</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Background · read in Week 1, revisit before Week 10</span>
+    </div>
+    <h1 class="chapter-title">Biology background</h1>
+    <div class="chapter-sub">Everything the chapters assume, and nothing more · what the machine actually does · and the four biological facts that break this project's model</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<p>This page assumes high-school biology: you know that DNA carries genes, that cells are the units of living things, and roughly what a protein is. It supplies the rest, and it deliberately stops there. Everything below is here because some chapter needs it; nothing is here for completeness. Where a number is uncertain or contested, this page says so and labels it, because the honest range matters more to this project than a memorable point value.</p>
+
+<h2>1 &nbsp;RNA, and what messenger RNA does</h2>
+
+<p>A gene is a stretch of DNA. DNA itself never leaves the nucleus and is never used directly to build anything. Instead the cell makes a working copy of a gene in a related molecule, <strong>RNA</strong>, in a process called <em>transcription</em>. The copy of a protein-coding gene is called <strong>messenger RNA</strong> (mRNA): it carries the message out of the nucleus to the ribosomes, which read it and build the corresponding protein. That step is <em>translation</em>.</p>
+
+<p>Three consequences matter for this project.</p>
+
+<ul>
+  <li><strong>mRNA is transient.</strong> Molecules are made and destroyed continually, with typical lifetimes of minutes to hours. So the set of mRNA in a cell right now is a snapshot of what the cell is <em>currently doing</em>, not a fixed property like its genome. This is why mRNA is worth measuring: every cell in your body has essentially the same DNA, and it is the RNA that differs.</li>
+  <li><strong>Most RNA in a cell is not mRNA.</strong> The large majority is ribosomal RNA, part of the protein-building machinery itself. mRNA is a small fraction of total RNA — commonly quoted as a few percent. <span class="claim cited">cited</span> Sequencing protocols therefore need a way to select the mRNA, which Section 4 describes.</li>
+  <li><strong>mRNA is a proxy for protein, not a measurement of it.</strong> The correlation between a gene's mRNA level and its protein level is real but imperfect. When this project says a cell "expresses <em>CD3D</em>", it means mRNA molecules from that gene were counted, and nothing stronger.</li>
+</ul>
+
+<h2>2 &nbsp;What "gene expression" means, quantitatively</h2>
+
+<p>Informally, a gene is "expressed" in a cell if the cell is making RNA from it. That is a yes/no statement and it is not enough for us. The quantity this project needs is:</p>
+
+<div class="box definition">
+  <span class="box-tag">Expression, as this project defines it</span>
+  <p>For a cell, and for each gene $g$, let</p>
+  $$p_g = \frac{\text{number of mRNA molecules from gene } g}{\text{total number of mRNA molecules in the cell}}.$$
+  <p>So $p_g$ is a <strong>fraction</strong>, between 0 and 1, and $\sum_g p_g = 1$ over all genes.
+  Equivalently: $p_g$ is the probability that a molecule picked at random from this cell came from
+  gene $g$.</p>
+  <p>A well-expressed gene might have $p_g = 0.002$ — two molecules in a thousand. The most extreme
+  genes in a specialized cell can be a percent or more on their own; the great majority of genes are
+  far below $10^{-4}$, and thousands are simply absent at any given moment.</p>
+</div>
+
+<p>Two things follow from defining expression as a fraction rather than a count.</p>
+
+<p>First, it is exactly the right object for a probability model. "Capture $D$ molecules at random from a cell whose composition is $p$" is a standard sampling problem the moment $p$ is a probability vector, and that is the sentence Week 1 turns into a Poisson.</p>
+
+<p>Second, it is <em>compositional</em>: the fractions must sum to 1, so if one gene goes up, everything else must go down slightly, even if nothing changed about those genes in absolute terms. This is a real subtlety in the field and this project mostly sidesteps it, because the marker genes we use are a tiny share of the total and the induced shifts are negligible. Worth knowing, and worth a sentence in a limitations section, not worth a chapter here.</p>
+
+<div class="box biology">
+  <span class="box-tag">A definition you will meet elsewhere and should not confuse with ours</span>
+  Published single-cell work almost never reports $p_g$. It reports normalized, log-transformed
+  values — "counts per 10,000, then $\log(1+x)$" is the near-universal default. Those numbers are
+  good for clustering and visualization and <strong>catastrophic</strong> for us: normalization
+  divides by each cell's library size and turns integers into real numbers whose variance no longer
+  equals their mean, which destroys exactly the Poisson structure this project is about. Week 10 is
+  emphatic about this. Know which of your matrices are raw counts and which are not, and never let
+  them mix.
+</div>
+
+<h2>3 &nbsp;The transcriptome, and how many molecules a cell holds</h2>
+
+<p>The <strong>transcriptome</strong> of a cell is the complete collection of RNA molecules in it at one moment — both the identities and the amounts. It is what a single-cell RNA-seq experiment is trying to sample. Note the word: <em>sample</em>. The transcriptome is the population; your count matrix is a draw from it.</p>
+
+<div class="box data">
+  <span class="box-tag">The number that sets the scale of this entire project <span class="claim cited">cited</span></span>
+  <p>A typical mammalian cell contains on the order of <strong>$10^5$ mRNA molecules</strong>.
+  Published estimates commonly fall in the range <strong>50,000 to 300,000</strong>, and the spread
+  is not sloppiness: the number genuinely varies with cell type, cell size, and how metabolically
+  active the cell is. A large secretory cell holds far more than a small resting lymphocyte, and the
+  PBMCs used in Week 10 are small, mostly quiescent cells that likely sit at the lower end.</p>
+  <p>It is also <em>hard to measure</em>, which is why the range is wide. You cannot count the
+  molecules in a cell directly. Estimates come from methods like adding a known quantity of
+  synthetic RNA ("spike-ins") and comparing, and each such method carries its own assumptions about
+  how the synthetic molecules behave relative to real ones.</p>
+  <p class="muted">Treat "about $10^5$" as an order of magnitude, quote a range rather than a point
+  value if anyone asks, and label it <span class="claim cited">cited</span>. Nothing in this project
+  depends on the exact figure — which is a design choice, not luck.</p>
+</div>
+
+<p>Now put that beside the measurement. A standard droplet experiment counts a couple of thousand molecules per cell. So:</p>
+
+$$\frac{\text{molecules counted}}{\text{molecules present}} \;\approx\; \frac{2{,}000}{100{,}000} \;=\; 2\%.$$
+
+<p>Ninety-eight percent of the cell is never seen. That single ratio is the reason this project exists, and it is the sentence to lead with if you have thirty seconds to explain the work to someone.</p>
+
+<h2>4 &nbsp;What single-cell RNA sequencing actually does</h2>
+
+<p>The dominant technology, and the one behind PBMC 3k, is droplet-based: 10x Genomics Chromium. Here is the whole process at the level of detail this project needs. You will never perform these steps; you need to know what each one does to the counts.</p>
+
+<table class="simple">
+  <tr><th>Step</th><th>What happens</th><th>Does it lose molecules?</th></tr>
+
+  <tr><td>1. Dissociation</td>
+      <td>The tissue or blood sample is broken into a suspension of single cells. For blood this is comparatively gentle; for solid tissue it is not.</td>
+      <td>It loses <em>cells</em>, and not at random: fragile cell types are destroyed preferentially, and the stress can change what a surviving cell is transcribing.</td></tr>
+
+  <tr><td>2. Droplet formation</td>
+      <td>Cells, barcoded gel beads and reaction mix are pushed through a microfluidic junction into oil, making tens of thousands of tiny droplets. The aim is one cell and one bead per droplet.</td>
+      <td>Loses cells (many droplets get no cell). Also creates <strong>doublets</strong> — two cells in one droplet, which then look like one impossible hybrid cell.</td></tr>
+
+  <tr><td>3. Lysis and capture</td>
+      <td>The cell bursts inside its droplet. Its mRNA floats free and binds to the bead's oligos: each oligo ends in a stretch of Ts (oligo-dT) that pairs with the poly-A tail almost every mRNA carries.</td>
+      <td><strong>Yes, heavily.</strong> Not every molecule finds an oligo. This is thought to be one of the biggest losses in the whole protocol, and it is not identical for every gene.</td></tr>
+
+  <tr><td>4. Reverse transcription</td>
+      <td>An enzyme copies each captured mRNA into cDNA (DNA is far more robust than RNA). The bead's <strong>cell barcode</strong> and the oligo's <strong>UMI</strong> are copied along with it.</td>
+      <td><strong>Yes.</strong> Reverse transcriptase is efficient but not perfect, and it falls off long or structured molecules more often.</td></tr>
+
+  <tr><td>5. Amplification (PCR)</td>
+      <td>The emulsion is broken, everything is pooled, and the cDNA is copied many times over so there is enough material to sequence.</td>
+      <td>Not directly, but it <em>distorts</em>: some molecules are copied far more than others. This is precisely the distortion UMIs were invented to undo (Section 5).</td></tr>
+
+  <tr><td>6. Library preparation and sequencing</td>
+      <td>Fragments are prepared and run on a sequencer. One read gives the cell barcode and UMI; the other gives a piece of the transcript, from the 3' end.</td>
+      <td><strong>Yes, at finite sequencing depth</strong>: a molecule present in the library but never sequenced is a molecule you do not have. This is the "reads per cell" budget line.</td></tr>
+
+  <tr><td>7. Alignment and counting</td>
+      <td>Reads are matched to genes; reads sharing a cell barcode and a UMI are collapsed to one molecule. The output is the count matrix: cells down the rows, genes across the columns, integers inside.</td>
+      <td>Loses ambiguous reads (multi-mapping, barcodes with errors). Also merges genuinely distinct molecules that happened to draw the same UMI — a <em>UMI collision</em>.</td></tr>
+</table>
+
+<p>Every "yes" in the right-hand column is a place where molecules disappear between the cell and your matrix. Multiply them together and you get the capture efficiency of Section 7.</p>
+
+<div class="box biology">
+  <span class="box-tag">Two consequences of the 3' protocol worth knowing</span>
+  <p><strong>Only the 3' end is sequenced.</strong> 10x counts <em>molecules per gene</em>; it does
+  not read the whole transcript, so it generally cannot tell which splice isoform a molecule was.
+  That is fine here — this project is about counting, not about isoforms — but it is a real
+  limitation of the data, and saying so when asked is better than discovering it in the Q&amp;A.</p>
+  <p><strong>Capture depends on the poly-A tail.</strong> RNAs without one are largely invisible to
+  the protocol. That is a systematic gap, not a random loss, and it is one of the reasons the phrase
+  "the transcriptome" is a slight overstatement of what you have measured.</p>
+</div>
+
+<h2>5 &nbsp;What a UMI is, and why nothing works without it</h2>
+
+<p>Step 5 above is a problem. PCR amplifies molecules unevenly — one molecule might end up with 200 copies and its neighbour with 20, for reasons having to do with sequence and luck. If you simply counted reads, you would be measuring the amplification, not the biology.</p>
+
+<div class="box definition">
+  <span class="box-tag">Definition · UMI (unique molecular identifier)</span>
+  <p>A <strong>UMI</strong> is a short random barcode — a stretch of about a dozen random bases —
+  attached to each mRNA molecule <em>before</em> amplification. Every oligo on the bead carries a
+  different one.</p>
+  <p>Amplification copies the UMI along with the molecule. So afterwards, all the reads descended
+  from one original molecule carry the same UMI, and you can collapse them back to a single count.
+  <strong>Counting distinct UMIs counts original molecules; counting reads counts PCR.</strong></p>
+</div>
+
+<p>This is why UMIs are load-bearing for this project specifically, and not just a technical nicety. Everything from Week 1 onwards depends on the counts being <em>counts of molecules sampled from the cell</em>, so that the Poisson law applies and the variance equals the mean. Read counts have no such property: their variance is inflated by amplification noise, and a Fano factor computed on them would measure the PCR machine.</p>
+
+<div class="box warning">
+  <span class="box-tag">The caveat, which belongs in your limitations section</span>
+  "One UMI equals one molecule" is standard and approximately right, not exact. Two different
+  molecules of the same gene in the same cell can draw the same random barcode (a <em>UMI
+  collision</em>), which undercounts, and this gets worse for very highly expressed genes.
+  Sequencing errors inside a barcode can split one molecule into two apparent ones, which
+  overcounts. Standard pipelines correct for both, and the residual error is generally small at
+  PBMC 3k's counts per gene. <span class="claim cited">cited</span> Say the sentence out loud before
+  anyone asks you: <em>"I am treating UMI counts as molecule counts, which is standard and
+  approximately right."</em>
+</div>
+
+<h2>6 &nbsp;What a cell type is, honestly</h2>
+
+<p>A <strong>cell type</strong> is a group of cells that share a function, an origin, and a characteristic pattern of gene expression: T cells, monocytes, neurons, hepatocytes. Immunologists have classified blood cell types for decades using surface proteins, and those classifications are real and useful.</p>
+
+<p>For this project, though, the working definition is narrower and entirely quantitative:</p>
+
+<div class="box definition">
+  <span class="box-tag">A cell type, as this project uses the term</span>
+  A cell type is <strong>a probability distribution over which gene the next transcript belongs
+  to</strong>: a vector $p^{(1)}$ or $p^{(2)}$ over genes, summing to 1. Two types are
+  distinguishable exactly to the extent that those two vectors differ.
+</div>
+
+<p>That definition makes the whole project possible, and it is also a simplification with a name attached, so name it now:</p>
+
+<div class="box warning">
+  <span class="box-tag">The boundary between cell types is fuzzy, and often there is no boundary</span>
+  <ul>
+    <li><strong>Cells of one type are not identical.</strong> Two T cells from the same donor have
+    genuinely different expression profiles: different points in the cell cycle, different recent
+    stimulation, different sizes. The model says they share one $p$ vector; they do not. This is the
+    assumption Week 11 kills, and it is what overdispersion <em>is</em>.</li>
+    <li><strong>Many differences are continuous, not categorical.</strong> Cells differentiate along
+    trajectories, and activation states grade smoothly. Where along a continuum you draw a line and
+    call one side "type A" is a decision, sometimes a useful one and sometimes an artefact of the
+    clustering algorithm's settings.</li>
+    <li><strong>Types nest.</strong> "T cell" contains CD4 and CD8, which contain naive, memory and
+    effector states, which contain finer distinctions still. The right level of granularity depends
+    on the question, and the answer to "how many cell types are there?" is "at what resolution?".</li>
+  </ul>
+  <p>This project studies <strong>two well-separated types</strong> — CD14+ monocytes and CD4 T
+  cells — precisely so that these difficulties are not the limiting factor. That is a legitimate
+  simplification and it needs to be stated as one, out loud, in the talk. The claim being tested is
+  about how accuracy scales with depth, not about how hard cell typing is in general.</p>
+</div>
+
+<div class="box data">
+  <span class="box-tag">Where the labels in PBMC 3k come from, and why it matters</span>
+  <p>Nobody looked at those cells and identified them. There is no independent measurement of what
+  type each barcode is: no flow sorting, no imaging, no second assay. The labels are produced by
+  computing on the same counts you then analyse — normalize, log, pick highly variable genes, PCA,
+  build a neighbour graph, run Leiden clustering, then name each cluster after whichever marker
+  panel it scores higher on.</p>
+  <p>So every real-data conclusion in this project is <strong>conditional on those annotations being
+  right</strong>, and that clause belongs in the report as a clause, not a footnote. It is also
+  exactly why the project has a simulation arm (where you chose each cell's type) and a bead arm
+  (where the tally sheet recorded the jar): those are the two arms in which the truth is known
+  rather than inferred.</p>
+</div>
+
+<h2>7 &nbsp;Marker genes</h2>
+
+<p>A <strong>marker gene</strong> is a gene whose expression differs substantially between the cell types you are trying to tell apart. In this project's language: a gene where $p_g^{(1)}$ and $p_g^{(2)}$ are noticeably different. Markers are how cell types are recognized in practice, and the panels for common blood cells have been known for years.</p>
+
+<table class="simple">
+  <tr><th>Gene</th><th>Marks</th><th>What the protein does, roughly</th></tr>
+  <tr><td><em>LYZ</em></td><td>Monocytes (and other myeloid cells)</td><td>Lysozyme: an enzyme that attacks bacterial cell walls. Very highly expressed — one of the strongest signals in the dataset.</td></tr>
+  <tr><td><em>S100A8</em>, <em>S100A9</em></td><td>Monocytes, neutrophils</td><td>The two halves of calprotectin, an abundant antimicrobial and inflammatory protein.</td></tr>
+  <tr><td><em>CST3</em></td><td>Monocytes, dendritic cells</td><td>Cystatin C, a protease inhibitor.</td></tr>
+  <tr><td><em>CD14</em></td><td>CD14+ monocytes specifically</td><td>A receptor for bacterial cell-wall components; it gives this monocyte subset its name.</td></tr>
+  <tr><td><em>CD3D</em>, <em>CD3E</em></td><td>T cells</td><td>Components of the CD3 complex, part of the T-cell receptor machinery. Defining for T cells.</td></tr>
+  <tr><td><em>IL7R</em></td><td>CD4 T cells (and other lymphocytes)</td><td>The interleukin-7 receptor, needed for T-cell survival.</td></tr>
+  <tr><td><em>LTB</em></td><td>Lymphocytes broadly</td><td>Lymphotoxin beta, a signalling molecule.</td></tr>
+  <tr><td><em>MS4A1</em></td><td>B cells</td><td>Also called CD20; the target of several therapeutic antibodies. Present in PBMC 3k but not used by this project.</td></tr>
+</table>
+
+<p>The monocyte-versus-T-cell pair is deliberately easy. The genes above are strongly and consistently different between the two populations, which keeps the classification accuracy inside the range where a scaling law can be measured: a hopeless pair would sit at chance at every depth, and a trivial pair at 1 everywhere. Neither can show you a curve.</p>
+
+<div class="box pitfall">
+  <span class="box-tag">Fold change is not $d'$, and this is where the biology and the statistics part company</span>
+  Biologists rank markers by <strong>fold change</strong>: how many times higher a gene's expression
+  is in one type than the other. A gene at $p = 10^{-6}$ against $p = 10^{-7}$ has a spectacular
+  tenfold change and contributes essentially nothing to classifying a single cell, because at a
+  depth of 2,000 molecules its expected count is 0.002 against 0.0002 and you will almost always see
+  zero from both. $d'$ knows this and fold change does not, because $d'$ has $\sqrt{\bar\lambda}$ in
+  its denominator. Week 10 makes you compute both rankings on real data and measure how much they
+  disagree.
+</div>
+
+<h2>8 &nbsp;Capture efficiency and dropout</h2>
+
+<p>Section 4 listed the steps at which molecules go missing. Their combined effect has a name.</p>
+
+<div class="box biology">
+  <span class="box-tag">Capture efficiency, and how uncertain it is <span class="claim cited">cited</span></span>
+  <p>The <strong>molecular capture efficiency</strong> is the fraction of a cell's mRNA molecules
+  that end up as counted UMIs. For droplet protocols it is usually quoted as somewhere in the range
+  of <strong>roughly 10% to 30%</strong>. So a cell containing 300,000 transcripts contributes
+  something like 30,000 to 90,000 counted molecules — before you account for how deeply the library
+  was actually sequenced, which is what brings a typical PBMC 3k cell down to a couple of thousand.</p>
+  <p>Treat that range with suspicion and say so out loud. The number is <em>protocol-dependent</em>
+  (plate-based protocols such as Smart-seq are generally credited with higher efficiency than
+  droplet ones), <em>estimate-dependent</em> (most measurements come from spiked-in synthetic RNA of
+  known concentration, which may not behave like cellular mRNA), and <em>version-dependent</em>
+  within a single vendor's chemistry. Published values for nominally the same platform differ by
+  more than a factor of two. See Svensson et al. (2017) and Zheng et al. (2017) in the
+  <a href="resources.html">resource library</a>.</p>
+</div>
+
+<p><strong>Dropout</strong> is the word the field uses for the consequence: a gene that is genuinely being expressed shows up as a zero in a particular cell, because none of its molecules happened to be captured. In this project dropout is written as a probability $q$ that a given molecule is lost, and the keep probability is $1-q$.</p>
+
+<div class="box win">
+  <span class="box-tag">Why the uncertainty in that 10–30% figure does not sink the project</span>
+  <p>Week 9 proves — from the thinning theorem — that losing each molecule independently with
+  probability $q$ produces <em>exactly</em> the distribution you would get by sequencing at depth
+  $D(1-q)$ with no losses at all. Dropout is not a new phenomenon; it is the depth axis with
+  different tick labels.</p>
+  <p>So you do not need to know $q$ in order to test the theory. Whatever it is, it slides you along
+  a curve whose <em>shape</em> is the thing being predicted. That is a small piece of research
+  design worth appreciating: an honest admission of ignorance about a parameter was made harmless by
+  arranging that no conclusion depends on it.</p>
+  <p class="muted">The assumption that does the work is that the loss probability is the same for
+  every molecule — the same for every gene, every expression level, every cell. Section 9 says why
+  that is the suspicious part.</p>
+</div>
+
+<h2>9 &nbsp;The four biological facts that break this project's model</h2>
+
+<p>The model is: a cell type is a fixed probability vector, genes are independent, capture is a uniform random sample, and the labels are known. All four are false. That is not a defect to be hidden; the schedule is built around measuring how false each one is, and by Week 14 this table is the skeleton of your limitations section.</p>
+
+<table class="simple">
+  <tr><th>#</th><th>The biological fact</th><th>What it breaks</th><th>Attacked in</th></tr>
+
+  <tr><td>1</td>
+      <td><strong>Cells of one type differ from one another.</strong> Cell size, cell-cycle stage, recent stimulation and micro-environment all shift a cell's expression profile, so there is no single $p^{(1)}$ shared by all type-1 cells.</td>
+      <td>Poisson counts. Mixing Poissons with varying rates gives $\mathrm{Var} = m + \varphi m^2$ — a negative binomial, Fano factor above 1. $d'$ then saturates at $|p_1-p_2|/(\bar p\sqrt\varphi)$ and deeper sequencing stops buying anything past a knee at mean count $1/\varphi$.</td>
+      <td><strong>Week 11</strong>, where you measure $F$ and $\hat\varphi$ on real PBMC counts and derive the ceiling. The headline negative result of the project.</td></tr>
+
+  <tr><td>2</td>
+      <td><strong>Genes are co-regulated.</strong> Genes work in programmes: transcription factors switch sets of genes together, and the monocyte markers in Section 7 rise and fall as a group rather than independently.</td>
+      <td>The quadrature step. Adding $d'$ values in quadrature needs independence across genes; with correlated markers the tenth gene repeats what the first nine already said, and the true $d'$ grows more slowly than $\sqrt k$.</td>
+      <td><strong>Week 5</strong> names the assumption where it is used and shows that a fixed marker budget cut into more pieces gains exactly nothing; <strong>Week 10</strong> measures the shortfall on real panels as $k$ grows.</td></tr>
+
+  <tr><td>3</td>
+      <td><strong>Capture is gene-dependent.</strong> Oligo-dT capture depends on the poly-A tail; reverse transcription depends on length, GC content and secondary structure. Molecules are not lost with one uniform probability.</td>
+      <td>The thinning theorem's third assumption, and with it the clean claim that dropout is just reduced depth. Gene-dependent capture is a per-gene rescaling of $p_g$, which also means the rates you estimate are the rates <em>as captured</em>, not as present.</td>
+      <td><strong>Week 9</strong>, which states the assumption explicitly in the proof and argues about how suspicious it is; <strong>Week 10</strong>'s rate estimation inherits the same caveat.</td></tr>
+
+  <tr><td>4</td>
+      <td><strong>The labels come from clustering.</strong> Cell-type annotations in PBMC 3k are computed from the same counts you go on to classify, using a pipeline with tunable settings.</td>
+      <td>The meaning of "accuracy" itself. A cell with atypical counts is likely to be clustered wrongly <em>and</em> classified wrongly, so the two errors correlate and cancel, biasing measured accuracy upwards. The absolute number is optimistic.</td>
+      <td><strong>Week 10</strong>, which is blunt about it and gives you the 150-word answer to the reviewer's question; <strong>Week 12</strong>, which puts the three arms' truth sources side by side; <strong>Week 13</strong>, where the claim ledger records what is conditional on what.</td></tr>
+</table>
+
+<div class="box win">
+  <span class="box-tag">Why the project survives all four</span>
+  <p>Because the claim being tested is about a <strong>slope</strong>, not a level. Facts 3 and 4
+  shift the accuracy curve up or down; they do not change how it scales with depth, because the
+  depth sweep downsamples the same cells with the same fixed labels. Fact 2 costs you some of the
+  $\sqrt k$ and is measurable as a shortfall. Only fact 1 attacks the exponent itself — which is
+  precisely why it is the interesting one, and why it gets a whole chapter rather than a caveat.</p>
+  <p>Knowing which of your defects damages your headline claim, and which merely make the numbers
+  less pretty, is most of what separates a strong limitations section from an apologetic one.</p>
+</div>
+
+<h2>10 &nbsp;A minimal vocabulary</h2>
+
+<table class="simple">
+  <tr><th>Word</th><th>Working definition</th></tr>
+  <tr><td>Transcription</td><td>Copying a gene from DNA into RNA.</td></tr>
+  <tr><td>mRNA / transcript</td><td>The RNA copy of a protein-coding gene. "Transcript" and "mRNA molecule" are used interchangeably here.</td></tr>
+  <tr><td>Transcriptome</td><td>All the RNA in one cell at one moment: identities and amounts.</td></tr>
+  <tr><td>Expression ($p_g$)</td><td>The fraction of a cell's transcripts that come from gene $g$.</td></tr>
+  <tr><td>scRNA-seq</td><td>Single-cell RNA sequencing: a count of captured molecules per gene, per cell.</td></tr>
+  <tr><td>Library size / depth ($D$)</td><td>Total molecules counted from one cell. A couple of thousand in PBMC 3k.</td></tr>
+  <tr><td>UMI</td><td>Random barcode attached to a molecule before amplification, so molecules can be counted rather than reads.</td></tr>
+  <tr><td>Cell barcode</td><td>Shared barcode on all oligos of one bead, identifying which droplet — and so which cell — a read came from.</td></tr>
+  <tr><td>Dropout</td><td>A gene reading as zero in a cell because none of its molecules were captured, not because it was silent.</td></tr>
+  <tr><td>Capture efficiency</td><td>Fraction of a cell's molecules that become counted UMIs. Roughly 10–30% for droplet protocols. <span class="claim cited">cited</span></td></tr>
+  <tr><td>Marker gene</td><td>A gene whose expression differs substantially between the cell types of interest.</td></tr>
+  <tr><td>Overdispersion</td><td>Variance larger than the mean; Fano factor above 1. The signature of variability beyond counting noise.</td></tr>
+  <tr><td>PBMC</td><td>Peripheral blood mononuclear cells: the round-nucleus white blood cells left after red cells and granulocytes are removed. Mostly T cells and monocytes.</td></tr>
+  <tr><td>Doublet</td><td>Two cells captured in one droplet, appearing as a single hybrid "cell".</td></tr>
+</table>
+
+<h2>11 &nbsp;Where to read more</h2>
+<ul>
+  <li>The <a href="https://scanpy-tutorials.readthedocs.io/">scanpy PBMC 3k tutorial</a> — click through it in Week 1 without trying to understand everything; return to it properly in Week 10. <span class="muted">~40 min the first time.</span></li>
+  <li>Luecken &amp; Theis (2019), <em>Current best practices in single-cell RNA-seq analysis</em> — the introduction and the normalization section only. <span class="muted">Read it to see what the field takes for granted.</span></li>
+  <li>Zheng et al. (2017), <em>Nature Communications</em> 8:14049 — the 10x Chromium paper and the origin of PBMC 3k. Read the UMI section and note the reported median UMIs per cell. <span class="claim cited">cited</span></li>
+  <li>Svensson et al. (2017), <em>Nature Methods</em> — where the capture-efficiency numbers come from, and how they were obtained. <span class="claim cited">cited</span></li>
+  <li>Course pages: <a href="glossary.html">glossary</a> · <a href="notation.html">notation card</a> · <a href="resources.html">resource library</a> · <a href="big-picture.html">the big picture</a></li>
+</ul>
+
+</div>
+
+<footer class="site">How Much Data Does It Take to Tell Two Cell Types Apart? · Course extras · <a href="../index.html">Course home</a></footer>
+
+</body>
+</html>

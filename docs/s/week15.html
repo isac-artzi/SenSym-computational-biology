@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 15 — Poster, Talk, and Submission</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="week14.html">← Week 14</a><a href="../index.html">Course home →</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Week 15</span>
+      <span class="badge mile">MILESTONE M8</span>
+      <span class="badge win">git tag <code>v1.0</code></span>
+    </div>
+    <h1 class="chapter-title">Poster, Talk, and Submission</h1>
+    <div class="chapter-sub">Three panels read from a metre away · twelve minutes, timed · an hour of adversarial questions · out the door · and what actually transfers</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<h2>Objectives</h2>
+<ul class="objectives">
+  <li>Build a three-panel poster — question, result, limits — that a stranger can read from a metre away in thirty seconds.</li>
+  <li>Give a twelve-minute talk to a timed structure, and say for each slide what is on it and what stays in your mouth.</li>
+  <li>Survive an hour of adversarial questions, including the ones you would rather not be asked, without becoming defensive and without bluffing.</li>
+  <li>Say "I do not know, and here is how I would find out" at least once, deliberately, and mean it.</li>
+  <li>Choose a submission venue, meet its actual current requirements, and submit.</li>
+  <li>Leave the repository in a state where a stranger could pick the project up: <code>v1.0</code>, a final README, and a handover note.</li>
+  <li>Name three fields outside biology where this week's detection theory is the same theory, and say what the $\sqrt{n}$ law has in common across all of them.</li>
+</ul>
+
+<h2>1 &nbsp;What this week is</h2>
+
+<p>Three deliverables and one rehearsal. The poster and the talk are compressions of the report you froze last week — no new results, no new figures beyond the three poster panels, no new analysis. The submission is an act, not a plan. And the rehearsal is the most valuable hour of the semester, which is not a figure of speech: an hour of a mentor attacking your work will teach you more about it than the preceding two weeks of writing.</p>
+
+<div class="box win">
+  <span class="box-tag">The frame for the whole week</span>
+  A poster is a conversation starter, not a paper on a wall. A talk is a guided tour, not a
+  reading. And the Q&amp;A is not an examination you pass or fail — it is the only part of the
+  whole process where you get to find out what a smart stranger thinks of your reasoning. Treat
+  the hard questions as the payoff rather than as the hazard, and the week gets much better.
+</div>
+
+<h2>2 &nbsp;The poster</h2>
+
+<p>Start from the physics of the situation. A poster session is a room of people walking past at about one metre, deciding in a few seconds whether to stop. If they stop, they will give you thirty seconds of reading before they either leave or start talking to you. Everything about the design follows from those two numbers.</p>
+
+<div class="box definition">
+  <span class="box-tag">The three-panel layout</span>
+  <p>A title bar across the top, then three columns, read left to right:</p>
+  <table class="simple">
+    <tr><th>Panel</th><th>Heading</th><th>Figure</th><th>Words</th><th>The one thing it must land</th></tr>
+    <tr><td>P1</td><td>The question</td><td><code>P1_question.png</code></td><td>≤ 80</td>
+        <td>Counting is sampling, so classifying a cell is a detection problem — and here is the
+        question that follows.</td></tr>
+    <tr><td>P2</td><td>The result</td><td><code>P2_result.png</code></td><td>≤ 80</td>
+        <td>Four times the data, twice the separation — predicted from Poisson statistics with no
+        fitted parameters, and confirmed three independent ways.</td></tr>
+    <tr><td>P3</td><td>The limits</td><td><code>P3_limits.png</code></td><td>≤ 80</td>
+        <td>Real counts are overdispersed, so there is a ceiling: past the knee, deeper sequencing
+        buys almost nothing.</td></tr>
+  </table>
+  <p>Under the three columns, a single strip: methods in four lines, the three or four references
+  that matter, the repository URL, and the acknowledgement. Total word count for the entire poster:
+  <strong>under 300</strong>. If you are over, you are writing a paper on a wall.</p>
+</div>
+
+<div class="box example">
+  <span class="box-tag">Type sizes, derived rather than looked up</span>
+  <p>A letter is legible when its cap height subtends about 5 arcminutes at the eye, and comfortable
+  continuous reading wants roughly three times the threshold. At one metre:</p>
+  $$5' = \frac{5}{60}\times\frac{\pi}{180} = 1.45\times10^{-3}\ \text{rad}, \qquad
+  h_{\min} = 1000\,\text{mm} \times 1.45\times10^{-3} = 1.45\ \text{mm}.$$
+  <p>Three times that is a cap height of about 4.4 mm. Cap height is roughly 0.7 of the nominal
+  font size, so the font must be at least $4.4/0.7 = 6.3$ mm, and since 1 pt $= 0.353$ mm that is
+  <strong>18 pt — the absolute floor for body text</strong>. Design at 24–28 pt to have a margin.</p>
+  <p>The title must work from three metres, so triple again: 54 pt minimum, and 72–100 pt in
+  practice. Panel headings sit between: 40–48 pt. Captions may drop to 20–24 pt, and nothing on
+  the poster goes below 18 pt — including the axis labels inside your figures, which is why
+  <code>week15_poster_figures.py</code> sets its own larger font sizes instead of scaling up the
+  report's PNGs.</p>
+  <p class="muted">Check it, do not trust it: print one panel at final size, tape it to a wall, and
+  stand a metre back. Five minutes, and it catches every mistake at once.</p>
+</div>
+
+<div class="box warning">
+  <span class="box-tag">A poster is a conversation starter</span>
+  <p>The commonest poster failure is treating the board as the deliverable. It is not — <em>you</em>
+  are the deliverable, and the board exists to get someone to stop and start talking to you, and
+  then to give you something to point at.</p>
+  <p>Practical consequences. Leave things out on purpose and know what you left out, so that when
+  someone asks "how did you pick the markers?" you have a real answer and a page in your folder
+  rather than a paragraph on the wall they could have read without you. Do not put the derivation
+  on the poster; put the result and derive it out loud on request. And have a one-sentence opener
+  ready for the person who stops and says nothing: <em>"It is about how much sequencing you need to
+  tell two kinds of cell apart — do you want the thirty-second version or the three-minute one?"</em></p>
+</div>
+
+<h2>3 &nbsp;The twelve-minute talk</h2>
+
+<p>Twelve minutes is a hard budget, and most first talks fail the same way: eight minutes of background, three minutes of rushed results, no limitations, and the buzzer during the conclusion. The structure below prevents that, because the section budgets are fixed before the slides are made.</p>
+
+<table class="simple">
+  <tr><th>Section</th><th>Time</th><th>Slides</th><th>What is on the slide</th><th>What stays in your mouth</th></tr>
+  <tr><td>The question</td><td>2:00</td><td>1–3</td>
+      <td>Title. One cell, one count, the number 41% (relative noise on a count of 6). The question
+      in one line.</td>
+      <td>Why anyone should care; the analogy to a poll of 6 people; the fact that most genes come
+      back as zero.</td></tr>
+  <tr><td>The theory</td><td>3:00</td><td>4–6</td>
+      <td>Poisson: variance $=$ mean, one line. $d'$ defined with a two-distribution picture.
+      $d'\propto\sqrt{Dk}$ and accuracy $=\Phi(d'/2)$. F2.</td>
+      <td>The derivation itself, delivered as a story of three steps, pointing at each line as you
+      say it. Never read the algebra aloud symbol by symbol.</td></tr>
+  <tr><td>Three lines of evidence</td><td>4:00</td><td>7–9</td>
+      <td>F3 simulation. F4 PBMC. F5 beads. One number with its interval per slide.</td>
+      <td>What each line of evidence can and cannot rule out; why you did three instead of one;
+      that the bead prediction was fixed before any bead was drawn.</td></tr>
+  <tr><td>Where it fails</td><td>2:00</td><td>10–11</td>
+      <td>The Fano panel: the data is not Poisson. F6: measured minus predicted with intervals.</td>
+      <td>The one-donor limitation, the label-circularity limitation, and the sentence "this is the
+      most interesting thing I found".</td></tr>
+  <tr><td>What next</td><td>1:00</td><td>12</td>
+      <td>Three bullets: more donors, effective $k$ from marker correlation, real deep sequencing
+      rather than downsampling.</td>
+      <td>Which of the three you would do first and why.</td></tr>
+  <tr><td colspan="5"><em>Backup slides, after the end:</em> the full $d'$ derivation · the claim
+      ledger · the Wilson coverage figure · the bead protocol photo · the marker-selection
+      procedure. Never shown unless asked, always ready.</td></tr>
+</table>
+
+<div class="box pitfall">
+  <span class="box-tag">What goes on the slide, and what does not</span>
+  <p>A slide is a visual aid for a spoken argument. Two rules cover almost everything.</p>
+  <p><strong>If it is on the slide, the audience is reading it and not listening to you.</strong> So
+  a slide holds one figure, one equation, or at most three short lines — never a paragraph, and
+  never a sentence you intend to say out loud, because they will read it faster than you can say
+  it and then wait, irritated.</p>
+  <p><strong>Caveats and nuance go in the mouth, not on the slide.</strong> The audience cannot hold
+  a footnote in their head at 40 seconds a slide, but they will remember you <em>saying</em> "these
+  are one donor, so the error bar is about cells, not people" — and they will trust you more for
+  having said it while the figure was up rather than in a limitations slide at the end.</p>
+  <p>The corollary: rehearse out loud, standing, with a timer, at least three times. A talk
+  rehearsed in your head runs 30–40% faster than the same talk delivered, which is exactly the
+  error that produces the buzzer-during-the-conclusion ending.</p>
+</div>
+
+<div class="lab">
+  <div class="lab-title">Lab 1 · Talk timer</div>
+  <div class="lab-desc">Enter the timings you actually plan (or the ones your rehearsal produced). The bar shows each section against the 12-minute budget. Two warnings fire: going over 12 minutes, and theory taking more time than the evidence — the balance that separates a research talk from a lecture.</div>
+  <canvas id="w15lab1" height="250"></canvas>
+  <div class="controls" id="w15lab1ctl"></div>
+  <div class="readout" id="w15lab1out"></div>
+</div>
+
+<h2>4 &nbsp;Adversarial Q&amp;A rehearsal</h2>
+
+<p>Book an hour with your mentor and ask them to be difficult. Not unkind — difficult: to interrupt, to ask the question you were hoping to avoid, to say "that is not what your figure shows". This hour is worth more than any other hour this week, for three reasons. You will discover which parts of your own argument you cannot actually reconstruct. You will hear your weakest claim said out loud by someone else, which is much easier to fix now than in front of a judge. And you will practise the single most valuable move in research conversation, which is saying "I do not know".</p>
+
+<div class="box definition">
+  <span class="box-tag">How to answer a hard question</span>
+  <ol>
+    <li><strong>Say the honest thing first</strong>, in one sentence. "Yes, partly, and it is the
+    limitation I would attack first." Concede immediately what is true; you cannot be cornered on
+    ground you already gave up.</li>
+    <li><strong>Then give the substance</strong> — two or three sentences, with a number in them if
+    a number exists.</li>
+    <li><strong>Then say what would settle it.</strong> This is the move that converts a weakness
+    into evidence of judgement.</li>
+  </ol>
+  <p>Never: bluff, argue about whether the question was fair, answer a different question you
+  prefer, or say "that is a good question" while you think (everyone knows what it means). If you
+  need a moment, ask them to repeat it — that is free, and it usually makes the question sharper.</p>
+</div>
+
+<h3>The question bank</h3>
+
+<p>Fifteen real questions. Answer each out loud, in two to four sentences, before reading the sketch. The sketches are not scripts; the phrasing must end up being yours. The stars here mark how hard the question is to answer <em>well</em>, not how hard it is to understand — the three-star ones are the questions that decide how the rest of the conversation goes.</p>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Q1</span><span class="stars">★★</span></div>
+  <div class="ex-body">"Isn't this just saying more data is better? Everyone knows that."</div>
+  <details><summary>Show a good answer</summary>
+    <div class="solution">
+      <p>"More is better" makes no prediction. Mine does: discriminability grows as the square root
+      of depth times marker count, so doubling how well you separate two cell types costs four times
+      the data, and the accuracy is $\Phi(d'/2)$ with nothing fitted. That could have been wrong —
+      an exponent of 1 would have falsified it. And the second half of the result is that more data
+      eventually stops helping, which "more is better" gets exactly backwards.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Q2</span><span class="stars">★★</span></div>
+  <div class="ex-body">"Why not use a neural network? Wouldn't that do better?"</div>
+  <details><summary>Show a good answer</summary>
+    <div class="solution">
+      <p>It could not do much better, and I checked rather than assuming. Under the model, the
+      naive-Bayes rule is provably optimal, and in Week 8 logistic regression and kNN both came
+      close to it, with the remaining gap a finite-sample effect rather than a modelling one — so
+      the bottleneck is the information in the counts, not the classifier. A
+      network could only close a gap that is already about zero, and it would not tell me
+      <em>why</em> accuracy scales as the square root of depth, which is the actual question.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Q3</span><span class="stars">★★★</span></div>
+  <div class="ex-body">"Your cell type labels come from clustering the same data. Isn't your accuracy measurement circular?"</div>
+  <details><summary>Show a good answer</summary>
+    <div class="solution">
+      <p>Partly, yes, and it is the limitation I would attack first. My "accuracy" is agreement with
+      an algorithmic annotation, not with truth, and I say so in the report. Two things limit the
+      damage: the labels come from clustering on all genes at full depth while I classify from 32
+      markers at up to 50-fold downsampling, so the tasks are not the same one; and what I am
+      testing is the <em>shape</em> of the accuracy-versus-depth curve, which circularity gives no
+      reason to look like $\Phi(d'/2)$. The clean fix is FACS-sorted cells, where the label comes
+      from a protein measurement made independently of the RNA — that is the experiment I would run
+      next.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Q4</span><span class="stars">★★</span></div>
+  <div class="ex-body">"Why should I believe that beads in a jar have anything to do with sequencing?"</div>
+  <details><summary>Show a good answer</summary>
+    <div class="solution">
+      <p>They do not model sequencing. They model <em>sampling</em>, which is the only part of
+      sequencing my theory is about. Drawing $n$ beads from a jar that is 30% red is the same
+      mathematical problem as capturing $D$ molecules from a cell: a random sample from an unknown
+      composition, and a decision from the tally. The beads cannot test anything biological — what
+      they test is whether the $\sqrt{n}$ law and $\Phi(d'/2)$ survive contact with a physical
+      process where none of my software can be wrong, which is exactly the failure mode the
+      simulation cannot check.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Q5</span><span class="stars">★★★</span></div>
+  <div class="ex-body">"The offsets in your three-ways figure are arbitrary — you slid the curves around until they lined up. Why is that figure not misleading?"</div>
+  <details><summary>Show a good answer</summary>
+    <div class="solution">
+      <p>Because the rescaling is stated in the caption and no part of the claim depends on it. The
+      three lines of evidence have incomparable x-units — molecules, simulated depth, beads — so
+      their absolute positions mean nothing; only the slopes are comparable, and the slope is what
+      the theory predicts. I rescaled each series to a common starting point so slopes can be
+      compared by eye, and the fitted exponents with their intervals are printed on the figure so
+      you do not have to take the eye's word for it. The un-rescaled version is in the appendix, and
+      I would much rather show it to you than have you find it.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Q6</span><span class="stars">★★★</span></div>
+  <div class="ex-body">"You have one donor. What does your error bar actually cover?"</div>
+  <details><summary>Show a good answer</summary>
+    <div class="solution">
+      <p>Resampling of cells within one blood sample, and nothing else. It does not cover variation
+      between people — genotype, age, health, batch — and with a single donor that variation cannot
+      be estimated at all, because a sample of one has no measurable spread. So every real-data
+      claim in my report should be read as being about this sample rather than about T cells and
+      monocytes in general. Fixing it needs several donors analysed with the <em>donor</em> as the
+      unit rather than the cell; I costed it, and about nine donors would pin the mean accuracy to
+      $\pm 0.02$ if between-donor variation is around 0.03.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Q7</span><span class="stars">★★★</span></div>
+  <div class="ex-body">"You assumed genes are independent. They are not — genes are co-regulated. How wrong does that make you?"</div>
+  <details><summary>Show a good answer</summary>
+    <div class="solution">
+      <p>Wrong in a direction I can name and a size I have not measured. Independence is what let me
+      add $d'$ in quadrature, so positive correlation means the effective number of independent
+      genes is below the nominal $k$ and my $\sqrt{k}$ law is an <em>upper bound</em> on what extra
+      markers buy. It does not touch the depth law, which is per-gene and does not use
+      independence. Measuring the correlation among my 32 markers and turning it into an effective
+      $k$ is a week of work and it is second on my list.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Q8</span><span class="stars">★★</span></div>
+  <div class="ex-body">"Your bead exponent is $0.42 \pm 0.20$. Isn't that consistent with almost anything?"</div>
+  <details><summary>Show a good answer</summary>
+    <div class="solution">
+      <p>Nearly — it is consistent with 0.3 and with 0.6 as well as with 0.5, so it is weak support
+      and the report says so in those words. The width comes from 40 trials per draw size, which is
+      what one person can do by hand in an afternoon; quartering the interval would take sixteen
+      times the draws, which I costed in Week 6 and could not afford. What the beads do establish
+      strongly is something else: accuracy rises with $n$ along a curve computed before any bead was
+      drawn, with no parameter fitted to the bead data at all.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Q9</span><span class="stars">★★★</span></div>
+  <div class="ex-body">"What would have falsified your hypothesis?"</div>
+  <details><summary>Show a good answer</summary>
+    <div class="solution">
+      <p>Several things, all fixed in advance. In simulation, a fitted exponent whose interval
+      excluded $1/2$, or measured accuracy departing from $\Phi(d'/2)$ by more than 0.02 in the
+      clean regime — that was a written gate in Week 9. In the dropout arm, curves that failed to
+      collapse onto effective depth. And on real data the Poisson version of the prediction
+      <em>was</em> falsified: the measurements sit below it systematically, the gap closes when I
+      use the measured overdispersion, and that is the main finding rather than a disappointment.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Q10</span><span class="stars">★★</span></div>
+  <div class="ex-body">"What is the practical recommendation for someone designing a sequencing run tomorrow?"</div>
+  <details><summary>Show a good answer</summary>
+    <div class="solution">
+      <p>Three things. Below the overdispersion knee, depth follows the square-root law, so budget
+      four times the reads for twice the separation and decide whether that is worth it. Past the
+      knee, extra depth buys almost nothing for cell typing, and the same money spent on more cells
+      or — better — more donors buys a great deal. And extra markers help as $\sqrt{k}$ only if they
+      carry independent signal, so adding co-regulated genes to a panel is close to free of benefit.
+      Where the knee sits depends on your genes' dispersion, which a pilot run and the Fano
+      computation in my repository will tell you in an afternoon.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Q11</span><span class="stars">★★</span></div>
+  <div class="ex-body">"Did you use AI to do this?"</div>
+  <details><summary>Show a good answer</summary>
+    <div class="solution">
+      <p>Yes, and it is disclosed in every weekly log under "Tools used", against the policy in the
+      course repository. I used it the way I would use a tutor and a rubber duck: explaining
+      concepts I was stuck on, finding bugs, and criticising drafts. The derivations are mine in the
+      sense that matters — ask me to do the $d'$ derivation at the board right now and I will. The
+      code I can explain line by line, and the tests were written from the specification before the
+      implementations, so they check the maths rather than agreeing with my code.</p>
+      <p class="muted">This answer only works if it is true. That is the entire point of the
+      disclosure habit: it costs nothing when you have been honest all semester and cannot be
+      manufactured in Week 15.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Q12</span><span class="stars">★★</span></div>
+  <div class="ex-body">"What would you do with another semester?"</div>
+  <details><summary>Show a good answer</summary>
+    <div class="solution">
+      <p>Three things, in this order. Multiple donors, so that an error bar on a real-data number
+      means something about people instead of about cells. Measuring the correlation among my
+      markers, so that $\sqrt{k}$ becomes a prediction in terms of an effective $k$ rather than a
+      nominal one. And testing the depth law against genuinely deeper sequencing rather than
+      downsampling, because thinning a shallow library and paying for a deep one are not the same
+      experiment and I have been assuming they are.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Q13</span><span class="stars">★★</span></div>
+  <div class="ex-body">"How do you know your simulator isn't just producing whatever you told it to produce?"</div>
+  <details><summary>Show a good answer</summary>
+    <div class="solution">
+      <p>To a large extent it is, and that is what it is for: the simulator tests the algebra, not
+      the biology. It samples Poisson counts, so the only thing it can check is whether
+      $\Phi(d'/2)$ is the right consequence of Poisson counting — which is a real thing to be wrong
+      about, and in fact it fails at low depth, where the Gaussian approximation breaks. The tests
+      of the <em>model</em> are the PBMC data and the beads, and I wrote neither of those.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Q14</span><span class="stars">★</span></div>
+  <div class="ex-body">"Why 30/70 and 35/65 for the jars? Those look like convenient numbers."</div>
+  <details><summary>Show a good answer</summary>
+    <div class="solution">
+      <p>They were designed in Week 6, before a single bead was drawn, to put the interesting part
+      of the curve inside the number of trials I could do by hand: a difference small enough that
+      ten beads tell you almost nothing and large enough that a couple of hundred gets you near
+      certainty. The sample-size calculation is in the repository, and the draw sizes and trial
+      counts came out of it rather than out of the data.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Q15</span><span class="stars">★★</span></div>
+  <div class="ex-body">"What is $d'$, and why not just report accuracy? Accuracy is what people care about."</div>
+  <details><summary>Show a good answer</summary>
+    <div class="solution">
+      <p>$d'$ is the gap between the two cell types' expected counts, measured in units of the
+      counting noise. It is the natural variable because it is the one with the simple law — it
+      grows as $\sqrt{Dk}$ — whereas accuracy is that quantity squashed through $\Phi$, which
+      compresses everything near 1 and hides large changes at the top end. So I report both: $d'$
+      when I am testing the scaling law, accuracy when I am saying what it means for someone
+      designing an experiment.</p>
+    </div>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-title">Lab 2 · Q&amp;A drill</div>
+  <div class="lab-desc">Draw a question, answer it <strong>out loud</strong> — actually out loud, in two to four sentences — and only then reveal the sketch. The counter tracks how many distinct questions you have drilled. Target: all fifteen, twice, before your mentor session. The order is seeded, so a second pass through the deck comes out the same.</div>
+  <div class="controls" id="w15lab2ctl"></div>
+  <div class="readout" id="w15lab2out"></div>
+</div>
+
+<h2>5 &nbsp;Where to submit</h2>
+
+<div class="box warning">
+  <span class="box-tag">Read this before the list</span>
+  Deadlines, eligibility rules, word limits and paperwork requirements change every year, and
+  several of these programmes have altered their rules substantially in recent cycles. Everything
+  below is orientation, not instruction. <strong>Check the current rules on the organisation's own
+  site, and check them with your fair's Scientific Review Committee before you commit</strong> —
+  especially anything involving prior approval, which several fairs require <em>before</em> the
+  research is done and cannot grant retroactively.
+</div>
+
+<table class="simple">
+  <tr><th>Venue</th><th>What it wants</th><th>Notes</th></tr>
+  <tr><td><strong>Regional science fair</strong></td>
+      <td>A board, an abstract (usually ~250 words), a research plan and forms, and a 10–15 minute
+      interview with several judges.</td>
+      <td>The natural first stop, and the best rehearsal available: several rounds of exactly the
+      Q&amp;A you drilled in Section 4. Usually held between January and March.</td></tr>
+  <tr><td><strong>State fair</strong></td>
+      <td>The same, at a higher standard, usually by advancing from a regional.</td>
+      <td>Judges are more likely to know the field. Expect harder versions of Q3 and Q6.</td></tr>
+  <tr><td><strong>ISEF (via an affiliated fair)</strong></td>
+      <td>You cannot enter directly: you advance from an affiliated regional or state fair. Strict
+      forms, an abstract, a research plan, and category selection.</td>
+      <td>This project fits Computational Biology and Bioinformatics. The forms are genuinely
+      strict about prior approval and about human-subjects rules — a public de-identified dataset
+      such as PBMC 3k is normally straightforward, but your SRC decides, not you.</td></tr>
+  <tr><td><strong>JEI</strong> (Journal of Emerging Investigators)</td>
+      <td>A real manuscript with a mentor as co-author, genuine peer review, and revision rounds.
+      Free to submit.</td>
+      <td>The best fit for what you have written, because your Week 14 report is already almost the
+      right document. Expect reviewers to ask precisely the questions in Section 4 — in writing,
+      and with time to answer them properly. Being reviewed is the most educational outcome
+      available this semester.</td></tr>
+  <tr><td><strong>Regeneron STS</strong></td>
+      <td>US high-school seniors; a research report, essays, and recommendations; deadline
+      typically in November.</td>
+      <td>Timing matters: a semester ending in December is a year early or a year late depending on
+      your school year. Plan the calendar backwards from it if you intend to enter.</td></tr>
+  <tr><td><strong>Davidson Fellows</strong></td>
+      <td>A substantial piece of work with a portfolio and a written description of its
+      significance; deadline typically in February.</td>
+      <td>Highly selective, and explicitly looks for work that is significant rather than merely
+      competent. Worth reading past winners' abstracts to calibrate.</td></tr>
+  <tr><td><strong>arXiv q-bio preprint</strong></td>
+      <td>A formatted manuscript and an endorsement from an established author (your mentor may be
+      able to endorse or arrange it).</td>
+      <td><strong>Only with your mentor's explicit agreement</strong>, and only after they have
+      read the final version. A preprint is permanent and public; that is the point of it and also
+      the risk. Check whether any competition you plan to enter treats prior publication as
+      disqualifying.</td></tr>
+</table>
+
+<p>Choose one, possibly two. A fair plus JEI is a strong pair: the fair gives you the spoken defence and JEI gives you the written one. Submitting to nothing is the only wrong answer, because the submission is what converts a semester of work into something that exists outside your own laptop.</p>
+
+<h2>6 &nbsp;The repository handover</h2>
+
+<p><code>v1.0</code> is a promise to a stranger: everything needed to reproduce this project is here, and nothing here is a lie about what was done.</p>
+
+<div class="box verify">
+  <span class="box-tag">What <code>v1.0</code> must contain</span>
+  <ul>
+    <li><strong>The report</strong> — source and PDF — and the poster PDF, and the slides.</li>
+    <li><strong><code>figures/report/</code></strong> with <code>CAPTIONS.md</code> and
+    <code>SEEDS.json</code>, and <strong><code>figures/poster/</code></strong> with the three
+    panels.</li>
+    <li><strong>All fifteen progress logs</strong>, including the weeks that went badly, and
+    <code>progress/week13_claims.md</code> with the STATUS column filled in.</li>
+    <li><strong>Notebook scans</strong> in <code>notebook/</code>, including the bead tally sheets
+    in the handwriting they were recorded in.</li>
+    <li><strong>Bead data</strong> as CSVs in <code>python/data/beads/</code>, matching the scans.</li>
+    <li><strong>Green tests:</strong> <code>pytest tests/</code> with no failures and no skips you
+    cannot explain.</li>
+    <li><strong>A clean full regeneration:</strong> <code>python experiments/make_all_figures.py</code>
+    exits 0 from a fresh clone, on a machine that is not yours if you can borrow one.</li>
+    <li><strong>The final README</strong> and the handover note below.</li>
+  </ul>
+</div>
+
+<p>The README's final state is not the one you started with. Rewrite the top of it so that the first screen answers three questions for someone who arrived from a link: <em>what was found</em> (three or four sentences with actual numbers and their intervals), <em>how to reproduce it</em> (three commands: install, test, regenerate), and <em>what is known to be wrong with it</em> (four bullets, pulled from the limitations section). Keep the repository map and the milestone table below that. Add the report PDF's location and the submission status.</p>
+
+<div class="box example">
+  <span class="box-tag">The handover note — <code>HANDOVER.md</code>, about 400 words</span>
+  <p>Write it to a specific reader: a student a year behind you who has been handed this project and
+  a semester. Five short sections.</p>
+  <ul>
+    <li><strong>What is solid.</strong> The theory chain and the simulation validation. Do not
+    re-derive these; read Weeks 3 and 5 and check you can reproduce the derivation, then move on.</li>
+    <li><strong>What is thin.</strong> The bead exponent (40 trials per point, interval $\pm 0.2$),
+    the one-donor real-data arm, and the untested independence assumption.</li>
+    <li><strong>The three next experiments, in priority order</strong>, with what each would settle:
+    multiple donors; effective $k$ from measured marker correlation; genuinely deeper sequencing
+    rather than downsampling.</li>
+    <li><strong>The two things that will bite you.</strong> The marker-mass convention in
+    <code>marker_profiles</code> — read its docstring before trusting any $k$ sweep. And the bead
+    CSV format: run <code>validate_tally</code> on every sheet before trusting it, and record which
+    of your own runs it caught something in.</li>
+    <li><strong>Where the bodies are buried.</strong> Every decision you made that a stranger would
+    not guess: which point was dropped and why, which seed was chosen before versus after seeing
+    output, which figure has a convention that differs from its neighbour. Be specific. This
+    section is a gift to your successor and it takes twenty minutes.</li>
+  </ul>
+</div>
+
+<h2>7 &nbsp;Your Python laboratory</h2>
+
+<div class="box python">
+  <span class="box-tag">This week in the celldetect project</span>
+  <p>One command:</p>
+  <p><code>python experiments/week15_poster_figures.py</code> — <strong>SEED 115</strong>, about 20
+  seconds. It writes three panels into <code>figures/poster/</code>:</p>
+  <ul>
+    <li><code>P1_question.png</code> — counting noise at two rates with the measured var/mean
+    printed, beside accuracy against depth for 1, 10 and 100 marker genes. The phenomenon and the
+    question in one panel.</li>
+    <li><code>P2_result.png</code> — the headline: $d'$ against amount of data on log-log axes, with
+    theory, simulation and beads rescaled to a common start so their <em>slopes</em> can be
+    compared.</li>
+    <li><code>P3_limits.png</code> — $d'$ against depth for three values of the dispersion
+    $\varphi$, showing the knee past which deeper sequencing buys nothing.</li>
+  </ul>
+  <p>The script sets its own larger font sizes through a <code>POSTER_RC</code> block rather than
+  scaling the report figures, because a scaled-up PNG has scaled-up axis labels and blurred type.
+  Poster panels are regenerated, never resized.</p>
+  <p>Read the script's final printed reminder before you print anything. It says, in effect, what
+  Q5 says: the offsets in P2 are rescaled and meaningless, only the slopes are comparable, and you
+  must say so in the caption and out loud. A reviewer who notices it before you mention it has
+  found your weakest moment.</p>
+  <p>Then, from a <em>fresh clone</em>: <code>pytest tests/</code> and
+  <code>python experiments/make_all_figures.py</code>. Both must be clean before you tag.</p>
+</div>
+
+<h2>8 &nbsp;What actually transfers</h2>
+
+<p>Here is the part worth carrying out of the semester. Almost none of it is about cells.</p>
+
+<div class="box theorem">
+  <span class="box-tag">Detection theory is everywhere</span>
+  <p>The structure you derived — two hypotheses, overlapping distributions, a threshold, an error
+  probability governed by a separation index — is not a fact about sequencing. It is the same
+  structure in:</p>
+  <ul>
+    <li><strong>Radar,</strong> where it was worked out in the 1940s and 1950s and where the
+    notation $d'$ comes from. Is that blip an aircraft or noise? Same two distributions, same
+    threshold, same trade-off between missing a target and crying wolf.</li>
+    <li><strong>Medical testing.</strong> Sensitivity and specificity are the two tail
+    probabilities you computed; an ROC curve is the same curve; and "should we lower the screening
+    threshold?" is the same question as where to place the decision boundary.</li>
+    <li><strong>Spam filters.</strong> Naive Bayes on word counts is <em>literally</em> the
+    classifier in Week 5 — a sum of per-feature log-likelihood ratios, thresholded — with genes
+    replaced by words and depth by message length.</li>
+    <li><strong>Particle physics.</strong> The five-sigma discovery convention is a statement about
+    $d'$: it fixes the false-positive rate for a signal separated from background by five standard
+    deviations, and it exists because physicists run enormous numbers of comparisons and know what
+    Section 7 of Week 13 does to you if you do not correct for it.</li>
+  </ul>
+  <p>You now have the machinery for all four, and you will recognise it on sight for the rest of
+  your life. That recognition is worth more than the specific result you proved.</p>
+</div>
+
+<div class="box theorem">
+  <span class="box-tag">The $\sqrt{n}$ law is one law, wearing five costumes</span>
+  <p>Count them up. The relative noise on a Poisson count falls as $1/\sqrt{\lambda}$ (Week 1).
+  $d'$ grows as $\sqrt{\text{depth}}$ (Week 3) and as $\sqrt{k}$ (Week 5). The bead accuracy rises
+  with $\sqrt{n}$ (Week 12). And the width of your own Wilson error bars shrinks as $1/\sqrt{n}$
+  (Week 13) — four times the trials, half the width, which the test suite checks explicitly.</p>
+  <p>All five are one argument: independent things add, their means add linearly, their variances
+  add linearly, so their standard deviations add as a square root, and any ratio of the two grows
+  as $\sqrt{n}$. Every square root in this project descends from the single line in Week 1's second
+  worked derivation. Once you see that, you will start predicting the exponent before doing the
+  algebra — and being right, and knowing why.</p>
+</div>
+
+<div class="box win">
+  <span class="box-tag">The habit that will still be useful in ten years</span>
+  <p>Labelling claims. <span class="claim proved">proved</span> ·
+  <span class="claim cited">cited</span> · <span class="claim observed">observed</span> ·
+  <span class="claim conjectured">conjectured</span>.</p>
+  <p>It felt like bureaucracy in Week 1 and like a chore in Week 13. What it actually is, is a
+  discipline for keeping the difference between <em>the data agrees with the theory</em> and
+  <em>I want the data to agree with the theory</em> visible to yourself. Nobody else can do that
+  for you, and no amount of statistical machinery substitutes for it — you can compute a perfectly
+  correct p-value about a claim you have quietly promoted two levels.</p>
+  <p>Ten years from now you will not remember the coefficient in the Wilson half-width. You will
+  still, in a meeting, hear someone say "we showed that…" and find yourself asking whether they
+  mean proved, cited, observed or conjectured. That question is the most portable thing this
+  course had to give you.</p>
+</div>
+
+<h2>9 &nbsp;Exercises</h2>
+<p class="muted">Stars mark difficulty: ★ routine · ★★ requires an idea · ★★★ challenge. These produce material you will actually use this week.</p>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 15.1</span><span class="stars">★</span></div>
+  <div class="ex-body">Using the arcminute argument in Section 2, compute the minimum comfortable font size for text read at (a) 1 m, (b) 2 m, (c) 3 m. Then measure the smallest type on your drafted poster and say whether it passes.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>The chain is: comfortable cap height $= 3 \times 5' \times$ distance; font size
+      $=$ cap height $/\,0.7$; points $=$ mm $/\,0.353$.</p>
+      <p>At 1 m: cap height $3 \times 1.45 = 4.36$ mm, font $6.23$ mm $= 17.6$ pt, so
+      <strong>18 pt</strong>.</p>
+      <p>The result is linear in distance, so (b) 2 m gives <strong>35 pt</strong> and (c) 3 m gives
+      <strong>53 pt</strong>.</p>
+      <p>These are floors, not targets. Design body text at 24–28 pt (a 1.4× margin at one metre),
+      headings at 40–48 pt, and the title at 72–100 pt. The check that matters is physical: print
+      one panel at final size, tape it up, walk back a metre.</p>
+      <p class="muted">The commonest violation is not the body text — it is the axis labels inside
+      a figure that was designed for a page and then dropped onto a poster. Run
+      <code>week15_poster_figures.py</code> rather than resizing.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 15.2</span><span class="stars">★</span></div>
+  <div class="ex-body">Your talk has 12 slides plus 5 backups. (a) What is the average time per shown slide? (b) Which two slides should get roughly double, and which two should get half? (c) Your first rehearsal runs 15:30. Which section do you cut, and by how much?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) $12{:}00 / 12 = 60$ seconds per slide. Backup slides get zero by definition.</p>
+      <p>(b) Double (about two minutes each): the slide carrying $d' \propto \sqrt{Dk}$ and
+      $\Phi(d'/2)$, because it is the entire contribution and the audience needs time on it; and
+      the divergence slide (F6), because it is the most interesting result and the one that invites
+      questions. Half (about 30 seconds each): the title slide and the "what next" slide, which is
+      three bullets you say faster than they read.</p>
+      <p>(c) 3:30 over. Cut it from the sections that grow by accident, not from the ones that carry
+      the argument: about 1:00 from the question section (background always inflates), about 1:00
+      from theory by moving the full derivation to a backup slide, and about 1:30 from the evidence
+      section by giving each of the three lines one number rather than three. Do not cut "where it
+      fails" — that section is why the talk is worth listening to, and cutting it is the change that
+      most damages the impression you leave.</p>
+      <p class="muted">Rehearsing at 15:30 on the first pass is normal and is not a problem. Being
+      at 15:30 on the third pass is a problem, because it means you are cutting words rather than
+      material.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 15.3</span><span class="stars">★★</span></div>
+  <div class="ex-body">Write out your answer to Q3 (label circularity) in 60 words or fewer, in your own words, and check it against the three-move structure in Section 4: concede, substantiate, say what would settle it. Then time yourself saying it — it should take about 25 seconds.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>A 58-word version:</p>
+      <p><em>"Partly, yes — it is the limitation I would attack first. My accuracy is agreement with
+      an algorithmic annotation, not with truth. Two things limit the damage: the labels use all
+      genes at full depth while I use 32 markers at up to 50-fold downsampling, and circularity
+      gives no reason for the curve's shape. FACS-sorted cells would settle it."</em></p>
+      <p>Check: concedes in the first four words; substantiates with two specific, checkable facts;
+      names the experiment that would settle it. Nothing defensive, nothing bluffed, and it fits in
+      one breath.</p>
+      <p class="muted">Sixty words is roughly 25 seconds of speech. Any answer that runs past a
+      minute has stopped being an answer and started being a second talk — and the questioner
+      usually only wanted to know whether you had thought about it.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 15.4</span><span class="stars">★★</span></div>
+  <div class="ex-body">P3 has room for three bullets of at most twelve words each. From the nine-item limitations checklist in Week 14, choose the three that go on the poster and say what happens to the other six.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>A defensible choice, picking the limitations that are both severe and comprehensible at a
+      glance:</p>
+      <ul>
+        <li>"One donor: error bars cover cells, not people."</li>
+        <li>"Labels come from clustering, not from independent ground truth."</li>
+        <li>"Genes assumed independent; correlation makes $\sqrt{k}$ an upper bound."</li>
+      </ul>
+      <p>The other six — the marker-mass convention, the Gaussian approximation at low depth,
+      $\varphi$ under thinning, the bead exponent's interval, dropped points, and any stand-in data
+      — do not disappear. They live in three places: in the report, which is on the table beside the
+      poster; in your mouth, ready for the conversation the poster is designed to start; and on a
+      single printed page in your folder headed "limitations, full list", which you can hand to
+      anyone who asks. Handing over that page is one of the strongest moves available to you at a
+      poster session.</p>
+      <p class="muted">Note the selection principle: not the three that are easiest to defend, but
+      the three a knowledgeable reader would notice first. Getting there before they do is the
+      whole game.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 15.5</span><span class="stars">★★</span></div>
+  <div class="ex-body">A judge says: "I would like to reproduce your Figure 6. What do you send me?" Answer concretely — list what you hand over and what they will need on their end, and state the one thing you cannot give them.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>Hand over: the repository URL at tag <code>v1.0</code>; the three commands
+      (<code>pip install -r python/requirements.txt</code>, <code>pytest tests/</code>,
+      <code>python experiments/week13_error_bars.py</code>); the seed, which is 113 and is also in
+      <code>figures/report/SEEDS.json</code>; and <code>figures/report/CAPTIONS.md</code> so they
+      know which panel is F6 and which script produced it.</p>
+      <p>They need on their end: Python with NumPy, SciPy and matplotlib at the versions recorded in
+      Methods, and about thirty seconds. F6 needs no downloaded data — it is generated from the
+      simulator — which is exactly why it is a good figure to be asked about.</p>
+      <p>What you cannot give them: byte-identical output on a different matplotlib version, because
+      the version string lives in the PNG header. Say so in advance and offer the numbers instead —
+      the printed table from the script is the real content, and it will match exactly.</p>
+      <p class="muted">Notice how much easier this is for F6 than it would be for F4, which needs
+      the PBMC download. Being able to say which of your figures reproduce from nothing but the
+      repository, and which need data fetched, is a sign of someone who has actually thought about
+      reproducibility rather than adopting the vocabulary.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 15.6</span><span class="stars">★★★</span></div>
+  <div class="ex-body">Design the multi-donor follow-up. (a) If between-donor standard deviation in accuracy is about 0.03, how many donors are needed to pin the mean to $\pm 0.02$ at 95%? (b) What is the unit of analysis and what changes in the code? (c) Give one result that would make you abandon the $\sqrt{\text{depth}}$ framing entirely. (d) Why is this a better use of a semester than adding a neural network?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) The half-width of a 95% interval for a mean is $1.96\,\sigma/\sqrt{m}$. Setting
+      $1.96 \times 0.03/\sqrt{m} = 0.02$ gives $\sqrt{m} = 2.94$ and $m = 8.6$, so
+      <strong>9 donors</strong>. (With $m$ that small you would use a $t$ interval, which pushes it
+      to eleven or twelve — worth saying out loud, because it is the kind of correction a judge
+      notices.)</p>
+      <p>(b) The unit of analysis is the <em>donor</em>, not the cell. In code: compute one accuracy
+      per donor, assemble a vector of nine numbers, and put the interval on <em>that</em> —
+      <code>bootstrap_ci</code> over donors, or a $t$ interval. Cell-level bootstrapping stays, but
+      only as a within-donor diagnostic. Everything else, including the classifier, is unchanged;
+      the whole difference is which axis you resample along.</p>
+      <p>(c) If the per-donor accuracy-versus-depth curves had different <em>shapes</em> — not
+      merely different heights — then no single exponent describes the population and the framing is
+      wrong rather than imprecise. A shared shape with donor-specific offsets would instead mean
+      the law holds with a per-donor constant, which is a much weaker and much more repairable
+      finding.</p>
+      <p>(d) Because the bottleneck is not the classifier. Week 8 established that logistic
+      regression and kNN both come close to the provably optimal naive-Bayes rule, so a better
+      classifier has very little left to win. The bottleneck is that every real-data claim currently rests
+      on one person's blood. The next experiment should attack the largest source of uncertainty,
+      and that is not the model.</p>
+      <p class="muted">Part (d) is the answer to Q2 in a stronger form, and it is also the habit
+      worth taking out of the semester: when choosing what to do next, ask what dominates your
+      uncertainty rather than what would be interesting to build.</p>
+    </div>
+  </details>
+</div>
+
+<h2>10 &nbsp;Research notebook, and the close</h2>
+
+<p>The last entries:</p>
+
+<ul>
+  <li>Your fifteen Q&amp;A answers, in your own words, one per page, dated after the mentor session
+  with anything they broke marked in a different colour.</li>
+  <li>The talk timings from all three rehearsals, and what you cut between them.</li>
+  <li>A page headed <strong>"what I would do differently from Week 1"</strong>. Be specific and be
+  fair to yourself: this page is the most useful thing in the notebook for the next project, and it
+  is worth an hour.</li>
+  <li>The final state of the <strong>"assumptions I am making"</strong> list, started in Week 1 with
+  three entries. Count them. Mark each as tested, partly tested, or untested. That list, more than
+  any figure, is the record of what you actually learned.</li>
+  <li>Where you submitted, when, and what they said if they have said anything yet.</li>
+</ul>
+
+<p>Scan to <code>notebook/week15/</code>, fill in <code>progress/week15.md</code>, commit the
+poster, the slides, <code>HANDOVER.md</code> and the final README, and then — only if the gate
+below passes — tag:</p>
+
+<p><code>git tag -a v1.0 -m "M8: report, poster and talk delivered; submitted to [venue]; all tests green"</code><br>
+<code>git push origin v1.0</code></p>
+
+<div class="box verify">
+  <span class="box-tag">MILESTONE M8 · verification (with mentor)</span>
+  <ul>
+    <li><strong>The talk has been given once to the mentor, in full, timed, with adversarial
+    Q&amp;A.</strong> Not summarised, not walked through — given, standing, to the clock, followed
+    by at least half an hour of hostile questions including Q3, Q6 and Q9. You said "I do not know,
+    and here is how I would find out" at least once and it was true.</li>
+    <li><strong>The poster prints legibly.</strong> Printed at final size, taped to a wall, read
+    from a metre. Nothing below 18 pt anywhere, including inside the figures. Under 300 words
+    total.</li>
+    <li><strong>The submission is actually submitted.</strong> Not drafted, not planned:
+    submitted, with a confirmation you can show, or a fair registration completed. The venue and
+    date are in <code>progress/week15.md</code>.</li>
+    <li><strong><code>pytest tests/</code> fully green</strong> in front of your mentor, from a
+    fresh clone.</li>
+    <li><strong><code>python experiments/make_all_figures.py</code> runs clean from that fresh
+    clone</strong>, with zero failures, and any skip is one you can explain.</li>
+    <li><strong>The repository is handed over.</strong> Final README, <code>HANDOVER.md</code>, all
+    fifteen progress logs, the notebook scans, the bead CSVs, and both figure directories.</li>
+    <li><strong>The tag <code>v1.0</code> exists and is pushed.</strong></li>
+  </ul>
+  <p class="muted">And then stop. A project that is finished and honestly limited is worth more than
+  one that is still being improved the night before the fair. The list of things you would do next
+  belongs in <code>HANDOVER.md</code>, not in the last forty-eight hours.</p>
+</div>
+
+<h2>11 &nbsp;Going deeper</h2>
+<ul>
+  <li>Green &amp; Swets, <em>Signal Detection Theory and Psychophysics</em> (1966), chapter 1. <span class="muted">Where $d'$ comes from, in its original setting. You have been doing detection theory for fifteen weeks; this is the book it came out of, and chapter 1 will feel like reading your own notes in someone else's handwriting. <span class="claim cited">cited</span></span></li>
+  <li>Wickens, <em>Elementary Signal Detection Theory</em> (2002). <span class="muted">The gentler modern treatment, with the medical-testing and memory-experiment applications worked out. The natural next book if any of this is going to stay with you.</span></li>
+  <li>Reynolds &amp; Christian, <em>Designing Science Presentations</em> (2nd ed.). <span class="muted">Practical, specific, and unusually good on posters. Read the poster chapter before you lay yours out, not after.</span></li>
+  <li>Feynman (1974), <em>Cargo Cult Science</em>, again. <span class="muted">Read it a second time now that the work is done. It reads differently from the far end of a project than it did at the start, and the passage about leaning over backwards to show how you may be wrong is the standard your Q&amp;A section is trying to meet.</span></li>
+  <li>Whichever venue you chose: read three accepted papers or three winning abstracts from previous years before you submit. <span class="muted">Forty minutes, and it calibrates length, tone and expectations better than any set of guidelines.</span></li>
+  <li>Course extras: <a href="../extras/big-picture.html">the big picture</a> · <a href="../extras/glossary.html">glossary</a> · <a href="../extras/ai-policy.html">using AI tools honestly</a> · <a href="../extras/resources.html">resource library</a> · <a href="../index.html">back to the course home</a></li>
+</ul>
+
+<div class="box win">
+  <span class="box-tag">Last word</span>
+  Fifteen weeks ago the claim was that a count of 6 carries 41% relative noise, and that everything
+  else followed from it. It did. You derived a parameter-free prediction, tested it three
+  independent ways, found precisely where it breaks, put an interval on every number, and wrote it
+  down so a stranger can check you. That is not a school project with a research theme on top. That
+  is what the job is.
+</div>
+
+</div>
+
+<footer class="site">How Much Data Does It Take to Tell Two Cell Types Apart? · Week 15 · <a href="../index.html">Course home</a></footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  /* ---------------- Lab 1: talk timer ------------------------------------ */
+  (function () {
+    const SEC = [
+      { key: "q", name: "The question", target: 2.0, color: CD.C.blue },
+      { key: "t", name: "The theory", target: 3.0, color: CD.C.orange },
+      { key: "e", name: "Three lines of evidence", target: 4.0, color: CD.C.teal },
+      { key: "f", name: "Where it fails", target: 2.0, color: CD.C.purple },
+      { key: "n", name: "What next", target: 1.0, color: CD.C.green }
+    ];
+    const mins = {};
+    SEC.forEach(s => { mins[s.key] = s.target; });
+
+    function run() {
+      let total = 0;
+      SEC.forEach(s => { total += mins[s.key]; });
+
+      const P = CD.plot("w15lab1", { xmin: 0, xmax: 16, ymin: 0, ymax: 3,
+                                     xlabel: "minutes", ylabel: "", yfmt: () => "" });
+      P.clear(); P.axes();
+      const ctx = P.ctx;
+      let x = 0;
+      SEC.forEach(s => {
+        ctx.fillStyle = s.color;
+        ctx.fillRect(P.X(x), P.Y(2.3), P.X(x + mins[s.key]) - P.X(x), P.Y(1.3) - P.Y(2.3));
+        x += mins[s.key];
+      });
+      P.vline(12, "12:00 budget", { color: CD.C.red, width: 2.5 });
+      P.label(0.15, 2.5, "question · theory · evidence · failure · next",
+              { color: CD.C.navy });
+      P.label(0.15, 0.75, "total: " + total.toFixed(1) + " minutes",
+              { color: CD.C.navy, font: "700 14px sans-serif" });
+
+      const warn = [];
+      if (total > 12) warn.push("OVER by " + (total - 12).toFixed(1) + " min — cut background first");
+      if (total < 10) warn.push("under 10 min — you have room for the derivation");
+      if (mins.t > mins.e)
+        warn.push("theory (" + mins.t.toFixed(1) + ") exceeds evidence (" + mins.e.toFixed(1) +
+                  "): this is a lecture, not a research talk");
+      CD.table("w15lab1out", ["quantity", "value"], [
+        ["total", total.toFixed(1) + " min of 12.0"],
+        ["seconds per shown slide (12 slides)", (total * 60 / 12).toFixed(0) + " s"],
+        ["evidence share", (100 * mins.e / total).toFixed(0) + "%"],
+        ["warnings", warn.length ? "<b style='color:#b91c1c'>" + warn.join(" · ") + "</b>" : "none"]
+      ]);
+    }
+
+    SEC.forEach(s => {
+      CD.slider("w15lab1ctl", { label: s.name, min: 0, max: 8, step: 0.5,
+                                value: s.target, fmt: v => v.toFixed(1) + "m" },
+                v => { mins[s.key] = v; run(); });
+    });
+  })();
+
+  /* ---------------- Lab 2: Q&A drill ------------------------------------- */
+  (function () {
+    const BANK = [
+      ["Isn't this just saying more data is better?",
+       "It makes a quantitative prediction that could have been wrong: d' grows as the square root of depth times k, so twice the separation costs four times the data, and accuracy is Phi(d'/2) with nothing fitted. And past the overdispersion knee, more data stops helping — which 'more is better' gets backwards."],
+      ["Why not use a neural network?",
+       "The bottleneck is the information in the counts, not the classifier. Naive Bayes is provably optimal under the model, and in Week 8 logistic regression and kNN both came close to it, with the remaining gap a finite-sample effect. A network could only close a gap that is already small — and it would not explain the square-root law."],
+      ["Your cell type labels come from clustering. Isn't that circular?",
+       "Partly, and it is the limitation I would attack first. Accuracy here means agreement with an algorithmic annotation. It is mitigated by the labels using all genes at full depth while I use 32 markers heavily downsampled, and by the fact that circularity gives no reason for the curve's shape. FACS-sorted cells would settle it."],
+      ["Why should I believe the beads have anything to do with sequencing?",
+       "They model sampling, not sequencing — and sampling is the only part my theory is about. Drawing n beads from a 30% red jar is the same problem as capturing D molecules from a cell. They cannot test biology; they test whether the law survives a physical process where none of my software can be wrong."],
+      ["The offsets in your three-ways figure are arbitrary. Why is that not misleading?",
+       "Because the rescaling is in the caption and no claim depends on it. The three lines have incomparable x-units, so only slopes are comparable, and the slope is what the theory predicts. The fitted exponents with intervals are printed on the figure, and the un-rescaled version is in the appendix."],
+      ["You have one donor. What does your error bar actually cover?",
+       "Resampling of cells within one blood sample, and nothing else. Between-person variation is invisible to it and cannot be estimated from one donor. So real-data claims are about this sample; fixing it needs several donors with the donor as the unit of analysis — about nine to pin the mean to plus or minus 0.02."],
+      ["You assumed genes are independent. They are not. How wrong does that make you?",
+       "Wrong in a known direction: correlation lowers the effective number of independent genes, so the sqrt(k) law is an upper bound on what extra markers buy. It does not affect the depth law, which is per-gene. I have not measured the size — computing an effective k from marker correlation is second on my list."],
+      ["Your bead exponent is 0.42 plus or minus 0.2. Isn't that consistent with anything?",
+       "Nearly — with 0.3 and 0.6 as well as 0.5, so it is weak support and the report says so. The width comes from 40 trials per point, which is what one person can do by hand; quartering it needs sixteen times the draws. What the beads do show strongly is a rise along a curve fixed before any bead was drawn."],
+      ["What would have falsified your hypothesis?",
+       "A fitted exponent whose interval excluded 1/2 in simulation. Dropout curves that failed to collapse onto effective depth. A departure from Phi(d'/2) beyond the 0.02 gate written down in Week 9. And on real data the Poisson version was falsified, which is the main finding."],
+      ["What is the practical recommendation for someone designing a sequencing run?",
+       "Below the knee, budget four times the reads for twice the separation. Past the knee, spend on more cells or more donors instead, because depth buys almost nothing. And extra markers help as sqrt(k) only if they are independent. Where the knee sits follows from your genes' dispersion, measurable from a pilot run."],
+      ["Did you use AI to do this?",
+       "Yes, disclosed in every weekly log under 'Tools used', against the course policy. I used it as a tutor and a rubber duck: explanations, bug-finding, criticising drafts. Ask me to derive d' at the board right now and I will; I can explain the code line by line, and the tests were written from the spec before the implementations."],
+      ["What would you do with another semester?",
+       "Multiple donors, so an error bar means something about people. Marker correlation, so sqrt(k) becomes a prediction about an effective k. And genuinely deeper sequencing rather than downsampling, because thinning a shallow library and paying for a deep one are not the same experiment."],
+      ["How do you know your simulator isn't just producing what you told it to?",
+       "Largely it is — it tests the algebra, not the biology. It can only check whether Phi(d'/2) follows from Poisson counting, which is a real thing to be wrong about, and it did fail at low depth. The tests of the model itself are the PBMC data and the beads, and I wrote neither."],
+      ["Why 30/70 and 35/65 for the jars?",
+       "Designed in Week 6 before any bead was drawn, so that the interesting part of the curve fits inside the trials one person can run by hand: uninformative at ten beads, near-certain at a couple of hundred. The sample-size calculation is in the repository."],
+      ["What is d', and why not just report accuracy?",
+       "d' is the gap between the two types' expected counts in units of the counting noise. It is the variable with the simple law — it grows as sqrt(depth times k) — while accuracy is that squashed through Phi, which compresses everything near 1. I report both: d' for the law, accuracy for what it means."]
+    ];
+
+    const r = CD.rng(115);
+    const order = BANK.map((q, i) => i);
+    for (let i = order.length - 1; i > 0; i--) {      // seeded Fisher-Yates
+      const j = Math.floor(r() * (i + 1));
+      const t = order[i]; order[i] = order[j]; order[j] = t;
+    }
+    let pos = -1, drilled = 0;
+    const seen = {};
+    const out = document.getElementById("w15lab2out");
+
+    function show(withAnswer) {
+      if (pos < 0) {
+        out.innerHTML = "<b>Press &ldquo;Draw a question&rdquo; to begin. " +
+          "Answer out loud before revealing anything.</b>";
+        return;
+      }
+      const q = BANK[order[pos % BANK.length]];
+      out.innerHTML =
+        "<div style='font-size:15px;font-family:var(--sans);margin-bottom:6px'><b>Q" +
+        (pos + 1) + ".</b> " + q[0] + "</div>" +
+        (withAnswer
+          ? "<div style='font-size:14px;font-family:var(--sans);color:#334155;" +
+            "border-left:3px solid #7c3aed;padding-left:10px'>" + q[1] + "</div>"
+          : "<div style='color:#5b6472'>… answer it out loud, then reveal.</div>") +
+        "<div style='margin-top:8px'>drilled: <b>" + drilled + "</b> of " + BANK.length +
+        " distinct questions</div>";
+    }
+
+    CD.button("w15lab2ctl", "Draw a question", () => {
+      pos++;
+      const idx = order[pos % BANK.length];
+      if (!seen[idx]) { seen[idx] = true; drilled++; }
+      show(false);
+    });
+    CD.button("w15lab2ctl", "Show a good answer", () => { show(true); }, true);
+    CD.button("w15lab2ctl", "Reset the deck", () => { pos = -1; show(false); }, true);
+    show(false);
+  })();
+});
+</script>
+</body>
+</html>

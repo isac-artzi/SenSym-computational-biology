@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 2 — The Probability You Actually Need</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="week01.html">← Week 1</a><a href="week03.html">Week 3 →</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Week 2</span>
+      <span class="badge aim1">Aim 1 · Theory</span>
+    </div>
+    <h1 class="chapter-title">The Probability You Actually Need</h1>
+    <div class="chapter-sub">Binomial to Poisson · expectation and variance, derived · the thinning theorem that covers depth, dropout and beads at once</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<h2>Objectives</h2>
+<ul class="objectives">
+  <li>Define a random variable, its expectation and its variance, and compute all three for a coin flip without looking anything up.</li>
+  <li>Derive $E[X] = Dp$ and $\mathrm{Var}(X) = Dp(1-p)$ for a binomial by writing $X$ as a sum of indicator variables.</li>
+  <li>Take the Poisson limit ($D \to \infty$, $p \to 0$, $Dp = \lambda$ fixed) and show the pmf converges, at least for $k = 0$ and $k = 1$.</li>
+  <li>Point at the exact factor whose disappearance turns "variance = $Dp(1-p)$" into "variance = mean", and say in one sentence why that matters for the rest of the project.</li>
+  <li>State and prove the thinning theorem, and name the three different experimental manipulations it covers.</li>
+  <li>Implement <code>poisson_logpmf</code>, <code>poisson_pmf</code> and <code>downsample_counts</code>, and explain why the first one works in log space.</li>
+  <li>Reproduce the thinning figures and record the seed in your progress log.</li>
+</ul>
+
+<h2>1 &nbsp;What we are actually claiming</h2>
+
+<p>Last week you were handed a distribution and told that its variance equals its mean. You watched that happen in a lab, which is evidence, and then you were told — twice — that evidence is not a derivation. This week you pay that debt.</p>
+
+<p>Here is the chain of claims, stated up front so you can see where each piece goes:</p>
+
+<table class="simple">
+  <tr><th>Claim</th><th>Status by Friday</th><th>Used in</th></tr>
+  <tr><td>A sequencing count is a binomial: $D$ draws, probability $p_g$ each</td><td>modelling assumption, stated</td><td>everything</td></tr>
+  <tr><td>$E[X] = Dp$ and $\mathrm{Var}(X) = Dp(1-p)$</td><td><span class="claim proved">proved</span></td><td>Week 3</td></tr>
+  <tr><td>Binomial $\to$ Poisson when $D$ is large and $p$ small</td><td><span class="claim proved">proved</span></td><td>Weeks 3–5</td></tr>
+  <tr><td>For a Poisson, variance $=$ mean</td><td><span class="claim proved">proved</span></td><td>the entire project</td></tr>
+  <tr><td>Thinning a Poisson gives a Poisson</td><td><span class="claim proved">proved</span></td><td>Weeks 9, 10, 11, 12</td></tr>
+</table>
+
+<p>That last row is the one that will surprise you. It is a single short theorem, and it is what makes three completely different experiments — sequencing less deeply, losing molecules to dropout, drawing fewer beads out of a jar — into the <em>same</em> experiment. Without it this project would be three projects.</p>
+
+<h2>2 &nbsp;Random variables, expectation, variance</h2>
+
+<p>None of this section is hard, and all of it will be used verbatim. Read it slowly once rather than quickly twice.</p>
+
+<div class="box definition">
+  <span class="box-tag">Definition · random variable</span>
+  <p>A <strong>random variable</strong> is a number produced by a random experiment. Formally it is a
+  function from outcomes to numbers, but for our purposes: run the experiment, write down a number,
+  and that number is $X$.</p>
+  <p>A random variable is <em>discrete</em> if the numbers it can take form a list
+  $x_0, x_1, x_2, \dots$. All of our counts are discrete: a gene's count is $0, 1, 2, \dots$ and
+  never $2.7$. The function $P(X = x)$ is its <strong>probability mass function</strong> (pmf); it
+  is non-negative and sums to 1 over all possible $x$.</p>
+</div>
+
+<p>Notation, once and for all: capital letters ($X$, $Y$) are random variables; lower-case letters ($x$, $k$) are particular values they might take. "$P(X = 3)$" is a number; "$X$" is not.</p>
+
+<div class="box definition">
+  <span class="box-tag">Definition · expectation</span>
+  The <strong>expectation</strong> (or mean) of a discrete random variable is the probability-weighted
+  average of its values:
+  $$E[X] \;=\; \sum_{k} k \, P(X = k).$$
+  It is a fixed number, not a random one. Two properties, both used constantly:
+  <ul>
+    <li><strong>Linearity:</strong> $E[aX + b] = aE[X] + b$, and $E[X + Y] = E[X] + E[Y]$ for
+    <em>any</em> $X$ and $Y$, independent or not (you proved this in Week 1, worked derivation 1).</li>
+    <li><strong>Law of the unconscious statistician:</strong> for any function $g$,
+    $E[g(X)] = \sum_k g(k) P(X = k)$. You do not need the distribution of $g(X)$; you reweight the
+    distribution of $X$. We use this with $g(x) = x^2$.</li>
+  </ul>
+</div>
+
+<div class="box definition">
+  <span class="box-tag">Definition · variance</span>
+  The <strong>variance</strong> is the expected squared distance from the mean:
+  $$\mathrm{Var}(X) \;=\; E\big[(X - E[X])^2\big] \;=\; E[X^2] - (E[X])^2,$$
+  and the <strong>standard deviation</strong> is $\mathrm{sd}(X) = \sqrt{\mathrm{Var}(X)}$, which is
+  in the same units as $X$ (molecules, not molecules-squared). Two properties:
+  <ul>
+    <li>$\mathrm{Var}(aX + b) = a^2\,\mathrm{Var}(X)$. Shifting does nothing; scaling squares.</li>
+    <li>$\mathrm{Var}(X + Y) = \mathrm{Var}(X) + \mathrm{Var}(Y)$ <strong>only when $X$ and $Y$ are
+    independent</strong> (Week 1, exercise 1.4). This asymmetry with expectation is the single most
+    important structural fact in the next four weeks.</li>
+  </ul>
+</div>
+
+<p>The middle expression in the variance definition is the honest one; the right-hand one is the computational one. They agree because expanding $(X - \mu)^2 = X^2 - 2\mu X + \mu^2$ and taking expectations term by term gives $E[X^2] - 2\mu E[X] + \mu^2 = E[X^2] - \mu^2$, using linearity and the fact that $\mu = E[X]$ is a constant.</p>
+
+<div class="box example">
+  <span class="box-tag">The one example everything is built from · a single coin flip</span>
+  <p>Let $I$ be $1$ with probability $p$ and $0$ with probability $1-p$. This is a
+  <strong>Bernoulli</strong>, or an <strong>indicator</strong> variable. Then</p>
+  $$E[I] = 1\cdot p + 0\cdot(1-p) = p.$$
+  <p>For the variance, note that $I^2 = I$ (because $0^2 = 0$ and $1^2 = 1$ — this trick is worth
+  remembering), so $E[I^2] = E[I] = p$, and</p>
+  $$\mathrm{Var}(I) = E[I^2] - (E[I])^2 = p - p^2 = p(1-p).$$
+  <p class="muted">Note the shape of $p(1-p)$: zero at $p = 0$ and $p = 1$ (a coin that always does
+  the same thing is not random), maximal at $p = 1/2$. Every variance in this project is ultimately
+  a sum of these.</p>
+</div>
+
+<h2>3 &nbsp;The binomial, derived</h2>
+
+<p>Now the model. A cell of type 1 has a fraction $p$ of its transcripts belonging to some gene $g$. The sequencer captures $D$ molecules, each one drawn independently, each one landing on gene $g$ with probability $p$. Let $X$ be the number of the $D$ captured molecules that turn out to be gene $g$.</p>
+
+<div class="box definition">
+  <span class="box-tag">Definition · the binomial distribution</span>
+  $X \sim \mathrm{Binomial}(D, p)$ if $X$ counts the successes in $D$ independent trials, each with
+  success probability $p$. Its pmf is
+  $$P(X = k) = \binom{D}{k} p^k (1-p)^{D-k}, \qquad k = 0, 1, \dots, D,$$
+  where $\binom{D}{k} = \dfrac{D!}{k!\,(D-k)!}$ counts the ways to choose <em>which</em> $k$ of the
+  $D$ trials succeeded. The three factors are: which trials succeeded, the probability that those
+  ones did, and the probability that the others did not.
+</div>
+
+<p>You could get $E[X]$ and $\mathrm{Var}(X)$ by grinding through $\sum_k k \binom{D}{k} p^k(1-p)^{D-k}$ with a factorial identity. Do not. There is a route that is shorter, more memorable, and — crucially — makes visible <em>exactly which step needs independence</em>.</p>
+
+<div class="box theorem">
+  <span class="box-tag">Theorem · mean and variance of a binomial &nbsp;<span class="claim proved">proved</span></span>
+  If $X \sim \mathrm{Binomial}(D, p)$ then
+  $$E[X] = Dp, \qquad \mathrm{Var}(X) = Dp(1-p).$$
+</div>
+
+<div class="box proof">
+  <span class="box-tag">Proof · by indicator decomposition</span>
+  <p>Let $I_i = 1$ if trial $i$ succeeded and $0$ otherwise, for $i = 1, \dots, D$. Counting the
+  successes is the same as adding up the indicators:</p>
+  $$X = I_1 + I_2 + \cdots + I_D.$$
+  <p>That single line is the whole idea. It converts one complicated variable into a sum of $D$
+  copies of the simplest possible variable, whose mean and variance we computed above.</p>
+  <p><strong>The mean.</strong> Expectation is linear, always, with no conditions:</p>
+  $$E[X] = \sum_{i=1}^{D} E[I_i] = \sum_{i=1}^{D} p = Dp.$$
+  <p><strong>The variance.</strong> The trials are independent by assumption, so variances add
+  (Week 1, exercise 1.4 — the covariance terms vanish):</p>
+  $$\mathrm{Var}(X) = \sum_{i=1}^{D} \mathrm{Var}(I_i) = \sum_{i=1}^{D} p(1-p) = Dp(1-p).
+  \qquad \blacksquare$$
+  <p><strong>Assumptions used:</strong> (i) each molecule is captured independently of the others;
+  (ii) every molecule has the same probability $p$ of belonging to gene $g$; (iii) $D$ is fixed in
+  advance, not itself random.</p>
+</div>
+
+<p>Look at what the two halves of that proof cost. The mean needed nothing. The variance needed independence, and it needed it at exactly one step. If molecules were captured in clumps — one capture event pulling in several copies of the same transcript — the $E$ line would still be true and the $\mathrm{Var}$ line would be false, and the variance would come out too big. Hold that thought until Week 11, where real data does precisely this.</p>
+
+<div class="box pitfall">
+  <span class="box-tag">Assumption (iii) is doing more work than it looks</span>
+  Real sequencing does not deliver exactly $D$ molecules per cell: library sizes vary from cell to
+  cell, sometimes by a factor of three. Everything in this project conditions on $D$ — that is, it
+  asks "given that this cell yielded $D$ molecules, what follows?" — and then compares cells at
+  matched depth. Week 10 makes that matching explicit by downsampling every cell to a common depth,
+  which is legitimate <em>because</em> of the thinning theorem in section 6. If you ever find
+  yourself comparing a cell with $D = 5000$ to one with $D = 1500$ without normalizing, you are
+  measuring library size, not biology.
+</div>
+
+<h2>4 &nbsp;The Poisson limit</h2>
+
+<p>The binomial is correct but awkward: it has two parameters, its pmf contains a factorial of $D$ (which for $D = 3000$ is a number with over 9000 digits), and its variance $Dp(1-p)$ depends on both parameters separately. In our regime it collapses into something much better behaved.</p>
+
+<p>The regime is: <strong>many draws, each unlikely to hit our gene, with a fixed expected count</strong>. Formally, let $D \to \infty$ and $p \to 0$ together in such a way that $Dp = \lambda$ stays fixed. Then $p = \lambda/D$, and we ask what the pmf converges to.</p>
+
+<div class="box theorem">
+  <span class="box-tag">Theorem · the Poisson limit &nbsp;<span class="claim proved">proved</span></span>
+  Fix $\lambda > 0$ and set $p = \lambda / D$. Then for every fixed $k = 0, 1, 2, \dots$,
+  $$\lim_{D \to \infty} \binom{D}{k}\left(\frac{\lambda}{D}\right)^{k}
+    \left(1 - \frac{\lambda}{D}\right)^{D-k}
+    \;=\; \frac{\lambda^{k} e^{-\lambda}}{k!}.$$
+</div>
+
+<div class="box proof">
+  <span class="box-tag">Proof · start with the two cases you can do by hand</span>
+  <p>The one fact we import from calculus is the definition of $e$:
+  $\displaystyle \lim_{D\to\infty}\left(1 + \frac{x}{D}\right)^{D} = e^{x}$. With $x = -\lambda$ this
+  gives $(1 - \lambda/D)^{D} \to e^{-\lambda}$. Everything else is bookkeeping.</p>
+
+  <p><strong>Case $k = 0$.</strong> There is only one way to have zero successes: every one of the $D$
+  trials fails.</p>
+  $$P(X = 0) = (1-p)^{D} = \left(1 - \frac{\lambda}{D}\right)^{D} \;\longrightarrow\; e^{-\lambda}
+    \;=\; \frac{\lambda^{0} e^{-\lambda}}{0!}. \;\checkmark$$
+
+  <p><strong>Case $k = 1$.</strong> Choose which trial succeeded ($D$ ways), it succeeds
+  (probability $p$), the other $D-1$ fail:</p>
+  $$P(X = 1) = D\,p\,(1-p)^{D-1}
+    = \underbrace{D \cdot \frac{\lambda}{D}}_{=\;\lambda}
+      \cdot \underbrace{\left(1 - \frac{\lambda}{D}\right)^{D}}_{\to\, e^{-\lambda}}
+      \cdot \underbrace{\left(1 - \frac{\lambda}{D}\right)^{-1}}_{\to\, 1}
+    \;\longrightarrow\; \lambda e^{-\lambda} = \frac{\lambda^{1}e^{-\lambda}}{1!}. \;\checkmark$$
+  <p>Notice the manoeuvre in the second line: we rewrote $(1-p)^{D-1}$ as $(1-p)^{D}(1-p)^{-1}$ so
+  that one factor is exactly the limit we know and the other is a nuisance factor tending to 1. That
+  trick is the entire general case.</p>
+
+  <p><strong>General $k$.</strong> Write the binomial coefficient out and split the powers the same
+  way:</p>
+  $$\binom{D}{k}\left(\frac{\lambda}{D}\right)^{k}\left(1-\frac{\lambda}{D}\right)^{D-k}
+   = \frac{\lambda^{k}}{k!}
+     \cdot \underbrace{\frac{D(D-1)\cdots(D-k+1)}{D^{k}}}_{\text{(A)}}
+     \cdot \underbrace{\left(1-\frac{\lambda}{D}\right)^{D}}_{\text{(B)}}
+     \cdot \underbrace{\left(1-\frac{\lambda}{D}\right)^{-k}}_{\text{(C)}}.$$
+  <p>Take the three braced factors in turn, with $k$ held fixed while $D$ grows:</p>
+  <ul>
+    <li>(A) is a product of $k$ terms $\frac{D}{D}\cdot\frac{D-1}{D}\cdots\frac{D-k+1}{D}$, each of
+    which tends to 1. A fixed number of factors each tending to 1 has product tending to 1.</li>
+    <li>(B) $\to e^{-\lambda}$, by the definition of $e$.</li>
+    <li>(C) $\to 1^{-k} = 1$, since $\lambda/D \to 0$.</li>
+  </ul>
+  <p>Multiplying, the limit is $\lambda^{k}e^{-\lambda}/k!$. <span class="qed">∎</span></p>
+  <p><strong>Assumptions used:</strong> $k$ is held fixed while $D \to \infty$; $\lambda = Dp$ is held
+  fixed; the trials are independent and identically distributed (that is what made it a binomial in
+  the first place).</p>
+</div>
+
+<h3>Where "variance = mean" comes from</h3>
+
+<p>Now the payoff, and it is a single line. Under the same limit, what happens to the variance?</p>
+
+<div class="box theorem">
+  <span class="box-tag">The coincidence, finally explained &nbsp;<span class="claim proved">proved</span></span>
+  $$\mathrm{Var}(X) = Dp(1-p) = \lambda\,(1-p) \;\xrightarrow[\;p \to 0\;]{}\; \lambda = E[X].$$
+  <p>That is the whole thing. A binomial has variance <em>strictly less</em> than its mean, by
+  exactly the factor $(1-p)$. As $p \to 0$ that factor goes to 1 and the deficit disappears, leaving
+  variance and mean equal.</p>
+  <p><strong>The Poisson is the distribution whose spread you no longer get to choose.</strong> Fix
+  the mean and the variance is determined. Every square root in the remaining thirteen weeks —
+  $d' \propto \sqrt{\text{depth}}$, $d' \propto \sqrt{k}$, the accuracy formula
+  $\Phi(d'/2)$ — descends from this line, and the failure of this line is what Week 11 is about.</p>
+</div>
+
+<p>It is worth saying loudly what is <em>not</em> going on here. "Variance equals mean" is not a deep truth about counting. It is the vanishing of a specific correction factor $(1-p)$ in a specific limit. If you ever want to know whether the theory should apply to some new situation, the question to ask is not "are these counts?" but "is the $(1-p)$ factor negligible, and are the trials independent?"</p>
+
+<div class="box example">
+  <span class="box-tag">How good is the approximation for scRNA-seq? Very.</span>
+  <p>Take the well-expressed gene from Week 1's exercise 1.1: depth $D = 3000$, per-molecule
+  probability $p = 0.002$, so $\lambda = Dp = 6$.</p>
+  <ul>
+    <li>Binomial variance: $Dp(1-p) = 6 \times 0.998 = 5.988$.</li>
+    <li>Poisson variance: $\lambda = 6$.</li>
+    <li>Standard deviations: $2.4470$ versus $2.4495$ — a difference of one part in a thousand.</li>
+  </ul>
+  <p>Pointwise, the two pmfs differ by at most $1.6 \times 10^{-4}$ (you will read this number off
+  Lab 1's readout). The total of all the absolute differences is $9.5\times 10^{-4}$: if you drew a
+  thousand cells you would expect roughly one of them to land on a count where the two models even
+  disagree about the third decimal place.</p>
+  <p class="muted">And $p = 0.002$ is a <em>generous</em> gene. A typical gene in PBMC 3k sits nearer
+  $p = 10^{-4}$, where $(1-p) = 0.9999$. In this application the Poisson approximation is not a
+  convenience; it is better than the measurement.</p>
+</div>
+
+<div class="box theorem">
+  <span class="box-tag">How close, in general &nbsp;<span class="claim cited">cited</span></span>
+  Le Cam's theorem (Le Cam 1960) bounds the error uniformly: if $X \sim \mathrm{Binomial}(D,p)$ and
+  $Y \sim \mathrm{Poisson}(Dp)$, then
+  $$\sum_{k=0}^{\infty}\big|P(X = k) - P(Y = k)\big| \;\le\; 2Dp^{2} = 2\lambda p.$$
+  For $D = 3000$, $p = 0.002$ this bound is $0.024$ — and the true value, $9.5\times10^{-4}$, is
+  twenty-five times smaller still. We use the bound rather than prove it; the proof is a coupling
+  argument well outside Calculus AB. Note its shape: the error is controlled by $p$, not by $D$.
+</div>
+
+<h2>5 &nbsp;Lab: watch the binomial become a Poisson</h2>
+
+<p>Fix the expected count $\lambda$ and slide $D$. As $D$ rises, $p = \lambda/D$ falls to keep the product fixed, and the blue bars (the exact binomial) walk onto the orange curve (the Poisson). Watch the maximum discrepancy in the readout: it should fall roughly in proportion to $p$, exactly as Le Cam's bound predicts.</p>
+
+<div class="lab">
+  <div class="lab-title">Lab 1 · The binomial, the Poisson, and the gap between them</div>
+  <div class="lab-desc">Blue bars: the exact binomial pmf $\binom{D}{k}p^k(1-p)^{D-k}$ with $p = \lambda/D$. Orange curve: the Poisson pmf $\lambda^k e^{-\lambda}/k!$. The two parameters $D$ and $\lambda$ move independently; $p$ is whatever it must be. Find the smallest $D$ at which you honestly cannot see a gap, then read the number that says how big it still is.</div>
+  <canvas id="w2lab1" height="330"></canvas>
+  <div class="controls" id="w2lab1ctl"></div>
+  <div class="readout" id="w2lab1out"></div>
+</div>
+
+<p>Three things to take away from playing with it. First, the approximation is bad at $D = 25$, $p = 0.8$ — the binomial cannot exceed $D$, and it visibly piles up against that ceiling, while the Poisson has a tail going off to infinity. Second, the convergence is governed by $p$ alone: at $\lambda = 20$ you need a much larger $D$ to reach the same $p$, and the same $p$ gives you about the same maximum error. Third, at the actual scRNA-seq operating point ($D = 3000$, $\lambda = 6$, $p = 0.002$) the two curves are indistinguishable at any plausible screen resolution, and the readout tells you the disagreement is in the fourth decimal place.</p>
+
+<div class="box biology">
+  <span class="box-tag">Why $p$ is small in this application</span>
+  <p>A human cell carries a few hundred thousand mRNA molecules spread over roughly twenty thousand
+  genes. Even a gene making up an unusually large 0.2% of the transcriptome — one molecule in five
+  hundred — gives $p = 0.002$. Most of the genes we will use as markers are ten to a hundred times
+  rarer than that.</p>
+  <p>So the Poisson limit is not a mathematical idealization we are hoping applies. It is a
+  description of the regime the technology actually operates in, and the honest place to attack this
+  project is not "is $p$ small enough?" (it is) but "are the captures really independent?" (they are
+  not quite, and Week 11 measures how badly).</p>
+</div>
+
+<h2>6 &nbsp;The thinning theorem</h2>
+
+<p>Now the result this week exists for. Suppose you have a Poisson number of things, and then you lose some of them at random. What is left?</p>
+
+<div class="box theorem">
+  <span class="box-tag">Theorem · Poisson thinning &nbsp;<span class="claim proved">proved</span></span>
+  Let $X \sim \mathrm{Poisson}(\lambda)$, and suppose each of the $X$ items independently
+  <em>survives</em> with probability $q$ and is lost otherwise, independently of $X$. Let $Y$ be the
+  number of survivors. Then
+  $$Y \sim \mathrm{Poisson}(q\lambda).$$
+  Exactly. Not approximately, not asymptotically, not in the limit of large $\lambda$.
+</div>
+
+<div class="box proof">
+  <span class="box-tag">Proof · condition on how many there were to begin with</span>
+  <p>We want $P(Y = m)$ for a fixed $m \ge 0$. The number of survivors depends on two things: how
+  many items there were ($X = n$), and how many of those survived. So split on $n$, using the law of
+  total probability:</p>
+  $$P(Y = m) \;=\; \sum_{n=m}^{\infty} P(X = n)\, P(Y = m \mid X = n).$$
+  <p>The sum starts at $n = m$ because you cannot have more survivors than items. Given $X = n$, the
+  survivors are $n$ independent coin flips with success probability $q$ — a binomial:</p>
+  $$P(Y = m \mid X = n) = \binom{n}{m} q^{m}(1-q)^{n-m}.$$
+  <p>Substituting the Poisson pmf for $P(X = n)$:</p>
+  $$P(Y = m) = \sum_{n=m}^{\infty}
+      \frac{e^{-\lambda}\lambda^{n}}{n!}
+      \cdot \frac{n!}{m!\,(n-m)!}\, q^{m}(1-q)^{n-m}.$$
+  <p>The $n!$ cancels — this is the step that makes the whole thing work, and it is worth noticing
+  that it cancels because the Poisson pmf and the binomial coefficient contain the <em>same</em>
+  factorial:</p>
+  $$P(Y = m) = \frac{e^{-\lambda} q^{m}}{m!}
+      \sum_{n=m}^{\infty} \frac{\lambda^{n}(1-q)^{n-m}}{(n-m)!}.$$
+  <p>Now substitute $j = n - m$ (so $n = j + m$ and $j$ runs from 0 upwards), and split
+  $\lambda^{j+m} = \lambda^{m}\lambda^{j}$:</p>
+  $$P(Y = m) = \frac{e^{-\lambda}(q\lambda)^{m}}{m!}
+      \sum_{j=0}^{\infty} \frac{\big(\lambda(1-q)\big)^{j}}{j!}.$$
+  <p>That remaining sum is the Taylor series of the exponential, $\sum_j z^j/j! = e^{z}$, with
+  $z = \lambda(1-q)$. So</p>
+  $$P(Y = m) = \frac{e^{-\lambda}(q\lambda)^{m}}{m!}\, e^{\lambda(1-q)}
+             = \frac{(q\lambda)^{m} e^{-q\lambda}}{m!},$$
+  <p>because $e^{-\lambda}e^{\lambda - q\lambda} = e^{-q\lambda}$. That is exactly the
+  $\mathrm{Poisson}(q\lambda)$ pmf. <span class="qed">∎</span></p>
+  <p><strong>Assumptions used:</strong> $X$ is Poisson; each item survives independently of the
+  others; the survival probability $q$ is the same for every item and does not depend on $X$.</p>
+</div>
+
+<div class="box win">
+  <span class="box-tag">Say this out loud: one theorem, three experiments</span>
+  <p>The thinning theorem is not a technical lemma. It is the reason this project has one theory
+  instead of three. Every "less data" manipulation you will perform is the same mathematical
+  operation:</p>
+  <ul>
+    <li><strong>Lower sequencing depth.</strong> Sequencing a library to depth $qD$ instead of $D$
+    keeps each molecule with probability $q$. New rate: $q\lambda$. Still Poisson. This is why
+    Week 10's protocol — take the real PBMC 3k matrix and downsample it — is legitimate rather than
+    a fudge, and it is <code>downsample_counts</code> in your Python package.</li>
+    <li><strong>Transcript dropout.</strong> A molecule fails to be captured, reverse-transcribed or
+    amplified with some probability $1-q$. New rate: $q\lambda$. Still Poisson. So
+    <em>dropout is indistinguishable from shallower sequencing</em>, which is the headline of Week 9
+    and a genuinely surprising claim to most biologists.</li>
+    <li><strong>Drawing fewer beads.</strong> Week 12's physical experiment draws $n$ beads from a
+    jar and then applies a dropout rule with a die. Same theorem, same $q$, and this time nothing is
+    simulated.</li>
+  </ul>
+  <p>Because all three are thinning, all three shift $\lambda$ and nothing else. In Week 3 you will
+  see that $d'$ depends on $\lambda$ through $\sqrt{\lambda}$, so all three cost you separation by
+  the same factor $\sqrt{q}$. Three experiments, one prediction.</p>
+</div>
+
+<div class="box example">
+  <span class="box-tag">Corollary · thinnings compose, and the Fano factor never moves</span>
+  <p>Thin by $q_1$, then thin the survivors by $q_2$: apply the theorem twice and the result is
+  $\mathrm{Poisson}(q_2 q_1 \lambda)$. So a library sequenced at half depth and then subjected to 30%
+  dropout is exactly a library at rate $0.5 \times 0.7 \times \lambda = 0.35\lambda$, and no
+  experiment can tell the two apart.</p>
+  <p>And since the result is Poisson at rate $q\lambda$, its variance is $q\lambda$ too — so the Fano
+  factor is $q\lambda/q\lambda = 1$ for every $q$. Thinning cannot create or destroy overdispersion.
+  That flat line is the second figure you produce this week, and it is a much sharper test of your
+  code than "the mean looks about right".</p>
+</div>
+
+<h2>7 &nbsp;Lab: thinning, checked against the theorem</h2>
+
+<p>The theorem makes a falsifiable prediction: a Poisson($\lambda$) thinned by $q$ should be <em>statistically identical</em> to a Poisson($q\lambda$) drawn directly. Not similar in mean — identical in distribution. Here are both, on the same axes.</p>
+
+<div class="lab">
+  <div class="lab-title">Lab 2 · Two roads to the same distribution</div>
+  <div class="lab-desc">Blue bars: draw $\mathrm{Poisson}(\lambda)$, then flip a coin with probability $q$ for each of the $X$ molecules and keep the survivors. Teal outline: draw $\mathrm{Poisson}(q\lambda)$ directly, never having generated the discarded molecules at all. The theorem says these two histograms are samples from the same law. The Fano factors should both sit at 1 no matter how hard you thin.</div>
+  <canvas id="w2lab2" height="330"></canvas>
+  <div class="controls" id="w2lab2ctl"></div>
+  <div class="readout" id="w2lab2out"></div>
+</div>
+
+<p>Push $q$ down to $0.05$ and look at what survives: the two histograms still agree, and both Fano factors still sit near 1, but the <em>relative</em> noise has exploded. At $\lambda = 100$, $q = 0.05$ the mean is 5 and the standard deviation is $\sqrt{5} \approx 2.24$, so you are reporting a count that is wrong by 45% on a typical cell. Thinning does not break the Poisson structure; it just moves you to a much worse place on the same curve. That is the entire content of "sequencing depth matters".</p>
+
+<div class="box pitfall">
+  <span class="box-tag">The mistake this lab is designed to prevent</span>
+  <p>Almost everyone, on first meeting thinning, does the arithmetic as though it were a scaling:
+  "half the molecules, so half the count, so half the standard deviation." It is not. Halving the
+  <em>rate</em> divides the standard deviation by $\sqrt{2}$, not by 2, because the standard
+  deviation is $\sqrt{\lambda}$.</p>
+  <p>Concretely: thinning $\lambda = 100$ (sd $10$, relative noise 10%) by $q = 0.5$ gives
+  $\lambda = 50$ (sd $7.07$, relative noise 14%). The absolute noise went down and the relative noise
+  went up. If you cannot say which of those two your argument needs, you cannot yet do Week 3.</p>
+</div>
+
+<h2>8 &nbsp;A numerical warning: compute the pmf in log space</h2>
+
+<p>The pmf $\lambda^k e^{-\lambda}/k!$ is a mathematically innocent expression and a numerically catastrophic one. A float64 holds numbers up to about $1.8\times10^{308}$ and down to about $5\times10^{-324}$. At the depths this project uses, all three factors leave that window:</p>
+
+<table class="simple">
+  <tr><th>Quantity at $\lambda = k = 5000$</th><th>Approximate value</th><th>float64?</th></tr>
+  <tr><td>$\lambda^{k} = 5000^{5000}$</td><td>$10^{18494}$</td><td>overflow to <code>inf</code></td></tr>
+  <tr><td>$k! = 5000!$</td><td>$10^{16326}$</td><td>overflow to <code>inf</code></td></tr>
+  <tr><td>$e^{-\lambda} = e^{-5000}$</td><td>$10^{-2172}$</td><td>underflow to <code>0.0</code></td></tr>
+  <tr><td>the answer $P(X = 5000)$</td><td>$0.0056$</td><td>perfectly representable</td></tr>
+</table>
+
+<p>So the probability is an ordinary number near a hundredth, and every single intermediate step in the naive formula is unrepresentable. Evaluate it directly and you get <code>inf/inf</code>, which is <code>nan</code>, which then silently poisons every sum it touches downstream.</p>
+
+<div class="box python">
+  <span class="box-tag">The fix, which is also the standard practice</span>
+  <p>Take the logarithm first, evaluate <em>that</em>, and exponentiate only at the very end:</p>
+  $$\log P(X = k) \;=\; k\log\lambda \;-\; \lambda \;-\; \log(k!).$$
+  <p>At $\lambda = k = 5000$ the three terms are about $42586$, $-5000$ and $-37592$ — all
+  comfortable numbers. The factorial is computed as
+  $\log(k!) = \log\Gamma(k+1) = $ <code>scipy.special.gammaln(k + 1)</code>, which computes the log
+  of the factorial without ever forming the factorial. That is why <code>gammaln</code> is imported
+  at the top of <code>celldetect/counting.py</code> and why <code>poisson_logpmf</code> exists as a
+  separate function from <code>poisson_pmf</code>.</p>
+  <p>This is not a stylistic preference. The test
+  <code>test_poisson_logpmf_survives_large_lambda</code> evaluates the log-pmf at
+  $\lambda = 5000$ and asserts every value is finite. An implementation that computes the pmf and
+  then takes its log will fail it.</p>
+</div>
+
+<p class="muted">The same principle recurs three more times in this project: the naive-Bayes classifier in Week 5 adds log-probabilities rather than multiplying probabilities (a product of 2000 gene likelihoods underflows to zero); Week 4's exact Bayes error sums pmfs computed the same safe way; and Week 12's bead likelihoods are handled identically. "Work in logs" is the single most useful piece of numerical hygiene you will learn all semester.</p>
+
+<h2>9 &nbsp;Your Python laboratory</h2>
+
+<div class="box python">
+  <span class="box-tag">This week in the celldetect project</span>
+  <p>Open <code>python/celldetect/counting.py</code> and implement the three Week 2 functions. The
+  <code>TODO</code> comments and docstrings tell you exactly what each must do; the build order is
+  the order they appear in the file.</p>
+  <ul>
+    <li><code>poisson_logpmf(k, lam)</code> — $k\log\lambda - \lambda - \mathrm{gammaln}(k+1)$,
+    vectorized over <code>k</code>. Handle <code>lam == 0</code> as its own branch: all the mass sits
+    on $k = 0$, so return $0.0$ (that is $\log 1$) there and $-\infty$ elsewhere. Without that branch
+    <code>log(0)</code> warns and fills your array with <code>nan</code>.</li>
+    <li><code>poisson_pmf(k, lam)</code> — one line: exponentiate the log. Kept separate because
+    Week 4 wants probabilities and Week 5 wants logs.</li>
+    <li><code>downsample_counts(counts, keep_prob, rng)</code> — the thinning theorem as code. The
+    thinning <em>is</em> a binomial draw, so this is <code>rng.binomial(counts.astype(np.int64),
+    keep_prob)</code>, which numpy broadcasts elementwise. Validate <code>keep_prob</code> and reject
+    negative counts.</li>
+  </ul>
+  <p>Check yourself with <code>pytest tests/test_counting.py</code> — the whole file should now be
+  green, including last week's <code>sample_counts</code> and <code>fano_factor</code> tests. Read
+  the two tests named <code>test_downsample_counts_stays_poisson</code> and
+  <code>test_poisson_logpmf_survives_large_lambda</code> before you run them: one is the theorem you
+  just proved, and the other is section 8.</p>
+  <p>Then run <code>python experiments/week02_thinning.py</code>. It uses <strong>SEED = 102</strong>
+  and writes two figures into <code>figures/</code>:</p>
+  <ul>
+    <li><code>week02_thinning.png</code> — a Poisson(100) thinned by $q = 0.5$, a Poisson(50) drawn
+    directly, and the Poisson(50) pmf you computed, all on one axis.</li>
+    <li><code>week02_thinning_fano.png</code> — the mean and the Fano factor of the thinned counts
+    across keep probabilities from $0.05$ to $1.0$. The mean should ride the line $q\lambda$; the
+    Fano factor should be a flat line at 1. <em>That flat line is the theorem.</em></li>
+  </ul>
+  <p>Commit both figures and record the seed in <code>progress/week02.md</code>. Reference
+  implementations are in <code>python/solutions/</code> — read them after a real attempt, not
+  before.</p>
+</div>
+
+<div class="box pitfall">
+  <span class="box-tag">The one that catches everyone in Week 2</span>
+  <p>Two traps, and the tests are built to catch both.</p>
+  <p><strong>Trap 1: the same <code>rng</code>, twice.</strong> In
+  <code>test_downsample_counts_endpoints</code>, <code>downsample_counts(x, 1.0, rng)</code> must
+  return <code>x</code> exactly and <code>downsample_counts(x, 0.0, rng)</code> must return zeros. If
+  you special-case those and forget to draw from <code>rng</code> anyway, later calls will get
+  different random numbers than the seed implies. Just let <code>rng.binomial</code> handle both
+  endpoints; it does the right thing.</p>
+  <p><strong>Trap 2: <code>rng.binomial</code> wants integers.</strong> A count array that arrived as
+  float64 (very easy after a division) will make numpy raise or silently truncate. Cast with
+  <code>.astype(np.int64)</code>, as the docstring says, and then ask yourself where the float crept
+  in.</p>
+</div>
+
+<h2>10 &nbsp;Exercises</h2>
+<p class="muted">Stars mark difficulty: ★ routine · ★★ requires an idea · ★★★ challenge. Write full sentences; every claim needs a reason. Solutions are provided — attempt first, then compare.</p>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 2.1</span><span class="stars">★</span></div>
+  <div class="ex-body">A gene has $p = 0.002$ and the depth is $D = 3000$. Using the binomial formulas, compute $E[X]$, $\mathrm{Var}(X)$ and $\mathrm{sd}(X)$ exactly. Compare each to the Poisson answer and give the relative error of the standard deviation. Then repeat for a bead jar with $D = 20$ draws and $p = 0.3$, and say why the second case is <em>not</em> a Poisson problem.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p><strong>Sequencing.</strong> $E[X] = Dp = 3000 \times 0.002 = 6$.
+      $\mathrm{Var}(X) = Dp(1-p) = 6 \times 0.998 = 5.988$, so
+      $\mathrm{sd}(X) = \sqrt{5.988} = 2.4470$. The Poisson answers are $6$, $6$ and
+      $\sqrt{6} = 2.4495$. The relative error in the standard deviation is
+      $(2.4495 - 2.4470)/2.4470 = 0.10\%$.</p>
+      <p><strong>Beads.</strong> $E[X] = 20 \times 0.3 = 6$ — the same mean. But
+      $\mathrm{Var}(X) = 20 \times 0.3 \times 0.7 = 4.2$, against a Poisson prediction of $6$. The
+      Poisson would overstate the variance by 43%, and the standard deviation by 20%.</p>
+      <p>Why: the Poisson limit needs $p \to 0$, and $p = 0.3$ is nowhere near zero. The $(1-p) = 0.7$
+      factor is doing real work. Concretely, the binomial cannot return more than 20 and the Poisson
+      can return 25; the binomial is squeezed against a ceiling the Poisson does not have.</p>
+      <p class="muted">This is exactly why Week 12's bead experiment is analysed with the
+      <em>binomial</em>, not the Poisson, and why the bead chapter has its own version of the $d'$
+      derivation. The beads are an honest analog of <em>sampling</em>, not of the Poisson limit —
+      and being clear about which parts of an analogy transfer is most of what makes an analogy
+      scientific rather than decorative.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 2.2</span><span class="stars">★</span></div>
+  <div class="ex-body">Carry out the Poisson limit for $k = 2$ explicitly, in the style of the $k = 0$ and $k = 1$ cases: write the binomial probability with $p = \lambda/D$, split the powers of $(1-\lambda/D)$, and identify each factor's limit.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>With $k = 2$ the binomial coefficient is $\binom{D}{2} = \dfrac{D(D-1)}{2}$, so</p>
+      $$P(X = 2) = \frac{D(D-1)}{2}\left(\frac{\lambda}{D}\right)^{2}
+                   \left(1-\frac{\lambda}{D}\right)^{D-2}.$$
+      <p>Pull out $\lambda^2/2$ and split the last factor:</p>
+      $$= \frac{\lambda^{2}}{2}
+          \cdot \underbrace{\frac{D(D-1)}{D^{2}}}_{=\,1 - 1/D \,\to\, 1}
+          \cdot \underbrace{\left(1-\frac{\lambda}{D}\right)^{D}}_{\to\, e^{-\lambda}}
+          \cdot \underbrace{\left(1-\frac{\lambda}{D}\right)^{-2}}_{\to\, 1}
+        \;\longrightarrow\; \frac{\lambda^{2}e^{-\lambda}}{2} = \frac{\lambda^{2}e^{-\lambda}}{2!}.$$
+      <p>Which is the claim. Note that $2! = 2$ appeared from the binomial coefficient's denominator,
+      not from anywhere exotic.</p>
+      <p class="muted">Doing $k=2$ by hand is what makes the general proof readable rather than
+      symbol-shuffling: factor (A) in the general argument is precisely the
+      $D(D-1)\cdots/D^{k}$ you just wrote as $1 - 1/D$. If you can do $k = 2$ from scratch you can
+      reconstruct the whole theorem at a whiteboard, which is what Week 6's closed-book session will
+      ask of you.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 2.3</span><span class="stars">★★</span></div>
+  <div class="ex-body">Prove directly from the Poisson pmf that $E[X] = \lambda$ and $\mathrm{Var}(X) = \lambda$, without taking any limits. <em>Hint: for the variance, compute $E[X(X-1)]$ rather than $E[X^2]$; the factor $k(k-1)$ cancels beautifully against $k!$.</em></div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p><strong>The mean.</strong> The $k = 0$ term contributes nothing, so start at $k = 1$ and
+      cancel one factor of $k$ against $k!$:</p>
+      $$E[X] = \sum_{k=0}^{\infty} k\,\frac{\lambda^{k}e^{-\lambda}}{k!}
+             = \sum_{k=1}^{\infty} \frac{\lambda^{k}e^{-\lambda}}{(k-1)!}
+             = \lambda e^{-\lambda}\sum_{j=0}^{\infty}\frac{\lambda^{j}}{j!}
+             = \lambda e^{-\lambda}e^{\lambda} = \lambda,$$
+      <p>substituting $j = k-1$ and recognizing the exponential series.</p>
+      <p><strong>The second factorial moment.</strong> The same trick twice; the $k=0$ and $k=1$
+      terms vanish because $k(k-1) = 0$ for both:</p>
+      $$E[X(X-1)] = \sum_{k=2}^{\infty} k(k-1)\frac{\lambda^{k}e^{-\lambda}}{k!}
+                  = \sum_{k=2}^{\infty}\frac{\lambda^{k}e^{-\lambda}}{(k-2)!}
+                  = \lambda^{2}e^{-\lambda}\sum_{j=0}^{\infty}\frac{\lambda^{j}}{j!}
+                  = \lambda^{2}.$$
+      <p><strong>The variance.</strong> Since $E[X(X-1)] = E[X^{2}] - E[X]$, we get
+      $E[X^{2}] = \lambda^{2} + \lambda$, and therefore</p>
+      $$\mathrm{Var}(X) = E[X^{2}] - (E[X])^{2} = (\lambda^{2} + \lambda) - \lambda^{2} = \lambda.
+        \qquad \blacksquare$$
+      <p>Assumptions used: none beyond the pmf itself and absolute convergence of the series (which
+      holds because $e^\lambda$ converges for every $\lambda$).</p>
+      <p class="muted">Two independent routes to the same fact — the limit of $Dp(1-p)$ in section 4,
+      and this direct sum — is worth having. The limit route tells you <em>why</em> the variance
+      equals the mean (a factor died); the direct route tells you that it is exactly true for the
+      Poisson and not an artefact of the approximation. Week 3's derivation needs the second kind of
+      confidence.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 2.4</span><span class="stars">★★</span></div>
+  <div class="ex-body">A 10x run gives depth $D = 4000$ per cell. You are told the capture efficiency is only 32% — that is, 68% of the transcripts present in the cell never make it into the data. Your collaborator says "so the real depth is 4000, but we only see part of it, and the statistics are ruined." Answer them precisely: what is the distribution of the observed count for a gene at fraction $p = 0.0015$? Then, separately: you want to simulate a 25% dropout rate on <em>top</em> of a downsampling to half depth. What single keep probability is equivalent, and what does that do to the observed rate?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p><strong>The collaborator.</strong> The statistics are not ruined; they are relabelled. If the
+      cell's true content gives a Poisson rate and each molecule survives capture independently with
+      probability $q = 0.32$, the thinning theorem says the observed count is still Poisson, with
+      rate $q\lambda$. The number to quote is the <em>effective</em> depth $qD = 0.32 \times 4000 =
+      1280$ molecules, so for this gene $\lambda_{\text{obs}} = 1280 \times 0.0015 = 1.92$ counts.
+      Everything downstream — Fano factor, $d'$, accuracy — is computed from $1.92$ and is exactly as
+      valid as if the sequencer had been perfect at depth 1280.</p>
+      <p>What is lost is only the rate itself, not the model: relative noise is
+      $1/\sqrt{1.92} = 72\%$ instead of $1/\sqrt{6} = 41\%$.</p>
+      <p><strong>Composing thinnings.</strong> Downsampling to half depth is $q_1 = 0.5$; 25% dropout
+      is $q_2 = 0.75$. Applying the theorem twice gives a Poisson at rate
+      $q_2 q_1 \lambda = 0.375\lambda$, so the single equivalent keep probability is
+      $q = 0.375$. The observed rate is $0.375$ of what it was; the standard deviation is
+      $\sqrt{0.375} = 0.61$ of what it was; the relative noise is $1/\sqrt{0.375} = 1.63$ times
+      worse.</p>
+      <p class="muted">This exercise is Week 9 in miniature. The claim "dropout is just less depth"
+      sounds glib and is in fact a theorem, and the whole of Week 9 is spent finding the regime
+      (very low $\lambda$) where the <em>downstream</em> consequences stop matching, even though the
+      thinning statement itself never fails.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 2.5</span><span class="stars">★★</span></div>
+  <div class="ex-body">Prove the <em>superposition</em> theorem: if $X_1 \sim \mathrm{Poisson}(\lambda_1)$ and $X_2 \sim \mathrm{Poisson}(\lambda_2)$ are independent, then $X_1 + X_2 \sim \mathrm{Poisson}(\lambda_1 + \lambda_2)$. Then use it to say what the distribution of a cell's <em>total</em> count over all $G$ genes is, and what that means for the assumption "$D$ is fixed".</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p><strong>The proof.</strong> Split on how the total $n$ was divided:</p>
+      $$P(X_1 + X_2 = n) = \sum_{k=0}^{n} P(X_1 = k)P(X_2 = n-k)
+        = \sum_{k=0}^{n} \frac{\lambda_1^{k}e^{-\lambda_1}}{k!}\cdot
+                          \frac{\lambda_2^{n-k}e^{-\lambda_2}}{(n-k)!}.$$
+      <p>Multiply and divide by $n!$ to manufacture a binomial coefficient:</p>
+      $$= \frac{e^{-(\lambda_1+\lambda_2)}}{n!}\sum_{k=0}^{n}\binom{n}{k}\lambda_1^{k}\lambda_2^{n-k}
+        = \frac{e^{-(\lambda_1+\lambda_2)}(\lambda_1+\lambda_2)^{n}}{n!},$$
+      <p>by the binomial theorem. That is the $\mathrm{Poisson}(\lambda_1+\lambda_2)$ pmf.
+      Independence was used in the very first equality. <span class="qed">∎</span></p>
+      <p><strong>The consequence.</strong> If every gene's count is independently Poisson with rate
+      $\lambda_g$, the library size $D = \sum_g X_g$ is Poisson with rate
+      $\Lambda = \sum_g \lambda_g$ — a <em>random</em> variable, not a fixed one. So the two models
+      ("$D$ fixed, counts multinomial" and "counts independently Poisson, $D$ random") are not the
+      same model, though they are famously close: conditioning the Poisson model on
+      $\sum_g X_g = D$ returns exactly the multinomial model.</p>
+      <p class="muted">This is the "Poissonization" argument, and it is why single-cell papers move
+      between the two descriptions without comment. For our purposes the important direction is:
+      because the relative variation in $\Lambda$ is $1/\sqrt{\Lambda} \approx 1/\sqrt{3000} = 1.8\%$,
+      treating $D$ as fixed costs essentially nothing — which is a much better justification for
+      assumption (iii) in section 3 than "we assumed it".</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 2.6</span><span class="stars">★★★</span></div>
+  <div class="ex-body">In the thinning setup, let $Y$ be the survivors and $Z = X - Y$ the losses. Prove that $Y$ and $Z$ are <strong>independent</strong>, with $Y \sim \mathrm{Poisson}(q\lambda)$ and $Z \sim \mathrm{Poisson}((1-q)\lambda)$. Then explain, in one paragraph aimed at a biologist, what this means for the reads a downsampling protocol throws away.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p><strong>The joint pmf.</strong> The event $\{Y = m, Z = r\}$ requires $X = m + r$ and then
+      exactly $m$ of those $m+r$ items surviving:</p>
+      $$P(Y = m, Z = r) = P(X = m+r)\binom{m+r}{m}q^{m}(1-q)^{r}
+        = \frac{e^{-\lambda}\lambda^{m+r}}{(m+r)!}\cdot\frac{(m+r)!}{m!\,r!}q^{m}(1-q)^{r}.$$
+      <p>The factorials cancel, and splitting $\lambda^{m+r} = \lambda^m \lambda^r$ and
+      $e^{-\lambda} = e^{-q\lambda}e^{-(1-q)\lambda}$ gives</p>
+      $$P(Y = m, Z = r) = \underbrace{\frac{(q\lambda)^{m}e^{-q\lambda}}{m!}}_{\text{Poisson}(q\lambda)}
+        \cdot \underbrace{\frac{\big((1-q)\lambda\big)^{r}e^{-(1-q)\lambda}}{r!}}_{\text{Poisson}((1-q)\lambda)}.$$
+      <p>The joint pmf <em>factors</em> into a function of $m$ times a function of $r$, and each
+      factor is a legitimate pmf summing to 1. That is precisely the definition of independence, and
+      it simultaneously identifies both marginals. <span class="qed">∎</span></p>
+      <p><strong>For a biologist.</strong> When you downsample a library, the reads you discard carry
+      no information whatsoever about the reads you kept. Knowing that a cell lost 900 molecules tells
+      you nothing about how many it retained. This is not obvious and it is not true in general — for
+      a fixed total of 1000, losses and keeps are perfectly anticorrelated — but it is true here,
+      because the total was itself Poisson. It is the reason a downsampled dataset is a legitimate
+      stand-in for a genuinely shallower experiment rather than a strange, correlated shadow of the
+      deep one.</p>
+      <p class="muted">This is the single strongest justification for Week 10's protocol, and it is
+      worth being able to state at the poster session in Week 15, because "you just threw away data,
+      how is that the same as sequencing less?" is the most likely sharp question you will get. The
+      answer is one sentence: the kept and the discarded counts are independent Poissons, so the kept
+      half is distributed exactly as a real shallow run.</p>
+    </div>
+  </details>
+</div>
+
+<h2>11 &nbsp;Research notebook</h2>
+
+<p>This week's entries, all dated:</p>
+
+<ul>
+  <li>The indicator-decomposition proof of $E[X] = Dp$, $\mathrm{Var}(X) = Dp(1-p)$, written from
+  memory, with the step that needs independence <strong>circled</strong>.</li>
+  <li>The Poisson limit for $k = 0$, $k = 1$ and $k = 2$, and one sentence saying where the
+  $(1-p)$ went.</li>
+  <li>The thinning proof in full, plus a three-line box listing the three experiments it covers.
+  You will point at this box in Weeks 9, 10 and 12.</li>
+  <li>Exercise 2.4 and exercise 2.6 written out properly.</li>
+  <li>Add to your <strong>"assumptions I am making"</strong> list, started last week. Three new
+  entries: molecules are captured independently; every molecule of gene $g$ has the same capture
+  probability; the depth $D$ is treated as fixed. Note next to each one which derivation used it —
+  that mapping is what makes Week 11 a diagnosis rather than a surprise.</li>
+</ul>
+
+<p>Scan and upload to <code>notebook/week02/</code>, and fill in <code>progress/week02.md</code> from <code>progress/TEMPLATE.md</code>, including the seed (102) and the two figure filenames.</p>
+
+<div class="box verify">
+  <span class="box-tag">Verification this week (with mentor)</span>
+  <ul>
+    <li>You derive $E[X] = Dp$ and $\mathrm{Var}(X) = Dp(1-p)$ at the whiteboard using indicators,
+    and you say out loud which line needs independence and which does not.</li>
+    <li>You show the Poisson pmf limit for $k = 0$ and $k = 1$ without notes, and you can name the
+    factor whose disappearance gives "variance = mean".</li>
+    <li>You state the thinning theorem precisely (including its assumptions) and name the three
+    manipulations it covers.</li>
+    <li><code>pytest tests/test_counting.py</code> is fully green, and you can explain what
+    <code>test_downsample_counts_stays_poisson</code> is checking and why a bug in
+    <code>downsample_counts</code> would invalidate the whole Week 10 protocol.</li>
+    <li>Both figures from <code>experiments/week02_thinning.py</code> are committed with the seed
+    recorded, and you can point at the flat Fano line and say what it proves.</li>
+    <li>You explain why <code>poisson_logpmf</code> works in log space, using the $\lambda = 5000$
+    numbers.</li>
+  </ul>
+</div>
+
+<h2>12 &nbsp;Going deeper</h2>
+<ul>
+  <li>Blitzstein &amp; Hwang, <em>Introduction to Probability</em>, chapter 4 (expectation) and section 4.8 (Poisson). Freely available from the authors. <span class="muted">The indicator-decomposition proof of the binomial mean is their section 4.4; read it as a second opinion on section 3 above.</span></li>
+  <li>Kingman, <em>Poisson Processes</em> (1993), chapter 5 — thinning and superposition in their natural home. <span class="muted">Hard. Read the first three pages of the chapter and stop; the point is to see that our theorem is a special case of something structural, not to master the general theory.</span></li>
+  <li>Grün, Kester &amp; van Oudenaarden (2014), <em>Validation of noise models for single-cell transcriptomics</em>, Nature Methods — the paper that measured how much of scRNA-seq variability is Poisson counting noise and how much is not. <span class="muted">Read the first figure and its caption only. You are meeting the Week 11 result eight weeks early, from the people who found it.</span></li>
+  <li>Sarkar &amp; Stephens (2021), <em>Separating measurement and expression models clarifies confusion in single-cell RNA sequencing analysis</em>, Nature Genetics. <span class="muted">Skim the introduction. Their "measurement model" is exactly our thinning; their "expression model" is exactly the thing we assume away this week and pay for in Week 11.</span></li>
+  <li>Course extras: <a href="../extras/notation.html">notation card</a> · <a href="../extras/glossary.html">glossary</a> · <a href="../extras/problem-bank.html">problem bank</a> (§Poisson) · <a href="../extras/unstuck.html">how to get unstuck</a></li>
+</ul>
+
+</div>
+
+<footer class="site">How Much Data Does It Take to Tell Two Cell Types Apart? · Week 2 · <a href="../index.html">Course home</a></footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  /* ---------------- Lab 1: binomial vs Poisson at fixed lambda ------------- */
+  (function () {
+    const DS = [25, 50, 100, 250, 600, 1500, 3000, 10000, 30000];
+    const LAMS = [1, 2, 4, 6, 10, 20];
+    let di = 6, li = 3;
+
+    /* Both pmfs by upward recursion — no factorials are ever formed.
+       p(k+1)/p(k) is lambda/(k+1) for the Poisson and ((D-k)/(k+1))(p/(1-p))
+       for the binomial. This is the same idea as working in log space:
+       never build a number you cannot represent. */
+    function poissonPmf(lam, K) {
+      const out = []; let pk = Math.exp(-lam);
+      for (let k = 0; k <= K; k++) { out.push(pk); pk = pk * lam / (k + 1); }
+      return out;
+    }
+    function binomPmf(D, p, K) {
+      const out = []; const q = 1 - p; let pk = Math.exp(D * Math.log(q));
+      for (let k = 0; k <= K; k++) {
+        out.push(k <= D ? pk : 0);
+        pk = pk * ((D - k) / (k + 1)) * (p / q);
+      }
+      return out;
+    }
+
+    function run() {
+      const D = DS[di], lam = LAMS[li], p = lam / D;
+      const K = Math.max(8, Math.ceil(lam + 5 * Math.sqrt(lam) + 4));
+      const b = binomPmf(D, p, K), q = poissonPmf(lam, K);
+      let maxd = 0, argk = 0, total = 0;
+      for (let k = 0; k <= K; k++) {
+        const d = Math.abs(b[k] - q[k]);
+        total += d;
+        if (d > maxd) { maxd = d; argk = k; }
+      }
+      const ymax = Math.max.apply(null, q.concat(b)) * 1.28;
+
+      const P = CD.plot("w2lab1", { xmin: -0.8, xmax: K + 0.8, ymin: 0, ymax: ymax,
+                                    xlabel: "count k", ylabel: "P(X = k)" });
+      P.clear(); P.axes();
+      const ctx = P.ctx;
+      ctx.fillStyle = "rgba(37,99,235,0.42)"; ctx.strokeStyle = "rgba(37,99,235,0.85)";
+      ctx.lineWidth = 1;
+      for (let k = 0; k <= K; k++) {
+        const x0 = P.X(k - 0.42), x1 = P.X(k + 0.42), y = P.Y(b[k]);
+        ctx.fillRect(x0, y, x1 - x0, P.Y(0) - y);
+        ctx.strokeRect(x0, y, x1 - x0, P.Y(0) - y);
+      }
+      const pts = q.map((v, k) => [k, v]);
+      P.line(pts, { color: CD.C.orange, width: 2.5 });
+      P.scatter(pts, { color: CD.C.orange, r: 3 });
+      P.label(K * 0.55, ymax * 0.92, "binomial(D, p)", { color: CD.C.blue });
+      P.label(K * 0.55, ymax * 0.84, "Poisson(λ)", { color: CD.C.orange });
+
+      document.getElementById("w2lab1out").innerHTML =
+        "D = " + D + " &nbsp;·&nbsp; λ = " + lam +
+        " &nbsp;·&nbsp; p = λ/D = " + p.toPrecision(3) +
+        "<br>binomial variance Dp(1−p) = " + (D * p * (1 - p)).toFixed(4) +
+        " &nbsp;vs&nbsp; Poisson variance λ = " + lam.toFixed(4) +
+        "<br><b>max |pmf difference| = " + maxd.toExponential(2) + "</b> (at k = " + argk + ")" +
+        " &nbsp;·&nbsp; total |difference| = " + total.toExponential(2) +
+        " &nbsp;·&nbsp; Le Cam bound 2Dp² = " + (2 * D * p * p).toExponential(2);
+    }
+
+    const sD = CD.slider("w2lab1ctl", { label: "draws D", min: 0, max: DS.length - 1, step: 1,
+                                        value: di, fmt: i => DS[i] }, i => { di = i; run(); });
+    const sL = CD.slider("w2lab1ctl", { label: "expected count λ = Dp", min: 0,
+                                        max: LAMS.length - 1, step: 1, value: li,
+                                        fmt: i => LAMS[i] }, i => { li = i; run(); });
+    CD.button("w2lab1ctl", "Jump to scRNA-seq (D = 3000, λ = 6)",
+              () => { sL.set(3); sD.set(6); }, true);
+  })();
+
+  /* ---------------- Lab 2: thinning against a direct draw ----------------- */
+  (function () {
+    const LAMS = [10, 20, 50, 100, 200];
+    const QS = [0.05, 0.1, 0.2, 0.35, 0.5, 0.7, 0.9, 1.0];
+    let li = 3, qi = 4, seedBump = 0;
+    const N = 8000;
+
+    function moments(a) {
+      const m = a.reduce((s, x) => s + x, 0) / a.length;
+      const v = a.reduce((s, x) => s + (x - m) * (x - m), 0) / (a.length - 1);
+      return [m, v];
+    }
+
+    function run() {
+      const lam = LAMS[li], q = QS[qi], target = lam * q;
+      const r = CD.rng(1102 + 37 * li + 5 * qi + 1000 * seedBump);
+      const thinned = [], direct = [];
+      for (let i = 0; i < N; i++) thinned.push(CD.thin(CD.poisson(lam, r), q, r));
+      for (let i = 0; i < N; i++) direct.push(CD.poisson(target, r));
+
+      const hi = Math.max(8, Math.ceil(target + 4.5 * Math.sqrt(target) + 4));
+      const [m1, v1] = moments(thinned), [m2, v2] = moments(direct);
+      const ymax = Math.max(0.06, 1.3 / Math.sqrt(2 * Math.PI * Math.max(target, 0.5)));
+
+      const P = CD.plot("w2lab2", { xmin: -0.5, xmax: hi + 0.5, ymin: 0, ymax: ymax,
+                                    xlabel: "observed count", ylabel: "fraction of cells" });
+      P.clear(); P.axes();
+      P.histogram(thinned, hi + 1, { normalize: "density",
+                                     color: "rgba(37,99,235,0.45)", edge: "rgba(37,99,235,0.85)" });
+      P.histogram(direct, hi + 1, { normalize: "density",
+                                    color: "rgba(0,0,0,0)", edge: "rgba(13,148,136,0.95)" });
+      P.vline(target, "qλ = " + target.toFixed(2), { color: CD.C.orange, width: 2 });
+      P.label(hi * 0.58, ymax * 0.93, "Poisson(λ) thinned by q", { color: CD.C.blue });
+      P.label(hi * 0.58, ymax * 0.85, "Poisson(qλ) drawn directly", { color: CD.C.teal });
+
+      CD.table("w2lab2out",
+        ["", "mean", "variance", "Fano", "relative noise"],
+        [["thinned", m1.toFixed(3), v1.toFixed(3), (v1 / m1).toFixed(3),
+          (100 * Math.sqrt(v1) / m1).toFixed(1) + "%"],
+         ["direct", m2.toFixed(3), v2.toFixed(3), (v2 / m2).toFixed(3),
+          (100 * Math.sqrt(v2) / m2).toFixed(1) + "%"],
+         ["theory", target.toFixed(3), target.toFixed(3), "1.000",
+          (100 / Math.sqrt(target)).toFixed(1) + "%"]]);
+    }
+
+    CD.slider("w2lab2ctl", { label: "rate λ", min: 0, max: LAMS.length - 1, step: 1,
+                             value: li, fmt: i => LAMS[i] }, i => { li = i; run(); });
+    CD.slider("w2lab2ctl", { label: "keep probability q", min: 0, max: QS.length - 1, step: 1,
+                             value: qi, fmt: i => QS[i] }, i => { qi = i; run(); });
+    CD.button("w2lab2ctl", "Resample", () => { seedBump++; run(); }, true);
+  })();
+});
+</script>
+</body>
+</html>

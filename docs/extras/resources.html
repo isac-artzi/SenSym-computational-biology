@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Resource library — How Much Data Does It Take to Tell Two Cell Types Apart?</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="ai-policy.html">AI-use policy</a><a href="glossary.html">Glossary</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Reference · consult by week, not front to back</span>
+    </div>
+    <h1 class="chapter-title">Resource library</h1>
+    <div class="chapter-sub">An annotated, honestly triaged reading list — organized by when it becomes useful and by how much of it to actually read</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<p>The problem with a reading list is not finding things to put on it. It is that a list of forty items, all presented as equally worth your time, is indistinguishable from no list at all — and a student who tries to read it front to back in Week 2 will spend the semester reading instead of deriving.</p>
+
+<p>So every entry below carries three things: <strong>what it is</strong>, <strong>how long it takes</strong>, and <strong>what to take from it and what to ignore</strong>. Several entries consist mostly of instructions about what to skip. There is also a <a href="#donotread">"do not read yet"</a> section, which is the most important part of the page, because the fastest way to derail this project is to read the right thing at the wrong time.</p>
+
+<div class="box definition">
+  <span class="box-tag">The triage labels</span>
+  <p><strong>READ</strong> — actually read it, all of the part named, with a pen. Perhaps six items on this page.<br>
+  <strong>SKIM</strong> — twenty to forty minutes, looking for shape and vocabulary rather than content. You are learning what the field takes for granted.<br>
+  <strong>SHELF</strong> — do not read it now. Know it exists so that in Week 11, when you need it, you know where to go.<br>
+  <strong>DO NOT READ YET</strong> — genuinely counterproductive at this stage. See <a href="#donotread">Section 8</a>.</p>
+</div>
+
+<div class="box warning">
+  <span class="box-tag">On bibliographic detail, and a warning about how this list should be used</span>
+  <p>Where a full citation appears below, it is given because it is standard and stable. Where an entry instead <em>describes</em> a work and tells you to search for it, that is deliberate: the description is reliable, the exact volume, page range or year is not something to copy without checking.</p>
+  <p><strong>Either way, this page is not a source.</strong> The <a href="ai-policy.html">AI-use policy</a> rule applies without exception: every reference in your report must be one you have <em>opened and read</em>, with the DOI or URL and the access date recorded at the moment you read it. Citing something because a course page mentioned it is second-hand citation, and it is exactly as bad here as it is anywhere else — if the intermediate source got a detail wrong, you have now published the error under your own name.</p>
+</div>
+
+<h2>1 &nbsp;Weeks 1–2 · Probability and counting statistics</h2>
+
+<p>You need surprisingly little probability for this project, but you need it solidly: the binomial, its Poisson limit, expectation and variance, and the fact that variances of independent things add. Everything else in fifteen weeks is built from those four.</p>
+
+<table class="simple">
+  <tr><th>Item</th><th>Triage</th><th>Time</th><th>What to take · what to ignore</th></tr>
+  <tr>
+    <td><strong>Blitzstein &amp; Hwang, <em>Introduction to Probability</em></strong> — a well-known undergraduate textbook; the authors also have a free Harvard course (Stat 110) with lecture videos and a problem-set archive. Search for "Stat 110" to find the course materials.</td>
+    <td>SHELF</td>
+    <td>Chapters on discrete random variables: 2–4 hours if you work the problems</td>
+    <td><strong>Take:</strong> the definitions of expectation and variance, the binomial as a sum of indicators (this is the trick that makes Week 2's derivation two lines), and the Poisson as a limit of the binomial. <strong>Ignore:</strong> everything about continuous distributions until Week 4, and everything about Markov chains, conditional expectation as a random variable, and moment generating functions — none of it is used here.</td>
+  </tr>
+  <tr>
+    <td><strong>Ross, <em>A First Course in Probability</em></strong> — the other standard undergraduate text; interchangeable with the above for this project's purposes. Use whichever your library has.</td>
+    <td>SHELF</td>
+    <td>—</td>
+    <td>Same instructions. Do not read both; the marginal value of a second probability textbook is close to zero and the time cost is not.</td>
+  </tr>
+  <tr>
+    <td><strong>StatQuest (Josh Starmer), <em>The Poisson Distribution, Clearly Explained</em></strong> — YouTube.</td>
+    <td>SKIM</td>
+    <td>~10 min</td>
+    <td><strong>Take:</strong> a first, gentle picture of what the pmf looks like and why counts of rare events land there. <strong>Ignore:</strong> the temptation to think you now know it. A video is a first pass; the derivation in <a href="../s/week02.html">Week 2</a> is the thing.</td>
+  </tr>
+  <tr>
+    <td><strong>3Blue1Brown</strong> — the channel's videos on the binomial distribution, on Bayes' theorem, and on the central limit theorem. Search the channel rather than trusting a title from memory.</td>
+    <td>SKIM</td>
+    <td>~15–20 min each</td>
+    <td><strong>Take:</strong> geometric intuition, which is genuinely hard to get from a textbook, and the visual picture of why sums of independent things converge to a bell shape. <strong>Ignore:</strong> nothing, but do not substitute these for the algebra. Intuition without the derivation cannot tell you when a result stops applying, and this project's Week 11 is entirely about a result stopping applying.</td>
+  </tr>
+  <tr>
+    <td><strong>Wikipedia: "Poisson distribution", "Binomial distribution", "Fano factor"</strong></td>
+    <td>SKIM</td>
+    <td>10 min each, as needed</td>
+    <td><strong>Take:</strong> the summary boxes — mean, variance, pmf — as a quick check on your own algebra. <strong>Ignore:</strong> the long lists of properties, generalizations, and named special cases. And never cite an encyclopaedia in the report; use it to orient, then find the primary source.</td>
+  </tr>
+</table>
+
+<h2>2 &nbsp;Weeks 3–5 · Detection theory, $d'$, and ROC</h2>
+
+<p>This is the intellectual core of the project, and the part with the most interesting history. The problem "how well can a decision be made from a noisy sample" was solved in the early 1950s by radar engineers, then imported almost immediately into experimental psychology, where it is still the standard framework for perception experiments. Your $d'$ is their $d'$.</p>
+
+<table class="simple">
+  <tr><th>Item</th><th>Triage</th><th>Time</th><th>What to take · what to ignore</th></tr>
+  <tr>
+    <td><strong>The original signal-detectability literature.</strong> Two touchstones, both from 1954: Peterson, Birdsall and Fox's paper on the theory of signal detectability (published in the IRE professional group on information theory), and Tanner and Swets' paper introducing a decision-theoretic account of visual detection (in <em>Psychological Review</em>). Search for these by author and topic; both are widely reproduced and heavily cited.</td>
+    <td>SHELF</td>
+    <td>An hour of browsing, in Week 4 or later — <em>not</em> in Week 1</td>
+    <td><strong>Take:</strong> one paragraph of history for the report's introduction, and the genuine shock of recognizing your own $\Phi(d'/2)$ in a paper about radar operators. It is worth knowing that the answer you derive was worked out before anybody sequenced anything. <strong>Ignore:</strong> the receiver engineering, the matched-filter machinery, and any attempt to read them as tutorials — they are primary sources from a different field and they will not teach you the concept faster than <a href="../s/week04.html">Week 4</a> does.</td>
+  </tr>
+  <tr>
+    <td><strong>Green &amp; Swets, <em>Signal Detection Theory and Psychophysics</em> (1966)</strong> — the book that made this framework standard in psychology. Reprinted many times; any edition is fine.</td>
+    <td>SHELF</td>
+    <td>Chapter 1 and the ROC chapter: ~2 hours</td>
+    <td><strong>Take:</strong> the ROC curve as the complete description of a detector, independent of where you put the criterion — this is the idea that makes AUC meaningful and it is stated better here than in most modern treatments. <strong>Ignore:</strong> the psychophysical experimental detail, the auditory examples, and the chapters on multiple observations, unless you want them.</td>
+  </tr>
+  <tr>
+    <td><strong>Macmillan &amp; Creelman, <em>Detection Theory: A User's Guide</em></strong> — the modern accessible treatment, in print in more than one edition. Written for experimenters who need to compute $d'$ correctly rather than for theoreticians.</td>
+    <td>READ (the $d'$ chapter)</td>
+    <td>~90 min for the introductory chapters</td>
+    <td><strong>Take:</strong> the careful discussion of what $d'$ assumes — equal variances, Gaussian distributions, an unbiased observer — and what to do when those fail. That list is exactly your Week 14 limitations section, handed to you. Also: the relationship between $d'$, hit rate and false-alarm rate, which is how everyone outside this project will expect you to talk about it. <strong>Ignore:</strong> the chapters on rating experiments, forced-choice designs with more than two alternatives, and criterion bias measures. You have equal priors and a symmetric problem, which is the easy corner of their subject.</td>
+  </tr>
+  <tr>
+    <td><strong>Wikipedia: "Detection theory", "Receiver operating characteristic", "Sensitivity index"</strong></td>
+    <td>SKIM</td>
+    <td>30 min total</td>
+    <td><strong>Take:</strong> vocabulary and the standard notation, so you can read anything else in the field. The ROC article's worked examples are decent. <strong>Ignore:</strong> the machine-learning-flavoured sections on precision/recall and F-scores — with balanced classes and equal priors they add nothing here, and importing that vocabulary will confuse your Week 8 discussion.</td>
+  </tr>
+  <tr>
+    <td><strong>StatQuest, <em>ROC and AUC, Clearly Explained</em></strong> — YouTube.</td>
+    <td>SKIM</td>
+    <td>~16 min</td>
+    <td><strong>Take:</strong> the mechanical picture of sweeping a threshold and tracing a curve, which is precisely what <code>detection.roc_curve</code> does. <strong>Ignore:</strong> the framing that AUC is a model-quality score to be maximized. In this project AUC is a <em>measurement of the data</em>, not of the classifier — <a href="../s/week08.html">Week 8</a>'s whole point is that the classifier is not the bottleneck.</td>
+  </tr>
+</table>
+
+<h2>3 &nbsp;Weeks 7–10 · Single-cell RNA-seq</h2>
+
+<p>You need enough of this field to know what the data is, where it comes from, and what everybody else does with it — and then you need to stop, because it is enormous and almost none of it is about your question.</p>
+
+<table class="simple">
+  <tr><th>Item</th><th>Triage</th><th>Time</th><th>What to take · what to ignore</th></tr>
+  <tr>
+    <td><strong>Luecken &amp; Theis (2019), <em>Current best practices in single-cell RNA-seq analysis: a tutorial</em></strong>, <em>Molecular Systems Biology</em> 15:e8746. The field's standard survey.</td>
+    <td>READ (parts), SKIM (the rest)</td>
+    <td>Introduction + QC/normalization: ~60 min. The whole thing: 4+ hours, which you should not spend.</td>
+    <td><strong>Read:</strong> the introduction, and the sections on quality control and normalization. Those give you the vocabulary — counts, library size, UMI, filtering, cells versus droplets — that everything else in this project assumes. <strong>Skim once, later:</strong> the feature-selection and dimensionality-reduction sections, in Week 10, purely so that you know what "highly variable genes" means when somebody says it. <strong>Skip entirely:</strong> clustering, trajectory inference, RNA velocity, data integration, and everything downstream of clustering. They are excellent and they are answers to a different question. <span class="claim cited">cited</span> in <a href="../s/week01.html">Week 1</a> for exactly this reason.</td>
+  </tr>
+  <tr>
+    <td><strong>The scanpy tutorials</strong>, particularly the PBMC 3k walkthrough. <a href="https://scanpy-tutorials.readthedocs.io/">scanpy-tutorials.readthedocs.io</a></td>
+    <td>SKIM in Week 1, READ in Week 10</td>
+    <td>~40 min to click through; ~2 hours to work through properly</td>
+    <td><strong>Take:</strong> hands-on familiarity with the exact dataset you will use, and — this is the real value — a concrete sense of how much preprocessing sits between a sequencer and a "cell type" label. <strong>Ignore, actively:</strong> the clustering and UMAP steps as a <em>method</em>. But do <em>not</em> ignore what they imply: the cell-type labels you will use in <a href="../s/week10.html">Week 10</a> are the output of exactly this pipeline, which is why the chapter insists they are cluster annotations rather than measurements. That single realization is worth the two hours.</td>
+  </tr>
+  <tr>
+    <td><strong>Wolf, Angerer &amp; Theis (2018), <em>SCANPY: large-scale single-cell gene expression data analysis</em></strong>, <em>Genome Biology</em> 19:15.</td>
+    <td>SHELF</td>
+    <td>20 min</td>
+    <td><strong>Take:</strong> the citation, if you use the tool. <strong>Ignore:</strong> the performance benchmarks. This is a software paper; read it for what to cite, not for what to learn.</td>
+  </tr>
+  <tr>
+    <td><strong>10x Genomics technical notes and support documentation</strong> — the vendor's own material on the Chromium chemistry, on sequencing-depth recommendations, and on how the Cell Ranger pipeline turns reads into a count matrix. <a href="https://www.10xgenomics.com/support">10xgenomics.com/support</a></td>
+    <td>SKIM</td>
+    <td>~45 min, in Week 10</td>
+    <td><strong>Take:</strong> the physical picture — a cell in a droplet with a barcoded bead, a UMI on each captured molecule, PCR amplification, then deduplication by UMI. That picture is what justifies calling a count a "sample from the transcriptome", which is the assumption the entire project rests on. Also take their depth recommendations, and notice they are stated in <em>reads per cell</em>, which is not the same as your $D$ (see the <a href="glossary.html">glossary</a> on depth versus library size versus read count). <strong>Ignore:</strong> everything that is marketing, all product comparisons, and any claim about sensitivity that comes without a method attached.</td>
+  </tr>
+  <tr>
+    <td><strong>Zheng et al. (2017), <em>Massively parallel digital transcriptional profiling of single cells</em></strong>, <em>Nature Communications</em> 8:14049. The paper that introduced the droplet platform your data comes from; the PBMC datasets released alongside it are the origin of PBMC 3k.</td>
+    <td>SKIM</td>
+    <td>~40 min</td>
+    <td><strong>Take:</strong> the provenance of your dataset, which is a real methods-section requirement — you should be able to say where your data came from and who made it. Look at the reported UMIs per cell and compare them with what you measure. <strong>Ignore:</strong> the cell-type classification sections; they use methods you are deliberately not using.</td>
+  </tr>
+  <tr>
+    <td><strong>Grün, Kester &amp; van Oudenaarden (2014), <em>Validation of noise models for single-cell transcriptomics</em></strong>, <em>Nature Methods</em> 11:637–640.</td>
+    <td>SHELF, then READ in Week 11</td>
+    <td>~45 min</td>
+    <td><strong>Take:</strong> a careful empirical decomposition of single-cell count noise into technical (sampling) and biological components — which is your Week 1 Fano factor and your Week 11 overdispersion, measured by people with spike-in controls you do not have. This is the closest thing in the literature to an external check on the project's central assumption. <strong>Ignore:</strong> the details of the specific protocol, which is not 10x.</td>
+  </tr>
+</table>
+
+<h2>4 &nbsp;Week 11 · Overdispersion and the negative binomial</h2>
+
+<p>Why does the whole RNA-seq field use the negative binomial? Not because someone proved it is the true distribution — it is not — but because Poisson variance is empirically far too small for real replicate data, and the NB is the one-extra-parameter fix that has stayed useful for fifteen years. That lineage is worth knowing about and is <strong>not</strong> worth reading in full.</p>
+
+<div class="box warning">
+  <span class="box-tag">Read this section's entries as background, not as required reading</span>
+  <p>The DESeq2/edgeR papers are dense statistical methodology: generalized linear models, empirical Bayes shrinkage of dispersion estimates, Cox–Reid adjusted profile likelihood. None of that machinery is used in this project, and attempting it will cost you two weeks. Cite them for the <em>fact</em> that the field models counts as negative binomial and for <em>why</em>; do not attempt their methods.</p>
+</div>
+
+<table class="simple">
+  <tr><th>Item</th><th>Triage</th><th>Time</th><th>What to take · what to ignore</th></tr>
+  <tr>
+    <td><strong>Anders &amp; Huber (2010), <em>Differential expression analysis for sequence count data</em></strong>, <em>Genome Biology</em> 11:R106 — the original DESeq paper.</td>
+    <td>SHELF (background citation)</td>
+    <td>Abstract + introduction: 20 min</td>
+    <td><strong>Take:</strong> one sentence for your report — that counts from RNA-seq replicates show variance exceeding the mean, and that a negative binomial with a mean-dependent dispersion is the standard response. <strong>Ignore:</strong> the variance-function estimation, the local regression, and the whole testing framework.</td>
+  </tr>
+  <tr>
+    <td><strong>Robinson, McCarthy &amp; Smyth (2010), <em>edgeR: a Bioconductor package for differential expression analysis of digital gene expression data</em></strong>, <em>Bioinformatics</em> 26(1):139–140.</td>
+    <td>SHELF (background citation)</td>
+    <td>15 min</td>
+    <td><strong>Take:</strong> the other half of the lineage; edgeR and DESeq arrived at the same NB model independently, which is a stronger argument for the model than either paper alone. <strong>Ignore:</strong> everything about the software.</td>
+  </tr>
+  <tr>
+    <td><strong>Love, Huber &amp; Anders (2014), <em>Moderated estimation of fold change and dispersion for RNA-seq data with DESeq2</em></strong>, <em>Genome Biology</em> 15:550.</td>
+    <td>SHELF (background citation)</td>
+    <td>Abstract + Figure 1: 20 min</td>
+    <td><strong>Take:</strong> the picture of dispersion estimates shrunk toward a trend, which is a beautiful illustration of why per-gene estimates from few samples are unreliable — the same lesson as Week 1's Lab 2, in a professional setting. <strong>Ignore:</strong> the empirical Bayes derivation.</td>
+  </tr>
+  <tr>
+    <td><strong>Hafemeister &amp; Satija (2019), <em>Normalization and variance stabilization of single-cell RNA-seq data using regularized negative binomial regression</em></strong>, <em>Genome Biology</em> 20:296.</td>
+    <td>SKIM, in Week 11</td>
+    <td>~45 min</td>
+    <td><strong>Take:</strong> the demonstration that the dispersion needed depends systematically on a gene's mean expression, which is exactly the structure behind your depth ceiling. Their figures of dispersion against mean are the professional version of the figure you will make. <strong>Ignore:</strong> the regression machinery and the normalization recommendations.</td>
+  </tr>
+  <tr>
+    <td><strong>Svensson (2020), <em>Droplet scRNA-seq is not zero-inflated</em></strong>, <em>Nature Biotechnology</em> 38:147–150.</td>
+    <td>READ, in Week 11 — it is short</td>
+    <td>~30 min</td>
+    <td><strong>Take:</strong> a clean, short, well-argued correction to a widespread belief, showing that the excess zeros people attributed to a special "dropout" mechanism are what a negative binomial predicts anyway. Two things to take: the substance (which changes how you should describe dropout in your report) and the <em>form</em> — this is a model of how to write a short paper that overturns something, and it is the right length and tone to imitate. <strong>Ignore:</strong> nothing. This is one of the few READ items on the page.</td>
+  </tr>
+  <tr>
+    <td><strong>Wikipedia: "Negative binomial distribution", "Overdispersion", "Compound Poisson distribution"</strong></td>
+    <td>SKIM</td>
+    <td>20 min</td>
+    <td><strong>Take:</strong> the gamma–Poisson mixture representation, which is the one you actually use, and the several equivalent parameterizations — this is where students lose an afternoon, because the $\varphi$ in your $\mathrm{Var} = m + \varphi m^2$ is not everyone's $r$ or $k$ or $\alpha$. <strong>Ignore:</strong> the urn-model and waiting-time derivations; they are correct and irrelevant here.</td>
+  </tr>
+</table>
+
+<h2>5 &nbsp;Weeks 12–13 · Proportions, intervals and error bars</h2>
+
+<p>Every number your bead experiment produces is a proportion out of about forty trials. There is a surprisingly rich and surprisingly practical literature on how to put an interval around such a thing, and two of its papers are directly load-bearing for this project.</p>
+
+<table class="simple">
+  <tr><th>Item</th><th>Triage</th><th>Time</th><th>What to take · what to ignore</th></tr>
+  <tr>
+    <td><strong>Wilson (1927), <em>Probable Inference, the Law of Succession, and Statistical Inference</em></strong>, <em>Journal of the American Statistical Association</em> 22(158):209–212.</td>
+    <td>READ — it is four pages</td>
+    <td>~40 min, with a pen</td>
+    <td><strong>Take:</strong> the actual derivation of the interval you use in <code>stats.wilson_interval</code>, which is short enough to follow completely: instead of estimating the standard error at $\hat p$, solve for the values of $p$ consistent with the observed $\hat p$. That inversion is the whole idea, it is a genuinely elegant move, and being able to explain it in Week 13 is worth more than any amount of using the formula. <strong>Ignore:</strong> the 1927 notation, which is heavy going; translate as you read.</td>
+  </tr>
+  <tr>
+    <td><strong>Brown, Cai &amp; DasGupta (2001), <em>Interval Estimation for a Binomial Proportion</em></strong>, <em>Statistical Science</em> 16(2):101–133 (with discussion).</td>
+    <td>READ the first ten pages; SHELF the rest</td>
+    <td>~90 min for the part that matters</td>
+    <td><strong>Take:</strong> the coverage plots. They show that the textbook Wald interval $\hat p \pm z\sqrt{\hat p(1-\hat p)/n}$ has actual coverage that oscillates wildly and is often far below its nominal 95%, and that the failure is <em>not</em> confined to tiny samples. That is the argument for using Wilson everywhere in this project, and it is visual enough to put one panel of it in a talk. <strong>Ignore:</strong> the Edgeworth expansions, the asymptotic coverage algebra, and the extensive discussion section — unless you are enjoying it, in which case go ahead, but not before Week 13.</td>
+  </tr>
+  <tr>
+    <td><strong>Agresti &amp; Coull (1998), <em>Approximate Is Better Than "Exact" for Interval Estimation of Binomial Proportions</em></strong>, <em>The American Statistician</em> 52(2):119–126.</td>
+    <td>SKIM</td>
+    <td>~30 min</td>
+    <td><strong>Take:</strong> the "add two successes and two failures" rule of thumb, which is a one-line approximation to Wilson and a good sanity check on your implementation. Also take the title's argument, which is counterintuitive and correct: the Clopper–Pearson "exact" interval is conservative rather than accurate. <strong>Ignore:</strong> nothing much; it is short.</td>
+  </tr>
+  <tr>
+    <td><strong>Efron &amp; Tibshirani, <em>An Introduction to the Bootstrap</em> (1993)</strong> — the standard reference.</td>
+    <td>SHELF</td>
+    <td>Chapters 1–6: several hours. Chapter 1 alone: 30 min.</td>
+    <td><strong>Take:</strong> from Chapter 1, the central idea — resample your data with replacement, recompute the statistic, and use the spread of those recomputations as the sampling distribution. That is all <code>stats.bootstrap_ci</code> does and all you need. <strong>Ignore:</strong> BCa intervals, the bootstrap-t, and the theory of when the bootstrap fails, unless a reviewer asks. Do note one thing you <em>will</em> need: bootstrapping a fitted exponent means resampling <em>trials</em>, not resampling the five fitted points.</td>
+  </tr>
+  <tr>
+    <td><strong>Wasserstein &amp; Lazar (2016), <em>The ASA Statement on p-Values: Context, Process, and Purpose</em></strong>, <em>The American Statistician</em> 70(2):129–133.</td>
+    <td>READ — it is short and it is about how to talk</td>
+    <td>~30 min</td>
+    <td><strong>Take:</strong> the six principles, especially that a p-value is not the probability the hypothesis is true and that "statistically significant" is not a synonym for "important". Your Week 12 result will be a wide interval, and this paper is the professional community's own account of why reporting that honestly is the correct behaviour and not a failure. <strong>Ignore:</strong> the parts of the surrounding debate about banning p-values; you are barely using them.</td>
+  </tr>
+  <tr>
+    <td><strong>Wikipedia: "Binomial proportion confidence interval"</strong></td>
+    <td>SKIM</td>
+    <td>15 min</td>
+    <td><strong>Take:</strong> the side-by-side formulas for Wald, Wilson, Agresti–Coull and Clopper–Pearson, useful when checking your implementation. <strong>Ignore:</strong> the temptation to implement four of them. One correct interval used everywhere beats four used inconsistently.</td>
+  </tr>
+</table>
+
+<h2>6 &nbsp;Weeks 14–15 · Scientific writing and figure design</h2>
+
+<p>The report is 6–8 pages and the talk is twelve minutes. Both are shorter than you think and both are mostly cutting. Start reading this section in Week 12, not Week 14 — writing advice absorbed the night before is decoration.</p>
+
+<table class="simple">
+  <tr><th>Item</th><th>Triage</th><th>Time</th><th>What to take · what to ignore</th></tr>
+  <tr>
+    <td><strong>Mensh &amp; Kording (2017), <em>Ten simple rules for structuring papers</em></strong>, <em>PLOS Computational Biology</em> 13(9):e1005619.</td>
+    <td>READ</td>
+    <td>~40 min</td>
+    <td><strong>Take:</strong> the whole thing, and then re-read rule 1 (one central contribution) and the rules on the paragraph as a unit before every writing session. The context–content–conclusion structure they describe is directly applicable to a six-page report. <strong>Ignore:</strong> the parts about co-authors and revision cycles, which do not apply to you.</td>
+  </tr>
+  <tr>
+    <td><strong>Rougier, Droettboom &amp; Bourne (2014), <em>Ten simple rules for better figures</em></strong>, <em>PLOS Computational Biology</em> 10(9):e1003833.</td>
+    <td>READ</td>
+    <td>~30 min</td>
+    <td><strong>Take:</strong> "know your audience", "use colour effectively", and above all "do not trust the defaults" — matplotlib's defaults are designed to be inoffensive on any data, which means they are optimal for none. Apply it directly to your four-arm figure. <strong>Ignore:</strong> nothing; it is short and it is written by people who build plotting libraries.</td>
+  </tr>
+  <tr>
+    <td><strong>Tufte, <em>The Visual Display of Quantitative Information</em></strong> (1983; second edition 2001).</td>
+    <td>SHELF — browse the pictures</td>
+    <td>~1 hour of browsing</td>
+    <td><strong>Take:</strong> the data-ink ratio, the small-multiples idea (which is exactly what your depth sweeps want), and a general raising of standards. <strong>Ignore:</strong> the more dogmatic prescriptions, and do not spend a week redesigning a figure to satisfy a principle. Your figures need error bars, honest axes and a caption that says what the reader is looking at — that is 90% of it.</td>
+  </tr>
+  <tr>
+    <td><strong>Zinsser, <em>On Writing Well</em></strong> — the standard book on non-fiction prose.</td>
+    <td>SHELF</td>
+    <td>The first four chapters: ~90 min</td>
+    <td><strong>Take:</strong> clutter is the enemy; every sentence should be stripped to its cleanest components. Apply it mechanically to your first draft: delete every "it should be noted that", "in order to", "very", and "quite". <strong>Ignore:</strong> the genre-specific chapters (travel, memoir, sports).</td>
+  </tr>
+  <tr>
+    <td><strong>Feynman, <em>Cargo Cult Science</em></strong> — the 1974 Caltech commencement address, widely available online and reprinted in his collections.</td>
+    <td>READ</td>
+    <td>~20 min</td>
+    <td><strong>Take:</strong> "the first principle is that you must not fool yourself, and you are the easiest person to fool", and the specific obligation he describes: to report everything that might make your result wrong, not just what supports it. That is the standard your Week 14 limitations section is written to. Read it in Week 12, right after you get a bead result you like. <strong>Ignore:</strong> nothing.</td>
+  </tr>
+  <tr>
+    <td><strong>Your own institution's poster and report guidelines</strong>, whatever they are.</td>
+    <td>READ, in Week 13</td>
+    <td>20 min</td>
+    <td><strong>Take:</strong> the format constraints, before you design anything. Page limits, font minimums, whether references count toward the limit. <strong>Ignore:</strong> nothing — these are the only rules on this page that can disqualify you.</td>
+  </tr>
+</table>
+
+<h2 id="donotread">7 &nbsp;Do not read yet</h2>
+
+<p>Every item here is good. Every item here will hurt you if you read it in the wrong week. The mechanism is usually one of three: it answers a question you have not yet earned, it introduces machinery that makes your simple correct approach feel inadequate, or it tells you the answer before you have measured it.</p>
+
+<div class="box pitfall">
+  <span class="box-tag">The eight things not to read yet, and when to unlock each</span>
+  <table class="simple">
+    <tr><th>What</th><th>Why not now</th><th>Unlock</th></tr>
+    <tr><td><strong>Deep-learning methods for single-cell data</strong> — variational autoencoders, scVI and its relatives, foundation models for transcriptomics</td>
+        <td>The most seductive item on the page. It will convince you that your naive Bayes classifier is primitive and that a "real" project would use a neural network. That is exactly backwards: the whole point of <a href="../s/week08.html">Week 8</a> is that the classifier is <em>not</em> the bottleneck, and the closed-form Bayes-optimal rule is the strongest possible baseline. A deep model here would obscure the very thing you are measuring.</td>
+        <td>After Week 15. Genuinely interesting as a next project.</td></tr>
+    <tr><td><strong>Clustering, UMAP, t-SNE and trajectory inference</strong></td>
+        <td>An enormous, visually appealing literature about a different question — discovering structure you did not know about. Your question is supervised and two-class. Reading this in Week 3 produces a student who wants to make a UMAP plot instead of deriving $d'$, and a UMAP plot in this report would be decoration.</td>
+        <td>Skim in Week 10, only far enough to understand where PBMC 3k's labels came from.</td></tr>
+    <tr><td><strong>Full methods sections of DESeq2 and edgeR</strong></td>
+        <td>Generalized linear models, empirical Bayes shrinkage, adjusted profile likelihood. Two weeks of work to understand, zero use in this project, and a strong risk of making you feel your method-of-moments dispersion estimate is illegitimate. It is not; it is appropriate to what you are doing.</td>
+        <td>Never, for this project. Cite the abstracts.</td></tr>
+    <tr><td><strong>The zero-inflation debate</strong></td>
+        <td>Rich, contentious, and directly relevant — in Week 11. Before that, it will make you build a zero-inflated model to solve a problem you have not yet demonstrated exists. <a href="../s/week11.html">Week 11</a> has you measure the Fano factor <em>first</em> and then choose a model, which is the correct order and the whole lesson of the week.</td>
+        <td>Week 11, after you have your own Fano-factor figure.</td></tr>
+    <tr><td><strong>Fisher information and the Cramér–Rao bound</strong></td>
+        <td>This is the deep reason behind the square-root laws, and it is beautiful. It is also a genuine detour: it needs derivatives of log-likelihoods, and it can make the elementary Week 3 derivation feel like a special case not worth doing. Do the elementary derivation first — it is the one you will defend at the whiteboard.</td>
+        <td>After M2 (end of Week 5), as an optional enrichment. It makes an excellent "future work" paragraph.</td></tr>
+    <tr><td><strong>Measure-theoretic probability</strong></td>
+        <td>Nothing in this project requires it and it will consume unbounded time. The assumed background is Calculus AB.</td>
+        <td>University.</td></tr>
+    <tr><td><strong>Papers that report the answer to your question</strong> — analyses of how classification accuracy scales with sequencing depth</td>
+        <td>The subtlest item here. If you read someone's depth-versus-accuracy curve before you make your own, you will not be able to un-know it, and every analysis decision afterwards will be nudged toward reproducing it. That is not dishonesty; it is how people work, which is why blinding exists.</td>
+        <td>Week 13, after your own numbers are recorded and committed. Then read them properly and compare — that comparison is a strong report section, and it is only strong if your number was fixed first.</td></tr>
+    <tr><td><strong>Anything at all, during a closed-book exercise</strong></td>
+        <td><a href="../s/week06.html">Week 6</a>'s challenge is a measurement of you. Contaminating it destroys the only honest reading you get of where you stand.</td>
+        <td>After you have written your attempt.</td></tr>
+  </table>
+</div>
+
+<h2>8 &nbsp;Links rot; record the access date</h2>
+
+<div class="box warning">
+  <span class="box-tag">A URL is not a citation</span>
+  <p>Tutorials get rewritten. Documentation is versioned and old versions are removed. Vendor support pages are reorganized when a product line changes. Repositories are renamed, and GitHub redirects only until somebody claims the old name. A URL that worked in March is a plausible fraction of the time a dead link in November, and in a document that is meant to be checkable, a dead link is a claim your reader cannot verify.</p>
+  <p><strong>The rules:</strong></p>
+  <ul>
+    <li><strong>Prefer a DOI to a URL</strong> for anything that has one. DOIs are meant to be permanent; publisher URLs are not.</li>
+    <li><strong>Record the access date</strong> for everything without a DOI, in the form "accessed 2026-04-02", in the bibliography and in your notebook at the moment you read it.</li>
+    <li><strong>Record the version</strong> for software and documentation: "scanpy 1.10 tutorial", not "the scanpy tutorial". Your <code>python/README.md</code> and environment file already pin versions; the bibliography should match.</li>
+    <li><strong>Save a copy</strong> of anything you rely on heavily — a PDF print of a web page into <code>notebook/</code>. Not to redistribute, just so that in Week 14 you can check a number without hoping the page still exists.</li>
+    <li><strong>Note that this page will rot too.</strong> The links here were current when it was written. If one is dead, search for the title; every item is described well enough to be found by description alone, which is one of the reasons the entries are written the way they are.</li>
+  </ul>
+</div>
+
+<h2>9 &nbsp;If you only read five things</h2>
+
+<p>A student with four spare hours in the entire semester should spend them here, in this order:</p>
+
+<ol>
+  <li><strong>Wilson (1927)</strong>, four pages, in Week 12 or 13. It is the shortest route from "I used a formula" to "I can derive the interval on every number in my report".</li>
+  <li><strong>Svensson (2020)</strong>, three pages, in Week 11. Short, sharp, changes what you believe, and models the kind of paper you are trying to write.</li>
+  <li><strong>Mensh &amp; Kording (2017)</strong>, in Week 12, before you draft anything. It will save you more time than it costs by a factor of five.</li>
+  <li><strong>Feynman, <em>Cargo Cult Science</em></strong>, in Week 12, on the day your bead result comes out the way you hoped.</li>
+  <li><strong>Luecken &amp; Theis (2019)</strong>, introduction and normalization sections only, in Week 10. Enough context to place your work in a field, and no more.</li>
+</ol>
+
+<p class="muted">Everything else on this page is a shelf. That is not a failure of the list — a good shelf is exactly what you want in Week 11 when the Fano factor comes out at 4.2 and you need to know, in ten minutes, whether that is a bug or a result.</p>
+
+<p class="muted">Related pages: <a href="ai-policy.html">using AI tools honestly</a> (Section 6, on references that do not exist) · <a href="glossary.html">glossary</a> · <a href="problem-bank.html">problem bank</a> · <a href="biology-background.html">biology background</a> for what the single-cell entries above assume you know · <a href="../index.html">course home</a>.</p>
+
+</div>
+
+<footer class="site">How Much Data Does It Take to Tell Two Cell Types Apart? · Resource library · <a href="../index.html">Course home</a></footer>
+</body>
+</html>

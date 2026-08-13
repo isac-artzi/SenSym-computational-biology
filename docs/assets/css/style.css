@@ -1,0 +1,227 @@
+/* ============================================================
+   How Many Ideas Fit in a Vector Space? — interactive textbook
+   Shared stylesheet for all pages.
+   Design: clean print-textbook feel, high contrast, no frameworks.
+   ============================================================ */
+
+:root {
+  --navy: #1f3a5f;
+  --navy-dark: #16283f;
+  --blue: #2563eb;
+  --blue-light: #eff6ff;
+  --gold: #b45309;
+  --gold-light: #fef3c7;
+  --green: #15803d;
+  --green-light: #dcfce7;
+  --red: #b91c1c;
+  --red-light: #fee2e2;
+  --ink: #1c1e21;
+  --muted: #5b6472;
+  --rule: #d8dde5;
+  --bg: #fbfbfd;
+  --card: #ffffff;
+  --mono: "SF Mono", "Cascadia Code", Consolas, Menlo, monospace;
+  --serif: Charter, Georgia, "Times New Roman", serif;
+  --sans: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.65;
+  color: var(--ink);
+  background: var(--bg);
+}
+
+/* ---------- layout ---------- */
+.wrap { max-width: 880px; margin: 0 auto; padding: 0 24px 80px; }
+
+header.site {
+  background: linear-gradient(135deg, var(--navy-dark), var(--navy));
+  color: #fff;
+  padding: 28px 0 22px;
+  margin-bottom: 30px;
+}
+header.site .wrap { padding-bottom: 0; }
+header.site a { color: #cfe0ff; text-decoration: none; font-family: var(--sans); font-size: 14px; }
+header.site a:hover { text-decoration: underline; }
+.crumbs { display: flex; justify-content: space-between; margin-bottom: 14px; }
+.crumbs .nextprev a { margin-left: 18px; }
+h1.chapter-title { font-family: var(--sans); font-size: 30px; font-weight: 700; margin: 4px 0 6px; line-height: 1.25; }
+.chapter-sub { font-family: var(--sans); font-size: 15px; color: #b9c8e2; margin-bottom: 14px; }
+
+.badges { margin-bottom: 6px; }
+.badge {
+  display: inline-block; font-family: var(--sans); font-size: 12px; font-weight: 600;
+  padding: 3px 10px; border-radius: 12px; margin-right: 8px; letter-spacing: .3px;
+}
+.badge.week   { background: rgba(255,255,255,.16); color: #fff; }
+.badge.mile   { background: var(--gold-light); color: var(--gold); }
+.badge.buffer { background: var(--green-light); color: var(--green); }
+.badge.win    { background: #fde68a; color: #92400e; }
+
+/* ---------- typography ---------- */
+h2 { font-family: var(--sans); font-size: 23px; color: var(--navy); margin: 44px 0 12px; padding-bottom: 6px; border-bottom: 2px solid var(--rule); }
+h3 { font-family: var(--sans); font-size: 18px; color: var(--navy); margin: 28px 0 8px; }
+p { margin: 0 0 14px; }
+a { color: var(--blue); }
+code, pre { font-family: var(--mono); font-size: 14.5px; }
+code { background: #eef1f5; padding: 1px 5px; border-radius: 4px; }
+pre {
+  background: #10141a; color: #e6edf3; padding: 14px 16px; border-radius: 8px;
+  overflow-x: auto; line-height: 1.5;
+}
+pre code { background: none; padding: 0; color: inherit; }
+ul, ol { padding-left: 26px; }
+li { margin-bottom: 6px; }
+.muted { color: var(--muted); font-size: 15px; }
+
+/* ---------- boxes ---------- */
+.box { border-radius: 10px; padding: 16px 20px; margin: 18px 0; border: 1px solid var(--rule); background: var(--card); }
+.box .box-tag {
+  display: block; font-family: var(--sans); font-size: 12.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;
+}
+.box.definition { border-left: 5px solid var(--blue); }
+.box.definition .box-tag { color: var(--blue); }
+.box.theorem { border-left: 5px solid var(--navy); background: var(--blue-light); }
+.box.theorem .box-tag { color: var(--navy); }
+.box.proof { border-left: 5px solid #94a3b8; }
+.box.proof .box-tag { color: #64748b; }
+.box.example { border-left: 5px solid var(--green); }
+.box.example .box-tag { color: var(--green); }
+.box.warning { border-left: 5px solid var(--red); background: var(--red-light); }
+.box.warning .box-tag { color: var(--red); }
+.box.win { border-left: 5px solid var(--gold); background: var(--gold-light); }
+.box.win .box-tag { color: var(--gold); }
+.box.python { border-left: 5px solid #7c3aed; }
+.box.python .box-tag { color: #7c3aed; }
+.box.verify { border: 2px solid var(--gold); background: var(--gold-light); }
+.box.verify .box-tag { color: var(--gold); }
+
+.qed { float: right; font-weight: bold; }
+
+/* ---------- objectives checklist ---------- */
+.objectives { list-style: none; padding: 0; }
+.objectives li {
+  display: flex; align-items: flex-start; gap: 10px; padding: 7px 10px;
+  border-radius: 8px; margin-bottom: 4px; font-family: var(--sans); font-size: 15.5px;
+}
+.objectives li:hover { background: var(--blue-light); }
+.objectives input[type="checkbox"] { margin-top: 4px; width: 16px; height: 16px; accent-color: var(--blue); flex-shrink: 0; }
+.objectives li.done { color: var(--muted); text-decoration: line-through; }
+
+/* ---------- interactive labs ---------- */
+.lab {
+  border: 1px solid var(--rule); border-radius: 12px; background: var(--card);
+  padding: 18px 20px 14px; margin: 22px 0;
+  box-shadow: 0 1px 4px rgba(20,30,50,.06);
+}
+.lab .lab-title { font-family: var(--sans); font-weight: 700; font-size: 16px; color: var(--navy); margin-bottom: 4px; }
+.lab .lab-desc { font-family: var(--sans); font-size: 14px; color: var(--muted); margin-bottom: 12px; }
+.lab canvas { display: block; width: 100%; border: 1px solid var(--rule); border-radius: 8px; background: #fff; }
+.lab .controls { display: flex; flex-wrap: wrap; gap: 18px; margin: 12px 0 4px; font-family: var(--sans); font-size: 14px; align-items: center; }
+.lab .controls label { display: flex; align-items: center; gap: 8px; }
+.lab .controls input[type="range"] { width: 150px; accent-color: var(--blue); }
+.lab .controls .val { font-family: var(--mono); font-size: 13px; color: var(--navy); min-width: 46px; }
+.lab button {
+  font-family: var(--sans); font-size: 14px; font-weight: 600; color: #fff;
+  background: var(--blue); border: none; border-radius: 8px; padding: 7px 16px; cursor: pointer;
+}
+.lab button:hover { background: #1d4ed8; }
+.lab button.secondary { background: #e2e8f0; color: var(--navy); }
+.lab .readout { font-family: var(--mono); font-size: 13.5px; color: var(--navy); margin-top: 8px; }
+
+/* ---------- exercises ---------- */
+.exercise { border: 1px solid var(--rule); border-radius: 10px; margin: 14px 0; background: var(--card); overflow: hidden; }
+.exercise .ex-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 12px 18px 0; font-family: var(--sans);
+}
+.exercise .ex-num { font-weight: 700; color: var(--navy); font-size: 15px; }
+.exercise .stars { color: var(--gold); font-size: 14px; letter-spacing: 2px; }
+.exercise .ex-body { padding: 6px 18px 12px; }
+.exercise details { border-top: 1px dashed var(--rule); }
+.exercise summary {
+  cursor: pointer; padding: 10px 18px; font-family: var(--sans); font-size: 14px;
+  font-weight: 600; color: var(--blue); user-select: none;
+}
+.exercise summary:hover { background: var(--blue-light); }
+.exercise details[open] summary { border-bottom: 1px dashed var(--rule); }
+.exercise .solution { padding: 12px 18px; background: #fafbfe; }
+
+/* ---------- tables ---------- */
+table.simple { border-collapse: collapse; width: 100%; font-family: var(--sans); font-size: 14.5px; margin: 16px 0; }
+table.simple th { background: var(--navy); color: #fff; text-align: left; padding: 8px 12px; }
+table.simple td { border: 1px solid var(--rule); padding: 7px 12px; }
+table.simple tr:nth-child(even) td { background: #f4f6fa; }
+
+/* ---------- dashboard ---------- */
+.sem-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(255px, 1fr)); gap: 14px; margin: 18px 0 34px; }
+.week-card {
+  display: block; border: 1px solid var(--rule); border-radius: 12px; background: var(--card);
+  padding: 14px 16px; text-decoration: none; color: var(--ink);
+  transition: box-shadow .15s, transform .15s;
+}
+.week-card:hover { box-shadow: 0 4px 14px rgba(20,30,50,.12); transform: translateY(-2px); }
+.week-card.mile { border-left: 5px solid var(--gold); background: linear-gradient(#fff, #fffdf4); }
+.week-card.buffer { border-left: 5px solid var(--green); background: linear-gradient(#fff, #f6fdf8); }
+.week-card .wk { font-family: var(--sans); font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+.week-card .ti { font-family: var(--sans); font-size: 16px; font-weight: 700; color: var(--navy); margin: 2px 0 4px; }
+.week-card .de { font-family: var(--sans); font-size: 13px; color: var(--muted); line-height: 1.45; }
+
+.toolbar-links { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0 6px; }
+.toolbar-links a {
+  font-family: var(--sans); font-size: 13.5px; font-weight: 600; text-decoration: none;
+  color: var(--navy); background: #e8edf5; border-radius: 16px; padding: 6px 14px;
+}
+.toolbar-links a:hover { background: #d8e2f0; }
+
+footer.site { margin-top: 60px; padding: 24px; text-align: center; font-family: var(--sans); font-size: 13px; color: var(--muted); }
+
+/* ---------- print ---------- */
+@media print {
+  header.site { background: none; color: var(--ink); }
+  .lab { display: none; }
+  details { open: true; }
+}
+
+/* ============================================================
+   Project-specific additions — SenSym computational biology
+   ============================================================ */
+
+.box.biology { border-left: 5px solid #0d9488; }
+.box.biology .box-tag { color: #0d9488; }
+.box.data { border-left: 5px solid #b45309; background: #fffdf5; }
+.box.data .box-tag { color: #b45309; }
+.box.bead { border-left: 5px solid #c026d3; background: #fdf4ff; }
+.box.bead .box-tag { color: #a21caf; }
+.box.pitfall { border-left: 5px solid #b91c1c; background: #fff5f5; }
+.box.pitfall .box-tag { color: var(--red); }
+
+.badge.aim1 { background: #dbeafe; color: #1d4ed8; }
+.badge.aim2 { background: #ccfbf1; color: #0f766e; }
+.badge.aim3 { background: #fae8ff; color: #a21caf; }
+
+/* claim status tags — every claim in this project is labelled */
+.claim {
+  display: inline-block; font-family: var(--sans); font-size: 11.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .7px; padding: 1px 7px; border-radius: 4px;
+  margin-right: 6px; vertical-align: 2px;
+}
+.claim.proved      { background: #dcfce7; color: #15803d; }
+.claim.cited       { background: #e0e7ff; color: #4338ca; }
+.claim.conjectured { background: #fef3c7; color: #b45309; }
+.claim.observed    { background: #f1f5f9; color: #475569; }
+
+/* week cards: aim stripe on the dashboard */
+.week-card.aim3 { border-left: 5px solid #c026d3; background: linear-gradient(#fff, #fdf7ff); }
+
+/* small inline data tables inside lab readouts */
+.readout table { border-collapse: collapse; font-size: 12.5px; margin-top: 4px; }
+.readout table td, .readout table th { padding: 2px 10px 2px 0; text-align: right; }
+.readout table th { color: var(--muted); font-weight: 600; }
+.readout table td:first-child, .readout table th:first-child { text-align: left; }

@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How to get unstuck</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="biology-background.html">Biology background →</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Protocol · read it before you need it</span>
+    </div>
+    <h1 class="chapter-title">How to get unstuck</h1>
+    <div class="chapter-sub">A protocol with time-boxes · a separate one for debugging · and this codebase's specific traps</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<p>Being stuck is not a sign that something has gone wrong. It is the ordinary working state of anyone doing research, and the difference between a productive week and a wasted one is almost never how often you got stuck. It is whether you had a procedure.</p>
+
+<p>Here is the procedure. Read it now, before you need it, so that you recognize it later. The steps are in order, each has a time-box, and the whole ladder takes about ninety minutes. When you reach the end of it you stop for the day, having converted "I'm stuck" into a written question — which is a much better thing to be holding.</p>
+
+<div class="box definition">
+  <span class="box-tag">The protocol at a glance</span>
+  <table class="simple">
+    <tr><th>#</th><th>Step</th><th>Time-box</th></tr>
+    <tr><td>1</td><td>Re-read the definition of every symbol in the statement</td><td>5 min</td></tr>
+    <tr><td>2</td><td>Write the gap: what you CAN show, what you NEED, what is between</td><td>10 min</td></tr>
+    <tr><td>3</td><td>Try the smallest possible case</td><td>20 min</td></tr>
+    <tr><td>4</td><td>Try to break it — hunt for a counterexample</td><td>20 min</td></tr>
+    <tr><td>5</td><td>Draw it</td><td>10 min</td></tr>
+    <tr><td>6</td><td>Change one thing at a time (if code is involved)</td><td>30 min</td></tr>
+    <tr><td>7</td><td>Explain it out loud, to a person or an object</td><td>10 min</td></tr>
+    <tr><td>8</td><td>Stop, write it in the log, and put it on the check-in agenda</td><td>—</td></tr>
+  </table>
+  <p class="muted">Steps 3 and 4 are the two that most often end the problem, and they are the two
+  students skip. They feel like detours. They are the shortcut.</p>
+</div>
+
+<h2>1 &nbsp;Re-read the definition of every symbol <span class="muted">· 5 minutes</span></h2>
+
+<p>Take the statement you are stuck on and go through it symbol by symbol, saying out loud what each one is. Not what it does — what it <em>is</em>: a number, a vector, a function, an index. Use the <a href="notation.html">notation card</a> and check every one against it.</p>
+
+<p>This sounds too simple to be worth a step. It is the highest-yield step on the list, and here is why. Most "I don't understand this derivation" is actually "I think $\lambda$ is one gene's rate but this line is treating it as a vector over genes", or "I have been reading $q$ as the probability a molecule survives". Those are not conceptual difficulties. They are a mismatch between two dictionaries, and five minutes with the notation card resolves them.</p>
+
+<div class="box example">
+  <span class="box-tag">What this looks like in practice</span>
+  <p>Stuck on: $d'_{\text{total}} = \sqrt{\sum_g (d'_g)^2}$.</p>
+  <p>"$g$ is an index over genes, running 1 to $k$. $d'_g$ is a <em>number</em>, one per gene. The
+  sum is over genes, so it is a number. $d'_{\text{total}}$ is a number. So this line says: square
+  $k$ numbers, add them, take the square root. That is a length of a vector in $k$ dimensions."</p>
+  <p>Half the time the difficulty evaporates in the last sentence, because the object you were
+  confused about turns out to be something you already know.</p>
+</div>
+
+<h2>2 &nbsp;Write the gap <span class="muted">· 10 minutes</span></h2>
+
+<p>Three lines, on paper, in full sentences. This is the same template the progress log and the check-in agenda both use, which is not a coincidence: filling it in <em>is</em> the act of turning a feeling into a question.</p>
+
+<div class="box definition">
+  <span class="box-tag">The gap template</span>
+  <pre>I can show X: ______________________
+I need Y:     ______________________
+The gap is Z: ______________________</pre>
+  <p>Rules. <strong>X must be something you could actually write down right now</strong>, not
+  something you believe. <strong>Y must be the exact statement</strong>, copied, not paraphrased.
+  <strong>Z must be specific</strong>: "the gap is I don't get it" is not a Z, "the gap is that I
+  can get the expectation of the sum but not its variance, because I don't know whether the cross
+  terms vanish" is.</p>
+</div>
+
+<div class="box example">
+  <span class="box-tag">A real one, from Week 5</span>
+  <p><em>I can show X:</em> that the LLR is $\sum_g w_g x_g + b$ with $w_g = \log(\lambda_{1g}/\lambda_{2g})$, and I can compute its mean under each hypothesis.</p>
+  <p><em>I need Y:</em> that the $d'$ of the LLR equals $\sqrt{\sum_g (d'_g)^2}$.</p>
+  <p><em>The gap is Z:</em> I need the variance of $\sum_g w_g x_g$, and I only know how to add variances when the weights are 1. I do not know what $w_g$ does to a variance.</p>
+  <p class="muted">That Z is now a search term, a question for a mentor, and a five-line lookup:
+  $\mathrm{Var}(aX) = a^2\mathrm{Var}(X)$. Two minutes of work — once the question exists. The
+  hour before it existed was the expensive part.</p>
+</div>
+
+<p>Keep every filled-in template. In Week 14 they are the raw material of the "difficulties encountered" paragraph, and they are also, quietly, a record of you getting better: the Week 12 gaps are much sharper than the Week 3 ones.</p>
+
+<h2>3 &nbsp;Try the smallest possible case <span class="muted">· 20 minutes</span></h2>
+
+<p>Not a small case. The <em>smallest</em> one. $k = 1$ gene. $n = 2$ beads. Depth 1. Two cells. A fold change of exactly 2 so the arithmetic is clean. If the smallest case has a special structure that hides the phenomenon, go to the second smallest.</p>
+
+<p>The point is to move from symbols to numbers, because numbers can be checked and symbols can only be believed. If a general claim is false, it is usually false in the smallest case, and you will find out in ten minutes instead of after an hour of algebra. If it is true, computing the smallest case usually shows you <em>why</em>.</p>
+
+<table class="simple">
+  <tr><th>Stuck on</th><th>Smallest case</th><th>What it shows</th></tr>
+  <tr><td>Quadrature over $k$ genes</td><td>$k = 2$, both genes identical</td><td>$\sqrt{d^2+d^2} = d\sqrt2$ — the $\sqrt k$ appears, with no index gymnastics.</td></tr>
+  <tr><td>The thinning theorem</td><td>$\lambda = 1$, keep probability $\tfrac12$, count 0 or 1</td><td>The sum over $n$ becomes two terms and the cancellation is visible.</td></tr>
+  <tr><td>Why $\Phi(d'/2)$ has a 2 in it</td><td>$\lambda_1 = \lambda_2$ (so $d' = 0$)</td><td>Accuracy must be exactly $\tfrac12$. Any formula that fails this is wrong.</td></tr>
+  <tr><td>The bead decision rule</td><td>$n = 2$: outcomes 0, 1 or 2 red</td><td>You can enumerate all three and decide each by hand.</td></tr>
+  <tr><td>A matrix operation you cannot picture</td><td>3 cells, 2 genes, integers you chose</td><td>Print it. The shape error you were hunting is now visible.</td></tr>
+</table>
+
+<div class="box pitfall">
+  <span class="box-tag">The version of this step that does not work</span>
+  Running the full experiment with a smaller seed and squinting at the figure. That is not a small
+  case, it is the same case with less data, and it tells you nothing you could not already see.
+  A small case is one where <strong>you can compute the right answer by hand</strong> and compare.
+</div>
+
+<h2>4 &nbsp;Try to break it <span class="muted">· 20 minutes</span></h2>
+
+<p>Stop trying to prove the statement and spend twenty minutes trying to find a counterexample. Push every parameter to an extreme: rates equal, rate zero, one gene, a thousand genes, dropout 0, dropout 1, depth 1, depth $10^6$. Ask what happens if the two types are identical, or if one gene is silent in both.</p>
+
+<p>This is not defeatism, it is triangulation, and it has two possible outcomes and both are good:</p>
+
+<ul>
+  <li><strong>You find a counterexample.</strong> Excellent: the statement as you understood it is false, which is why you could not prove it. Now find the missing hypothesis. Nine times out of ten it is an assumption the chapter stated and you dropped — independence, equal priors, $\bar\lambda > 0$.</li>
+  <li><strong>You fail to find one, but you learn where the truth lives.</strong> The extremes you tried and the reasons each failed to break it are, collectively, the shape of the proof. "It cannot break when the rates are equal because then the numerator is zero" is a proof fragment.</li>
+</ul>
+
+<div class="box example">
+  <span class="box-tag">Why this is the research skill, not a study trick</span>
+  Week 11 exists because somebody asked "what if cells of the same type are not identical?" and
+  went looking for the break. The negative binomial, the depth ceiling and the most interesting
+  result in the project all came out of an attempt to falsify a claim that had already been proved.
+  Getting into that habit on a Week 3 exercise is how you have it available in Week 11.
+</div>
+
+<h2>5 &nbsp;Draw it <span class="muted">· 10 minutes</span></h2>
+
+<p>By hand, on paper, badly. Two overlapping bell curves with their means marked and the distance between them labelled $d'$. A log–log axis with a line of slope $\tfrac12$ on it. A matrix as a rectangle with "cells" down the side and "genes" along the top and one row circled. A cell as a bag with 100,000 marbles in it and a small scoop taking 2,000.</p>
+
+<p>Drawing forces you to commit to what is a vector, what is a scalar, and what is on which axis. Most confusions in this project are geometric underneath: the pooled standard deviation is a <em>width</em>, $d'$ is a <em>distance measured in widths</em>, and quadrature is <em>Pythagoras</em>. A picture makes the analogy do work that the algebra was hiding.</p>
+
+<h2>6 &nbsp;Change one thing at a time <span class="muted">· 30 minutes</span></h2>
+
+<p>If code is involved: stop editing. Make one change, run, observe, write down what happened, decide the next change. Two changes at once, and a result you cannot attribute, means you have spent the time and learned nothing.</p>
+
+<p>Keep a running list on paper: <em>what I changed, what I expected, what happened</em>. It takes fifteen seconds per line and it prevents the specific failure mode where at minute forty you cannot remember whether you already tried the thing you are about to try.</p>
+
+<p>And use version control as a safety net: commit the broken state on a scratch branch before you start rearranging, so that "revert to the version that at least ran" is always one command away.</p>
+
+<h2>7 &nbsp;Explain it out loud <span class="muted">· 10 minutes</span></h2>
+
+<p>To a person if one is available, and to an object if one is not — this really is a standard technique in software engineering, where the object is traditionally a rubber duck. Speak in complete sentences, from the beginning: what you are trying to show, what you know, what you tried.</p>
+
+<p>The mechanism is not mystical. Explaining forces serial, complete sentences, and a gap that your silent thinking glides over becomes audible as "and then, because... hmm". The place where you stop is the gap. Note it and go back to step 2 with a sharper Z.</p>
+
+<h2>8 &nbsp;Stop, and escalate on a schedule <span class="muted">· the time-box</span></h2>
+
+<p>When the ninety minutes are gone, stop. Not because effort is bad, but because the third hour on a stuck problem has a terrible return and it is stealing time from the six other things this week needs. Write the gap template into <code>progress/weekNN.md</code> under "Where I'm stuck" and move to another task. Sleep is a genuine algorithm; a surprising fraction of these resolve themselves on the walk to school.</p>
+
+<div class="box warning">
+  <span class="box-tag">The two-week time-box, and why it is automatic</span>
+  <p>If the same thing is still stuck at the next check-in, it goes on the agenda —
+  <strong>automatically</strong>, not because you judged it serious enough. The check-in template
+  has a line for exactly this: "nothing stuck past two weeks without being on this agenda".</p>
+  <p>The rule is automatic on purpose. Deciding case by case whether something is "worth bothering
+  your mentor about" is exactly the judgement a student gets wrong, always in the same direction.
+  Most four-week blockages would have cost somebody else twenty minutes in week one. Trading those
+  twenty minutes is the entire point of a mentored project, and using it is not an imposition; it
+  is the thing working.</p>
+</div>
+
+<h2>9 &nbsp;Stuck on a derivation versus stuck on code</h2>
+
+<p>The protocol above is written for a derivation. Debugging needs a different posture, and confusing the two is itself a way to lose an afternoon. The differences are worth stating explicitly.</p>
+
+<table class="simple">
+  <tr><th></th><th>Stuck on a derivation</th><th>Stuck on code</th></tr>
+  <tr><td>What is wrong</td><td>Something in <em>your understanding</em>. The maths is not broken.</td><td>Something in <em>the machine's state</em>. There is a definite, findable fact of the matter.</td></tr>
+  <tr><td>The goal</td><td>To see why the statement must be true — or to discover it is not.</td><td>To find where reality diverges from what you believe. One line, usually.</td></tr>
+  <tr><td>Main tool</td><td>Small cases, counterexamples, drawing.</td><td>Bisection, printing, checking shapes, testing on data whose answer you know.</td></tr>
+  <tr><td>Good move</td><td>Put it down and return tomorrow. Incubation genuinely works.</td><td>Do <em>not</em> put it down at minute five; the state is in your head and reloading it is expensive. But do stop at ninety minutes.</td></tr>
+  <tr><td>Bad move</td><td>Reading the solution and feeling it click. Recognition is not reconstruction.</td><td>Editing hopefully. Changing three things and re-running is not debugging, it is gambling.</td></tr>
+  <tr><td>You are done when</td><td>You can produce the argument from scratch on a blank page tomorrow.</td><td>You can say <em>why</em> the bug produced the symptom you saw. If the fix works and you do not know why, you are not done.</td></tr>
+</table>
+
+<div class="box pitfall">
+  <span class="box-tag">The trap of solving the wrong kind of stuck</span>
+  A frequent pattern: a test fails, you assume your maths is wrong, and you spend an hour rederiving
+  a correct formula while the actual problem is that <code>y</code> got shuffled and <code>X</code>
+  did not. The reverse also happens: you assume it is a bug and rewrite a function five times, when
+  the truth is that $\Phi(d'/2)$ genuinely disagrees with the exact answer at low depth and you have
+  rediscovered a real result. <strong>Ask which kind of stuck you are in before choosing a
+  tool</strong> — and note that "the code disagrees with the theory" has three possible causes, not
+  two: bad code, bad theory, or a real effect.
+</div>
+
+<h2>10 &nbsp;Debugging, specifically</h2>
+
+<p>Five moves, in order, before anything else.</p>
+
+<h3>10.1 &nbsp;Read the actual error message</h3>
+
+<p>All of it, and from the bottom. Python's traceback puts the exception type and message on the last line and the <em>innermost</em> call just above it. <code>ValueError: operands could not be broadcast together with shapes (300,20) (20,300)</code> is not noise; it is a complete diagnosis, and it names the two shapes. Reading tracebacks fluently is a skill worth ten minutes of deliberate practice, and most people never do those ten minutes.</p>
+
+<p>In pytest, the useful part is the assertion block: it prints both sides of the comparison. When a test says <code>assert 0.5013 == approx(0.6047, rel=0.02)</code>, the two numbers are evidence. Is the wrong one at chance? Is it the right answer for a different depth? Is it exactly half, or exactly the square of what it should be? The shape of the wrongness usually names the bug.</p>
+
+<h3>10.2 &nbsp;Check shapes and dtypes first</h3>
+
+<p>Before any theory: <code>print(X.shape, X.dtype, y.shape, y.dtype)</code>. In an array-heavy project this finds more bugs than every other technique combined, because NumPy's broadcasting rules will happily do something plausible and silent with the wrong shapes.</p>
+
+<ul>
+  <li><strong>Shape.</strong> This project's convention is <code>X</code> is (cells, genes) and rate vectors are (genes,). A transposed matrix often still runs.</li>
+  <li><strong>Dtype.</strong> Counts are integers. If a count matrix has come back as <code>float64</code>, something normalized it — and normalization destroys the Poisson structure the entire project is about.</li>
+  <li><strong>Range.</strong> <code>X.min(), X.max(), X.sum()</code>. A maximum of 0 means you sampled at depth 0 or with keep probability 0. A total that is 10 times what you expected means a factor is in the wrong place.</li>
+</ul>
+
+<h3>10.3 &nbsp;Test on data where you know the answer</h3>
+
+<p>Construct an input whose output you can state before running. This project gives you unusually good ones:</p>
+
+<table class="simple">
+  <tr><th>Input</th><th>Output that must come out</th></tr>
+  <tr><td>Two identical rate vectors</td><td>$d' = 0$, accuracy $= 0.5$, AUC $= 0.5$</td></tr>
+  <tr><td>Poisson data with $\lambda = 20$, many samples</td><td>Fano factor $\approx 1$; $\hat\varphi \approx 0$</td></tr>
+  <tr><td>Perfectly separated scores</td><td>AUC $= 1$, accuracy $= 1$</td></tr>
+  <tr><td>Keep probability 1</td><td>Downsampling returns the input unchanged</td></tr>
+  <tr><td>Keep probability 0</td><td>Everything is 0</td></tr>
+  <tr><td>Dispersion $\varphi = 0$</td><td><code>d_prime_overdispersed</code> equals <code>d_prime</code> to machine precision</td></tr>
+  <tr><td>$k$ identical genes</td><td><code>combine_d_prime</code> gives exactly $\sqrt k$ times one gene's $d'$</td></tr>
+  <tr><td>Labels replaced by coin flips</td><td>Honest accuracy $\approx 0.5$; anything higher is leakage</td></tr>
+</table>
+
+<p class="muted">Several of these are already tests in <code>python/tests/</code> — for example <code>test_d_prime_zero_for_identical_rates_and_for_silent_genes</code>, <code>test_downsample_counts_endpoints</code>, and <code>test_d_prime_overdispersed_reduces_to_poisson_when_phi_is_zero</code>. When one of them is red, it is telling you which of the sanity checks above your code has broken. Read the test before you read your function.</p>
+
+<h3>10.4 &nbsp;Bisect</h3>
+
+<p>Comment out half the pipeline and check the intermediate result. Then half of what remains. Ten steps of bisection localizes a bug in a thousand-line run, and it beats staring at any length of code.</p>
+
+<p>The version-control form of the same idea is even better: if it worked last week and does not now, <code>git diff</code> against the last good commit, or <code>git stash</code> your changes and confirm the old version really does still work. "It used to work" is a hypothesis; check it before building on it.</p>
+
+<h3>10.5 &nbsp;Explain the code line by line, out loud</h3>
+
+<p>Same as step 7, applied to a function. The line where you say "and this obviously gives the number of cells" and then stop, because you notice it gives the number of genes, is the bug. You will find it while talking about it.</p>
+
+<h2>11 &nbsp;The traps in <em>this</em> codebase</h2>
+
+<p>These are not general programming hazards. They are the specific errors this project produces, listed with the symptom you will actually see. Every one of them has bitten somebody.</p>
+
+<table class="simple">
+  <tr><th>Trap</th><th>Symptom</th><th>Check in ten seconds</th></tr>
+
+  <tr><td><strong>Labels and rows shuffled separately.</strong> <code>train_test_split</code> must apply <em>one</em> permutation to both <code>X</code> and <code>y</code>.</td>
+      <td>Accuracy pinned at about 0.5 at <em>every</em> depth, with no error and no warning. The curve is flat, not wrong-looking.</td>
+      <td>Run <code>pytest -k labels_travel_with_rows</code>. Or classify the training set: if that is also at chance, the labels are not attached to their rows.</td></tr>
+
+  <tr><td><strong>Dropout versus keep probability inverted.</strong> $q$ is loss; <code>keep_prob</code> is survival; <code>apply_dropout</code> does the $1-q$ once.</td>
+      <td>Everything runs and looks smooth. Accuracy <em>rises</em> when you increase dropout, or the collapse test in Week 9 fails to collapse.</td>
+      <td>Set dropout to 0.9 and check <code>X.sum()</code> falls to roughly a tenth. If it grows, the arguments are swapped.</td></tr>
+
+  <tr><td><strong><code>ddof</code>.</strong> NumPy's <code>var()</code> divides by $n$; the unbiased estimator divides by $n-1$.</td>
+      <td>The Fano factor comes out low by a factor $(n-1)/n$ — 2% at 50 cells, which is the same size as the effect you are hunting in Week 11.</td>
+      <td><code>fano_factor</code> on 50 samples of $\lambda = 20$: should sit near 1.00, not near 0.98. <code>test_fano_factor_is_one_for_poisson</code> is calibrated for it.</td></tr>
+
+  <tr><td><strong><code>np.where</code> evaluates both branches.</strong> <code>np.where(m &gt; 0, v / m, np.nan)</code> computes <code>v / m</code> everywhere <em>first</em>, including where <code>m == 0</code>.</td>
+      <td>A <code>RuntimeWarning: invalid value encountered in divide</code> that you learn to ignore — and then a NaN that poisons an entire sum over genes and turns one figure blank.</td>
+      <td>Use the two-step guard the scaffolds show: build a safe denominator first, then select. <code>d_prime</code> and <code>gene_fano</code> both do this and both say why in a comment.</td></tr>
+
+  <tr><td><strong>Forgetting the <code>rng</code> argument.</strong> Nearly every sampling function takes an explicit <code>np.random.Generator</code>; almost none have a default.</td>
+      <td>A <code>TypeError</code> if you are lucky. If you route around it with a fresh <code>default_rng()</code> inside a loop, you get results that do not reproduce, and a figure whose recorded seed is a lie.</td>
+      <td>Create the generator once, at the top of the script, from the module's <code>SEED</code>, and pass it down. Run the script twice and diff the printed numbers: identical, or you have a hidden source of randomness.</td></tr>
+
+  <tr><td><strong>Normalized data where counts belong.</strong> The PBMC preprocessing exists only to obtain labels; the analysed matrix must be raw integers.</td>
+      <td>Fano factors near 0, dispersion estimates that make no sense, $d'$ values with no relation to depth.</td>
+      <td><code>X.dtype</code> must be integer and <code>X.max()</code> must be a plausible count. If you see 2.3026 anywhere, that is $\log(10)$ and something has been logged.</td></tr>
+
+  <tr><td><strong>Type 1 in the maths is index 0 in the code.</strong> Labels are 0/1; the chapters' types are 1/2.</td>
+      <td>Accuracy of exactly $1 - a$ instead of $a$ — 0.13 where you expected 0.87. The give-away is that it is symmetric about 0.5.</td>
+      <td>If accuracy is below chance by exactly the amount it should be above it, you have inverted a label, not broken a model. Week 9's checklist starts with <code>1 - y</code> for this reason.</td></tr>
+
+  <tr><td><strong>Selection leakage.</strong> Choosing marker genes with the labels of the cells you then test on.</td>
+      <td>Accuracy that is <em>too good</em>, especially with large panels — and it climbs as you add genes even when no gene is informative.</td>
+      <td>Run the whole pipeline with <code>y</code> replaced by coin flips. Honest accuracy must land at 0.5. Anything above that is leakage, and Week 10's Lab 1 builds exactly this case.</td></tr>
+
+  <tr><td><strong>Reporting a stand-in figure.</strong> Weeks 10–12 fall back to surrogate data before the download or the bead runs exist.</td>
+      <td>A big red "not a result" stamp on the figure and <code>USED_STAND_IN</code> set on the module.</td>
+      <td>Look at the figure. If it carries the stamp, the claim it supports does not exist yet, and <code>week14_report_figures.py</code> will refuse to copy it into the report set.</td></tr>
+</table>
+
+<div class="box python">
+  <span class="box-tag">Three commands worth memorizing</span>
+  <p><code>pytest tests/test_detection.py -x -q</code> — stop at the first failure, quiet output.</p>
+  <p><code>pytest -k "dropout"</code> — run only the tests whose names mention dropout.</p>
+  <p><code>python -i experiments/week07_simulator.py</code> — run the script and drop into an
+  interactive prompt with all its variables still alive, so you can poke at the arrays that
+  produced the figure instead of guessing about them.</p>
+</div>
+
+<h2>12 &nbsp;When to read the solution, and how</h2>
+
+<p>Reference implementations for every function are in <code>python/solutions/</code>, and every exercise has a full worked solution behind a toggle. Reading them is expected and is not cheating. Reading them <em>too early</em> is not cheating either; it is just ineffective, which is worse for you.</p>
+
+<div class="box definition">
+  <span class="box-tag">The condition for opening a solution</span>
+  <p>You have (i) re-read the chapter section, (ii) tried at least one concrete small case by hand,
+  and (iii) can say <em>which step</em> you are stuck on — that is, you have a filled-in gap
+  template. If you cannot name the step, you are not stuck yet; you are unstarted, and the solution
+  will teach you nothing.</p>
+  <p>Then: read it, <strong>read the comments rather than the code</strong> (that is where the
+  teaching is), close the file, and rewrite your own version from understanding. Copy-pasting runs;
+  it does not survive a check-in, where you will be asked why a particular line is there.</p>
+</div>
+
+<p>The same applies to AI assistants, with the additional requirement that every use is disclosed on the "Tools used" line of the week's progress log. The full policy is on the <a href="ai-policy.html">AI-use policy page</a>. Disclosure is never punished. The rule of thumb that matters: a tool that helps you <em>understand</em> a step is fine and should be named; a tool that <em>replaces</em> the step leaves you unable to defend it two weeks later, in front of a person whose job is to ask.</p>
+
+<h2>13 &nbsp;Related pages</h2>
+<ul>
+  <li><a href="notation.html">Notation card</a> — step 1 of the protocol lives there.</li>
+  <li><a href="how-to-use.html">How to use this course</a> — the weekly rhythm and what a check-in looks like.</li>
+  <li><a href="problem-bank.html">Problem bank</a> — extra problems when a topic needs more repetitions.</li>
+  <li><a href="glossary.html">Glossary</a> · <a href="ai-policy.html">AI-use policy</a></li>
+  <li><code>python/solutions/README.md</code> — the same policy, stated where the code is.</li>
+</ul>
+
+</div>
+
+<footer class="site">How Much Data Does It Take to Tell Two Cell Types Apart? · Course extras · <a href="../index.html">Course home</a></footer>
+
+</body>
+</html>

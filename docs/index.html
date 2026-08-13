@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How Much Data Does It Take to Tell Two Cell Types Apart? — Course Home</title>
+<link rel="stylesheet" href="assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="assets/css/style.css">
+<script defer src="assets/vendor/katex/katex.min.js"></script>
+<script defer src="assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="assets/js/cd.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="badges">
+      <span class="badge week">One-semester research project · 15 weeks</span>
+    </div>
+    <h1 class="chapter-title">How Much Data Does It Take to Tell Two Cell Types Apart?</h1>
+    <div class="chapter-sub">Counting statistics, detection theory, and the price of a sequencing read — an interactive textbook</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<p>A single-cell RNA sequencer does not measure a cell's transcriptome. It draws a <em>sample</em> from it — a few thousand molecules out of hundreds of thousands — and hands you the tally. Deciding what type a cell is, from that tally, is therefore not primarily a machine-learning problem. It is a <strong>statistical detection</strong> problem, of exactly the kind radar engineers solved in the 1950s, and it has an answer with no free parameters in it.</p>
+
+<p>This project derives that answer, tests it in simulation, tests it again on real 10x PBMC data, and then tests it a third time with two jars of coloured beads on a kitchen table. The prediction is a single number: discriminability grows as $\sqrt{\text{depth}\times k}$, so <strong>doubling the separation between two cell types costs four times the data</strong>.</p>
+
+<div class="box definition">
+  <span class="box-tag">The central question</span>
+  How does the accuracy of cell-type classification scale with (a) sequencing depth per cell
+  and (b) the number of informative marker genes? And where — precisely — does that scaling law
+  stop being true?
+</div>
+
+<p>Each week below is a chapter: objectives, exposition, interactive labs, exercises with full solutions, your Python assignment, and exactly what will be verified at check-in. <span class="badge mile">gold</span> = milestone week (a verification event) · <span class="badge buffer">green</span> = buffer week (no new mandatory material) · <span class="badge win">WIN</span> = a week that ends with something you can show someone.</p>
+
+<div class="toolbar-links">
+  <a href="extras/big-picture.html">The big picture: why this project?</a>
+  <a href="extras/how-to-use.html">How to use this course</a>
+  <a href="extras/notation.html">Notation card</a>
+  <a href="extras/glossary.html">Glossary</a>
+  <a href="extras/unstuck.html">How to get unstuck</a>
+  <a href="extras/biology-background.html">Biology background</a>
+  <a href="extras/bead-protocol.html">Bead experiment protocol</a>
+  <a href="extras/ai-policy.html">AI-use policy</a>
+  <a href="extras/resources.html">Resource library</a>
+  <a href="extras/problem-bank.html">Problem bank</a>
+</div>
+
+<h2>The three aims</h2>
+
+<table class="simple">
+  <tr><th>Aim</th><th>What it is</th><th>Weeks</th></tr>
+  <tr><td><span class="badge aim1">Aim 1 · Theory</span></td>
+      <td>Poisson counting statistics → the separation index $d'$ → a closed-form accuracy prediction $\Phi(d'/2)$ with $d' \propto \sqrt{\text{depth}\cdot k}$</td>
+      <td>1–5</td></tr>
+  <tr><td><span class="badge aim2">Aim 2 · Simulation &amp; data</span></td>
+      <td>A synthetic-cell simulator, classifiers written from scratch, then the same measurement on downsampled 10x PBMC 3k data</td>
+      <td>7–11</td></tr>
+  <tr><td><span class="badge aim3">Aim 3 · Physical analog</span></td>
+      <td>Two jars of beads at 30/70 and 35/65; draw $n$, guess the jar, measure accuracy against $n$; add a dropout rule</td>
+      <td>6–12</td></tr>
+</table>
+
+<p class="muted">Aim 3 is an honest analog of the <em>sampling</em> process, not a substitute for sequencing, and is presented as such throughout. Its value is that it is the only line of evidence in which nothing is simulated and no software can be wrong.</p>
+
+<h2>The 15 weeks</h2>
+<div class="sem-grid">
+  <a class="week-card" href="s/week01.html"><div class="wk">Week 1 · WIN</div><div class="ti">Counting Noise and the Question</div><div class="de">Why a sequencer's output is a sample · variance equals mean · your first figure.</div></a>
+  <a class="week-card" href="s/week02.html"><div class="wk">Week 2</div><div class="ti">The Probability You Actually Need</div><div class="de">Binomial → Poisson · expectation and variance, derived · the thinning theorem.</div></a>
+  <a class="week-card mile" href="s/week03.html"><div class="wk">Week 3 · M1</div><div class="ti">The Separation Index $d'$</div><div class="de">The first real derivation: $d' \propto \sqrt{\text{depth}}$, and why the Poisson coincidence causes it.</div></a>
+  <a class="week-card" href="s/week04.html"><div class="wk">Week 4</div><div class="ti">From $d'$ to an Error Probability</div><div class="de">The Gaussian approximation · $\Phi(d'/2)$ · ROC, AUC · and the exact answer that judges them.</div></a>
+  <a class="week-card mile" href="s/week05.html"><div class="wk">Week 5 · M2 · AIM 1 CLOSES</div><div class="ti">Many Genes: Naive Bayes and $\sqrt{k}$</div><div class="de">The log-likelihood ratio is linear · evidence adds in quadrature · the closed-form prediction.</div></a>
+  <a class="week-card buffer aim3" href="s/week06.html"><div class="wk">Week 6 · buffer</div><div class="ti">Consolidation, and Designing the Beads</div><div class="de">No new theory · a closed-book derivation · sample-size planning before a single bead is drawn.</div></a>
+  <a class="week-card" href="s/week07.html"><div class="wk">Week 7 · WIN</div><div class="ti">The Simulator</div><div class="de">Synthetic cells from an explicit model · the first accuracy-vs-depth curve with theory on it.</div></a>
+  <a class="week-card" href="s/week08.html"><div class="wk">Week 8</div><div class="ti">Classifiers, From Scratch</div><div class="de">Logistic regression and kNN by hand · train/test discipline · why the classifier is not the bottleneck.</div></a>
+  <a class="week-card mile" href="s/week09.html"><div class="wk">Week 9 · M3</div><div class="ti">Dropout, and Where the Law Bends</div><div class="de">Dropout is just less depth, proved · the low-depth regime where $\Phi(d'/2)$ fails.</div></a>
+  <a class="week-card" href="s/week10.html"><div class="wk">Week 10 · WIN</div><div class="ti">Real Data I: PBMC 3k and Markers</div><div class="de">A real dataset · choosing markers without leaking · fold change is not $d'$.</div></a>
+  <a class="week-card mile" href="s/week11.html"><div class="wk">Week 11 · M4</div><div class="ti">Real Data II: Overdispersion</div><div class="de">Real counts are not Poisson · the negative binomial · the depth ceiling nobody can buy past.</div></a>
+  <a class="week-card mile aim3" href="s/week12.html"><div class="wk">Week 12 · M5 · CENTREPIECE</div><div class="ti">The Beads, and Three Lines of Evidence</div><div class="de">The physical experiment analysed · every line of evidence on one pair of log-log axes.</div></a>
+  <a class="week-card buffer" href="s/week13.html"><div class="wk">Week 13 · M6 · buffer</div><div class="ti">Error Bars and the Claim Ledger</div><div class="de">Wilson intervals, bootstrap, permutation · every claim labelled proved / cited / observed / conjectured.</div></a>
+  <a class="week-card mile" href="s/week14.html"><div class="wk">Week 14 · M7</div><div class="ti">Writing the Report</div><div class="de">6–8 pages, self-contained · the figure freeze · the limitations section that earns the rest.</div></a>
+  <a class="week-card mile" href="s/week15.html"><div class="wk">Week 15 · M8</div><div class="ti">Poster, Talk, and Submission</div><div class="de">Twelve minutes, adversarial Q&amp;A rehearsal, and out the door.</div></a>
+</div>
+
+<h2>What success looks like</h2>
+
+<div class="box win">
+  <span class="box-tag">Read this before Week 1, and again in Week 8</span>
+  <p>Success is <strong>not</strong> high classification accuracy. Getting 99% on PBMC 3k takes an
+  afternoon and teaches nothing — the cell types were chosen because they are easy to tell apart.</p>
+  <p>Success is a quantitative comparison between a <em>derived prediction</em>, a
+  <em>simulation</em>, and a <em>physical experiment</em>, with an honest account of where they
+  diverge. A clean negative result — dropout breaks the $\sqrt{n}$ law below some depth;
+  overdispersion caps what depth can buy — is a <em>strong</em> outcome, and the report has a
+  section reserved for exactly that.</p>
+</div>
+
+<h2>How claims are labelled</h2>
+
+<p>Every claim in this project carries a status, in the chapters, in the progress logs, and in the report:</p>
+
+<p>
+<span class="claim proved">proved</span> you can derive it at the whiteboard, on demand, without notes ·
+<span class="claim cited">cited</span> someone else established it; the reference is given ·
+<span class="claim observed">observed</span> measured here, with a seed and an error bar, but not derived ·
+<span class="claim conjectured">conjectured</span> believed, stated plainly as a belief
+</p>
+
+<p class="muted">An unlabelled claim is not admissible. This sounds like bureaucracy for one week and then becomes the most useful habit in the project, because it makes the difference between "the data agrees with the theory" and "I want the data to agree with the theory" impossible to blur.</p>
+
+<h2>Milestones</h2>
+
+<table class="simple">
+  <tr><th>Milestone</th><th>Week</th><th>Git tag</th><th>What it certifies</th></tr>
+  <tr><td>M1</td><td>3</td><td>—</td><td>The $d' \propto \sqrt{\text{depth}}$ derivation, defended at the whiteboard</td></tr>
+  <tr><td>M2</td><td>5</td><td><code>theory-complete</code></td><td>Aim 1 closed: the $\sqrt{k\cdot\text{depth}}$ law and the accuracy formula</td></tr>
+  <tr><td>M3</td><td>9</td><td><code>simulator-validated</code></td><td>Simulation matches theory, or the disagreement is characterized</td></tr>
+  <tr><td>M4</td><td>11</td><td>—</td><td>The real PBMC downsampling curve, produced end to end</td></tr>
+  <tr><td>M5</td><td>12</td><td><code>evidence-complete</code></td><td>All three lines of evidence on one axis</td></tr>
+  <tr><td>M6</td><td>13</td><td>—</td><td>Every claim labelled, every proportion with an interval</td></tr>
+  <tr><td>M7</td><td>14</td><td><code>report-draft</code></td><td>The 6–8 page report, figures frozen</td></tr>
+  <tr><td>M8</td><td>15</td><td><code>v1.0</code></td><td>Poster, talk, submission</td></tr>
+</table>
+
+<h2>The research documents</h2>
+<p class="muted">The governing plans live in <code>plans/</code> in this repository: the full research plan (milestones M1–M8, decision rules, the fallback ladder F1–F4), the student-facing research summary, and the 15-week schedule. The chapters above implement that schedule. The Python laboratory is documented in <code>python/README.md</code>; start with <code>python/SETUP.md</code>.</p>
+
+</div>
+
+<footer class="site">Built for a one-semester mentored research project · Vihaan Rao with Dr. Isac Artzi · works offline — just open this file in a browser</footer>
+</body>
+</html>

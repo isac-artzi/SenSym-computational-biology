@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 11 — Real Data II: Overdispersion</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="week10.html">← Week 10</a><a href="week12.html">Week 12 →</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Week 11</span>
+      <span class="badge mile">MILESTONE M4</span>
+      <span class="badge aim2">Aim 2 · Real data</span>
+    </div>
+    <h1 class="chapter-title">Real Data II: Overdispersion</h1>
+    <div class="chapter-sub">The Fano factor on real cells · the negative binomial as a gamma–Poisson mixture, derived · and the depth ceiling that no amount of money can buy past</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<h2>Objectives</h2>
+<ul class="objectives">
+  <li>Compute the per-gene Fano factor on real PBMC counts and state the median with an interval.</li>
+  <li>Read a Fano-versus-mean plot: explain why the Fano factor rises with expression level and why $\varphi$, not $F$, is the quantity to quote.</li>
+  <li>Explain in biological terms why cells of the "same type" are not identical, and name which assumption of Week 7's generative model this kills.</li>
+  <li>Derive $\mathrm{Var} = m + \varphi m^2$ for a gamma–Poisson mixture using the law of total variance, and state the assumptions used.</li>
+  <li>Estimate $\varphi$ by method of moments, and explain why a negative estimate is a Poisson gene rather than an error.</li>
+  <li>Derive the depth ceiling $d'_\infty = |p_1 - p_2| / (\bar p \sqrt{\varphi})$ and compute it for a stated pair of rates.</li>
+  <li>State, with a number, the depth past which deeper sequencing buys essentially nothing, and say what does help instead — and what does not.</li>
+  <li>Produce <code>week11_fano.png</code> and <code>week11_downsample.png</code> at SEED 111, report the RMSE of both theory curves, and pass (or honestly fail) milestone M4.</li>
+</ul>
+
+<h2>1 &nbsp;The measurement that breaks the model</h2>
+
+<p>Ten weeks ago, in Week 1, you were handed a definition and a promise. The definition was the Fano factor, $F = \mathrm{variance}/\mathrm{mean}$, which equals exactly 1 for Poisson data. The promise was that in Week 11 you would compute it on real PBMC counts, find that it is not 1, and that this would be the most important negative result in the project.</p>
+
+<p>This is that week. Here is the whole experiment, in three lines of Python:</p>
+
+<div class="box python">
+  <span class="box-tag">The measurement</span>
+  <p><code>X, y, genes, types = load_pbmc()</code></p>
+  <p><code>F = gene_fano(X)&nbsp;&nbsp;# variance / mean, per gene, across cells</code></p>
+  <p><code>print(np.nanmedian(F[X.mean(axis=0) &gt; 0.05]))</code></p>
+  <p>Poisson predicts <code>1.0</code>. You will not get <code>1.0</code>. For genes expressed above a fraction of a count per cell you will get values comfortably above 1, and for the well-expressed genes — the ones that make good markers — substantially above 1.</p>
+</div>
+
+<p>Write this week as the project's most interesting result, because that is what it is. A theory that survives every test tells you nothing you did not already believe. A theory that is exactly right in simulation, exactly right on a kitchen table with beads, and <em>measurably wrong on real cells in a specific, quantifiable direction</em> has just told you something true about biology. The failure is the finding.</p>
+
+<div class="box definition">
+  <span class="box-tag">Overdispersion</span>
+  A set of counts is <strong>overdispersed</strong> relative to Poisson if its variance exceeds its mean, i.e. $F > 1$. The excess variance is, by definition, variability that is not explained by counting a random sample. Something else is varying.
+</div>
+
+<h2>2 &nbsp;How to read the Fano-versus-mean plot</h2>
+
+<p>The left panel of <code>week11_fano.png</code> plots, for every gene, its Fano factor against its mean count, on log-log axes, with a horizontal orange line at $F = 1$. Before you make it, know what you are looking for, because the shape of the cloud is the whole result.</p>
+
+<p>Anticipating Section 4 by one formula: if a gene's counts follow a negative binomial with mean $m$ and dispersion $\varphi$, then $\mathrm{Var} = m + \varphi m^2$, and so</p>
+
+$$F = \frac{\mathrm{Var}}{m} = \frac{m + \varphi m^2}{m} = 1 + \varphi m.$$
+
+<div class="box warning">
+  <span class="box-tag">The Fano factor is not a property of a gene</span>
+  <p>Read that formula again: $F = 1 + \varphi m$. <strong>The Fano factor depends on the mean.</strong> The same gene, in the same cells, sequenced twice as deeply, has twice the mean and therefore roughly twice the excess dispersion $F - 1$. Two genes with identical biology but different expression levels sit at different heights on the plot.</p>
+  <p>So the cloud has a predictable shape: near $F = 1$ on the left, where $\varphi m \ll 1$ and the counting noise dominates, and rising with slope 1 on log-log axes on the right, where $\varphi m \gg 1$ and the biological variability dominates. The crossover happens around $m \approx 1/\varphi$. <strong>Genes that look Poisson are usually just genes that are lowly expressed.</strong></p>
+  <p>This is why the experiment plots a second panel: a histogram of $\log_{10}\varphi$, with the median marked. $\varphi$ is the depth-independent summary and $F$ is not. If you quote one number to a reader, quote $\varphi$; if you quote $F$, you must also say at what mean.</p>
+</div>
+
+<p>Two more features of the plot to be ready for, so you do not misread them:</p>
+
+<ul>
+  <li><strong>Enormous scatter at the left edge.</strong> A gene with a mean of $0.05$ counts has almost all zeros, and its sample variance from 2,700 cells is a very noisy quantity. That fan of points is estimation noise, not biology. It is why the script masks to <code>mean &gt; 0.05</code> before summarizing, and why you should report the median rather than the mean of the Fano factors — a handful of near-silent genes with $F = 40$ would drag a mean anywhere.</li>
+  <li><strong>A few genes far above the trend.</strong> Highly variable genes are exactly what the standard pipeline selects for clustering, and some of them are variable because they differ <em>between the two cell types you have pooled</em>. If you compute the Fano factor over all cells regardless of type, you are measuring within-type variability plus between-type variability. That is a real confound and exercise 11.2 asks you to do it properly, per type.</li>
+</ul>
+
+<h2>3 &nbsp;Why: cells of the same type are not identical</h2>
+
+<p>Go back to Week 7, Section 2, and read the first line of the generative model:</p>
+
+<div class="box definition">
+  <span class="box-tag">Assumption 1, from Week 7</span>
+  <strong>A cell type is a probability vector over genes.</strong> Type $c$ is a vector $p^{(c)}$, where $p^{(c)}_g$ is the probability that any given transcript belongs to gene $g$. <em>Every cell of type $c$ has the same vector.</em>
+</div>
+
+<p>That last sentence is false, and it is not subtly false. Two CD4 T cells sitting next to each other in the same tube differ in:</p>
+
+<ul>
+  <li><strong>Cell cycle stage.</strong> A cell in S phase is synthesizing DNA and expressing a completely different set of genes from one in G1. Cycling changes the transcriptome, in an organized way, on a timescale of hours.</li>
+  <li><strong>Cell size and total RNA content.</strong> A bigger cell has more mRNA. If a gene is a fixed fraction of a larger total, its absolute abundance is larger — and cell volume in a population varies by a factor of two or more.</li>
+  <li><strong>Activation state.</strong> A T cell that has recently seen antigen is transcriptionally different from a resting one. "CD4 T cell" is a label covering a continuum of states.</li>
+  <li><strong>Transcriptional bursting.</strong> Genes are not transcribed steadily; a promoter switches between "on" and "off" states, and mRNA is produced in bursts. At any instant, the number of mRNAs from a bursty gene varies far more between cells than steady production would predict — and this is a property of the molecular machinery, present even in genetically identical cells in identical conditions. <span class="claim cited">cited</span></li>
+  <li><strong>Ambient RNA and technical variation.</strong> Free-floating mRNA from lysed cells contaminates every droplet, by a variable amount, and capture efficiency varies droplet to droplet.</li>
+</ul>
+
+<p>Every one of those makes $p_g$ a property of a <em>cell</em>, not of a <em>type</em>. So the honest model is: each cell $i$ of type $c$ has its own rate $\lambda_{ig}$, drawn from some distribution whose mean is the type's rate $m_g$. And then the count is Poisson given that rate.</p>
+
+<div class="box biology">
+  <span class="box-tag">Assumption 1, dying in public</span>
+  <p>This is what a research project is supposed to look like. In Week 7 you wrote down three assumptions and, next to each, a column headed "how it is false about real cells" and a column headed "which week attacks it". Row 1 said: <em>Week 11. The extra variance shows up as a Fano factor above 1 and is modelled as a negative binomial. This is the project's headline negative result.</em></p>
+  <p>You are now cashing that cheque. The point of writing the assumption down four weeks in advance was to make today a <strong>measurement</strong> rather than a surprise. Note the difference: a student who had not written the assumption down would today have "a weird result"; you have "the predicted failure of assumption 1, quantified".</p>
+</div>
+
+<h2>4 &nbsp;The negative binomial, derived</h2>
+
+<p>The model is two lines, and it is worth stating precisely before deriving anything.</p>
+
+<div class="box definition">
+  <span class="box-tag">The gamma–Poisson mixture</span>
+  <p>For a given gene in a given cell type, let the cell's own rate $\Lambda$ be a random variable with</p>
+  $$E[\Lambda] = m, \qquad \mathrm{Var}(\Lambda) = \varphi m^2.$$
+  <p>Given $\Lambda = \lambda$, the observed count is $X \mid \Lambda = \lambda \sim \mathrm{Poisson}(\lambda)$.</p>
+  <p>$\varphi \ge 0$ is the <strong>dispersion</strong>. It is defined so that $\sqrt{\varphi}$ is the <em>relative</em> standard deviation of the rate: $\mathrm{sd}(\Lambda)/E[\Lambda] = \sqrt\varphi$. So $\varphi = 0.25$ means "cells of this type differ in their rate for this gene by about 50% (that is, $\sqrt{0.25}$) from cell to cell". That interpretation is the one to carry around; it is far more useful than the algebra.</p>
+  <p>If $\Lambda$ specifically follows a <em>gamma</em> distribution, the marginal distribution of $X$ has a closed form and is called the <strong>negative binomial</strong>. The derivation below needs only the mean and variance of $\Lambda$, not its shape.</p>
+</div>
+
+<div class="box theorem">
+  <span class="box-tag">Theorem · the variance of a mixed Poisson</span>
+  Under the model above, $$E[X] = m, \qquad \mathrm{Var}(X) = m + \varphi m^2.$$
+</div>
+
+<div class="box proof">
+  <span class="box-tag">Proof, using the law of total variance</span>
+  <p>The tool is one identity, and it is worth stating in words before symbols because in words it is obvious:</p>
+  <p style="margin-left:1em"><em>The total variance of $X$ is the average of the within-group variances, plus the variance of the within-group means.</em></p>
+  <p>Here a "group" is a fixed value of $\Lambda$. In symbols:</p>
+  $$\mathrm{Var}(X) = E\big[\mathrm{Var}(X \mid \Lambda)\big] + \mathrm{Var}\big(E[X \mid \Lambda]\big).$$
+  <p><strong>Step 1 — the mean.</strong> A Poisson with rate $\lambda$ has mean $\lambda$, so $E[X \mid \Lambda] = \Lambda$. Averaging over $\Lambda$ (the law of total expectation),
+  $$E[X] = E\big[E[X\mid\Lambda]\big] = E[\Lambda] = m.$$
+  So the mixing does not shift the mean at all. Good: $m$ still means what it meant.</p>
+  <p><strong>Step 2 — the first term.</strong> A Poisson with rate $\lambda$ has variance $\lambda$ too (Week 2). So $\mathrm{Var}(X\mid\Lambda) = \Lambda$, and
+  $$E\big[\mathrm{Var}(X\mid\Lambda)\big] = E[\Lambda] = m.$$
+  This is the counting noise: the variance you would have had if every cell shared the same rate. It is exactly the old Poisson answer.</p>
+  <p><strong>Step 3 — the second term.</strong> From Step 1, $E[X\mid\Lambda] = \Lambda$, so
+  $$\mathrm{Var}\big(E[X\mid\Lambda]\big) = \mathrm{Var}(\Lambda) = \varphi m^2.$$
+  This is the biological variability: the spread of the per-cell means themselves.</p>
+  <p><strong>Step 4 — add them.</strong>
+  $$\mathrm{Var}(X) = \underbrace{m}_{\text{counting}} + \underbrace{\varphi m^2}_{\text{biology}}. \qquad \blacksquare$$</p>
+  <p><strong>Assumptions used.</strong> (i) Given the rate, the count is Poisson — the capture is still a random sample. (ii) The rate has finite mean $m$ and variance $\varphi m^2$. (iii) Nothing about the <em>shape</em> of the rate distribution; gamma gives the tidy negative binomial pmf, but the variance formula holds for any mixing distribution with those two moments.</p>
+</div>
+
+<p>Look hard at the two terms, because their different powers of $m$ are the entire content of this week. Counting noise grows <strong>linearly</strong> in the mean. Biological variability grows <strong>quadratically</strong>. Sequencing deeper multiplies $m$; therefore sequencing deeper makes the second term grow faster than the first, and eventually the second term is all there is. Everything in Section 6 follows from that sentence.</p>
+
+<div class="box example">
+  <span class="box-tag">Why "gamma" specifically, and where you have already seen it</span>
+  <p>If $\Lambda \sim \mathrm{Gamma}(\text{shape} = 1/\varphi,\ \text{scale} = \varphi m)$, then $E[\Lambda] = \text{shape}\times\text{scale} = m$ and $\mathrm{Var}(\Lambda) = \text{shape}\times\text{scale}^2 = \varphi m^2$: exactly the two moments the theorem needs. The gamma is chosen because it is positive (rates must be), flexible in shape, and — the real reason — because mixing it with a Poisson produces a distribution with a clean closed form.</p>
+  <p>You have already run this generator. Open <code>surrogate_pbmc</code> in <code>realdata.py</code> and read the four lines that build each block:</p>
+  <p><code>g = rng.gamma(shape=1.0 / phi, scale=phi * lam, size=(half, n_genes))</code><br>
+     <code>blocks.append(rng.poisson(g))</code></p>
+  <p>That is the model, as code, and it has been sitting in the repository since Week 10. <code>test_negative_binomial_dispersion_recovers_phi</code> uses the same construction with $\lambda = 20$, $\varphi = 0.5$ and asserts your estimator recovers $0.5$ to within 15%.</p>
+</div>
+
+<div class="lab">
+  <div class="lab-title">Lab 1 · Building a negative binomial in front of you</div>
+  <div class="lab-desc">The purple histogram is a gamma–Poisson mixture: each "cell" gets its own rate drawn from a gamma with mean $m$ and relative spread $\sqrt\varphi$, and then a Poisson count from that rate. The orange outline is a plain Poisson at the <em>same mean</em>. At $\varphi = 0$ they coincide exactly. Turn $\varphi$ up and watch the purple histogram widen and grow a heavy right tail while its mean does not move — and watch the Fano factor climb from 1 along the predicted line $1 + \varphi m$.</div>
+  <canvas id="w11lab1" height="340"></canvas>
+  <div class="controls" id="w11lab1ctl"></div>
+  <div class="readout" id="w11lab1out"></div>
+</div>
+
+<p>Two observations to record. First, the mean really does not move: mixing adds variance without shifting the centre, which is Step 1 of the proof, visible. Second, at fixed $\varphi$ the ratio Fano-to-mean tracks $1 + \varphi m$ as you change $m$ — push the mean slider to 32 with $\varphi = 0.5$ and the Fano factor should land near $1 + 0.5\times32 = 17$. If your histogram and that arithmetic disagree, one of them is wrong and it is worth five minutes to find out which.</p>
+
+<h2>5 &nbsp;Estimating $\varphi$ from data</h2>
+
+<p>You have a formula with an unknown in it. Estimating that unknown is one line of algebra: take $\mathrm{Var} = m + \varphi m^2$, solve for $\varphi$, and put the sample moments in place of the true ones.</p>
+
+<div class="box definition">
+  <span class="box-tag">Method-of-moments estimator</span>
+  $$\hat\varphi = \frac{\widehat{\mathrm{Var}} - \hat m}{\hat m^2}, \qquad \text{clipped at } 0.$$
+  Equivalently, in terms of the Fano factor, $\hat\varphi = (F - 1)/\hat m$ — which is the same statement as $F = 1 + \varphi m$ read backwards, and is the cleanest way to remember it.
+</div>
+
+<p>"Method of moments" means exactly what it sounds like: write the theoretical moments in terms of the parameters, then set them equal to the sample moments and solve. It is the least sophisticated estimator available and it is the right one here, for three reasons: it is one line, it needs no optimizer, and it is transparent — you can say precisely what it is doing to a reader in one sentence. Maximum likelihood would be more efficient; it would also be a black box in the middle of a project whose whole point is that nothing is a black box.</p>
+
+<div class="box pitfall">
+  <span class="box-tag">A negative $\hat\varphi$ is not an error</span>
+  <p>You will get negative estimates, for a lot of genes, and the first instinct is to think something is broken. Nothing is broken. $\hat\varphi &lt; 0$ means the sample variance came out <em>below</em> the sample mean — and since $\widehat{\mathrm{Var}}$ from 2,700 cells is itself a random quantity that wobbles by a few percent, any gene whose true $\varphi$ is at or near zero will land below the line about half the time.</p>
+  <p>So a negative estimate means: <strong>this gene is, within the noise of this sample, Poisson.</strong> Clipping at 0 is the honest translation of "the data give no evidence of extra variability, and negative variability is not a thing". That is what <code>np.clip(phi, 0.0, None)</code> is for, and it is why <code>test_negative_binomial_dispersion_is_zero_for_poisson</code> asserts <code>&lt; 0.02</code> rather than <code>== 0</code>.</p>
+  <p>The cost of clipping, which you should state: it makes $\hat\varphi$ biased upwards for genes near $\varphi = 0$, because the downward wobbles are truncated and the upward ones are not. So the <em>median</em> $\hat\varphi$ over genes is a more trustworthy summary than the mean, and a median of exactly 0 would be meaningful while a mean of exactly 0 is impossible by construction.</p>
+</div>
+
+<p>One more caution before you quote a number. $\hat\varphi$ is a statistic from a finite sample, so it deserves an interval, exactly as Week 1's Lab 2 argued for the Fano factor. Week 13 gives you the bootstrap; for now, the honest thing at the M4 check-in is to report the median $\hat\varphi$ across genes <em>together with the interquartile range</em>, which is a spread across genes rather than a confidence interval on any one of them. Say which one you are quoting. "Median $\varphi = 0.6$, interquartile range $0.3$ to $1.4$ across the 32 marker genes" is a sentence a reviewer can use; "$\varphi = 0.6$" is not.</p>
+
+<h2>6 &nbsp;The headline result: a ceiling on $d'$</h2>
+
+<p>Now the payoff. Week 3 derived $d'$ from two ingredients: a difference of means in the numerator, and a noise width in the denominator. Only the denominator changes.</p>
+
+<div class="box theorem">
+  <span class="box-tag">$d'$ under overdispersion</span>
+  For a single gene with class means $\lambda_1, \lambda_2$, pooled mean $\bar\lambda = (\lambda_1+\lambda_2)/2$ and dispersion $\varphi$,
+  $$d' = \frac{|\lambda_1 - \lambda_2|}{\sqrt{\bar\lambda + \varphi\,\bar\lambda^{\,2}}}.$$
+  Setting $\varphi = 0$ recovers the Poisson $d'$ of Week 3 exactly. This is <code>d_prime_overdispersed(lam1, lam2, phi)</code>, and <code>test_d_prime_overdispersed_reduces_to_poisson_when_phi_is_zero</code> checks that reduction to twelve decimal places.
+</div>
+
+<p>Now let the depth grow. Write $\lambda_1 = D p_1$ and $\lambda_2 = D p_2$, so $\bar\lambda = D\bar p$ with $\bar p = (p_1+p_2)/2$. Substitute:</p>
+
+$$d'(D) = \frac{D\,|p_1 - p_2|}{\sqrt{D\bar p + \varphi D^2 \bar p^{\,2}}}.$$
+
+<div class="box proof">
+  <span class="box-tag">The ceiling, derived</span>
+  <p>Factor $D\bar p$ out of the square root:</p>
+  $$d'(D) = \frac{D|p_1-p_2|}{\sqrt{D\bar p}\,\sqrt{1 + \varphi D \bar p}} = \frac{|p_1-p_2|}{\sqrt{\bar p}}\cdot\frac{\sqrt D}{\sqrt{1+\varphi D\bar p}}.$$
+  <p>The first factor is a constant. Everything depends on $\sqrt{D}/\sqrt{1+\varphi D\bar p}$, and that function has two regimes:</p>
+  <ul>
+    <li><strong>Small $D$</strong> ($\varphi D \bar p \ll 1$): the denominator is $\approx 1$, so $d' \propto \sqrt D$. The Week 3 law, intact.</li>
+    <li><strong>Large $D$</strong> ($\varphi D\bar p \gg 1$): the denominator is $\approx \sqrt{\varphi D \bar p}$, the $\sqrt D$ cancels, and $d'$ stops depending on $D$ at all.</li>
+  </ul>
+  <p>Taking the limit properly:</p>
+  $$\boxed{\;d'_\infty = \lim_{D\to\infty} d'(D) = \frac{|p_1-p_2|}{\sqrt{\bar p}}\cdot\frac{1}{\sqrt{\varphi \bar p}} = \frac{|p_1 - p_2|}{\bar p\,\sqrt{\varphi}}.\;}$$
+  <p>The crossover — the <strong>knee</strong> — is where the two terms in the denominator are equal, $\varphi D \bar p = 1$, i.e. at depth $D_{\rm knee} = 1/(\varphi\bar p)$, equivalently at a mean count of $\bar\lambda = 1/\varphi$. <span class="qed">∎</span></p>
+  <p><strong>Assumptions used.</strong> (i) Counts are gamma–Poisson with dispersion $\varphi$. (ii) $\varphi$ does not itself change with depth — flagged and discussed in Section 8. (iii) The Gaussian $d'$ framing of Week 3, with the pooled variance as the noise scale.</p>
+</div>
+
+<div class="box win">
+  <span class="box-tag">Read the ceiling formula and notice what is missing from it</span>
+  <p>$$d'_\infty = \frac{|p_1-p_2|}{\bar p \sqrt\varphi}.$$</p>
+  <p><strong>The depth is not in it.</strong> Neither, once you write $p_1 = \bar p\cdot 2/(1+f)$ and $p_2 = \bar p \cdot 2f/(1+f)$ for a fold change $f$, is the expression level: the ceiling reduces to $$d'_\infty = \frac{2(f-1)}{(f+1)\sqrt{\varphi}},$$ which depends only on the fold change between the types and the biological variability within them. A highly expressed gene has no advantage over a lowly expressed one <em>once you are past the knee</em>. Sequence forever and this is what you get.</p>
+</div>
+
+<div class="box example">
+  <span class="box-tag">Worked numbers · $p_1 = 0.004$, $p_2 = 0.006$, $\varphi = 0.5$</span>
+  <p>Here $|p_1 - p_2| = 0.002$, $\bar p = 0.005$, $\sqrt{0.5} = 0.7071$. The ceiling is</p>
+  $$d'_\infty = \frac{0.002}{0.005 \times 0.7071} = \frac{0.002}{0.003536} = 0.566.$$
+  <p>The knee sits at $\bar\lambda = 1/\varphi = 2$ counts, i.e. at $D_{\rm knee} = 1/(0.5\times0.005) = 400$ molecules per cell — <em>below</em> PBMC 3k's typical library size. This gene is already past its knee in the data you have.</p>
+  <table class="simple">
+    <tr><th>depth $D$</th><th>$\bar\lambda$</th><th>$d'$ with $\varphi = 0.5$</th><th>$d'$ if Poisson</th><th>accuracy, NB</th><th>accuracy, Poisson</th></tr>
+    <tr><td>100</td><td>0.5</td><td>0.253</td><td>0.283</td><td>0.550</td><td>0.556</td></tr>
+    <tr><td>400</td><td>2</td><td>0.400</td><td>0.566</td><td>0.579</td><td>0.611</td></tr>
+    <tr><td>1,600</td><td>8</td><td>0.506</td><td>1.131</td><td>0.600</td><td>0.714</td></tr>
+    <tr><td>10,000</td><td>50</td><td>0.555</td><td>2.828</td><td>0.609</td><td>0.921</td></tr>
+    <tr><td>100,000</td><td>500</td><td>0.565</td><td>8.944</td><td>0.611</td><td>1.000</td></tr>
+    <tr><td>$\infty$</td><td>$\infty$</td><td><strong>0.566</strong></td><td>$\infty$</td><td><strong>0.611</strong></td><td>1.000</td></tr>
+  </table>
+  <p>Read the last two columns side by side and the result is impossible to miss. Going from $D = 400$ to $D = 10{,}000$ is <strong>twenty-five times the sequencing</strong>. Under Poisson it buys $d'$ from $0.566$ to $2.828$, a factor of 5, and accuracy from 61% to 92%. Under overdispersion with $\varphi = 0.5$ it buys $d'$ from $0.400$ to $0.555$ — <strong>a factor of 1.39</strong> — and accuracy from 58% to 61%. Three percentage points, for twenty-five times the money.</p>
+</div>
+
+<div class="box warning">
+  <span class="box-tag">This is a claim with a budget attached, so state it carefully</span>
+  <p>A core facility charges by the read. A lab that wants to double its ability to distinguish two similar cell types reasons, correctly under Poisson, that $d' \propto \sqrt{D}$ and therefore that quadrupling the depth doubles the resolution. <strong>Past the knee, that reasoning is wrong and the money is wasted</strong>: the $4\times$ buys a factor approaching 1.</p>
+  <p>Two things to be scrupulous about when you say this, because it is the most consequential claim in the project and it is also the easiest to overstate.</p>
+  <ul>
+    <li><strong>It is a claim about per-cell classification of a specific pair of types with a specific $\varphi$.</strong> Deeper sequencing still helps for plenty of other things — detecting lowly expressed genes at all, rare cell types, allele-specific expression, anything limited by counting rather than by biology. Say "for this decision" every time.</li>
+    <li><strong>It is a claim about the ceiling, not about where you are.</strong> The whole point of the knee is that below it the square-root law is fine. If your genes have $\varphi = 0.05$, the knee for $\bar p = 0.005$ is at $D = 4{,}000$, and at PBMC depth you are still on the rising part. Compute your own knee before you generalize.</li>
+  </ul>
+</div>
+
+<div class="lab">
+  <div class="lab-title">Lab 2 · Where the square-root law stops</div>
+  <div class="lab-desc">$\log_{10} d'$ against $\log_{10} D$, for several dispersions. The $\varphi = 0$ curve is a straight line of slope $\tfrac12$ — the Week 3 law, which on log-log axes is exactly a straight line and never bends. Each other curve follows it, then peels away and flattens onto its own dashed ceiling. Move the fold-change slider and watch every ceiling move together, since $d'_\infty = 2(f-1)/((f+1)\sqrt\varphi)$ depends on the contrast and the dispersion and on nothing else.</div>
+  <canvas id="w11lab2" height="350"></canvas>
+  <div class="controls" id="w11lab2ctl"></div>
+  <div class="readout" id="w11lab2out"></div>
+</div>
+
+<p>The table under the lab gives, for each $\varphi$: the ceiling, the ceiling accuracy $\Phi(d'_\infty/2)$ from a single gene, the knee depth, and the depth at which you reach 90% of the ceiling. That last column is the practical one — it is the answer to "how deep is deep enough?", and it is finite, which under Poisson it never is.</p>
+
+<h2>7 &nbsp;What actually beats the ceiling — and what does not</h2>
+
+<p>The ceiling is a statement about one gene. Three escape routes are worth evaluating, and only two of them work.</p>
+
+<p><strong>More genes: yes.</strong> Week 5's quadrature is untouched by any of this. Independent genes still add $d'$ in quadrature, so $k$ genes each at their own ceiling give $d'_{\rm total} = \sqrt{\sum_g (d'_{\infty,g})^2}$. With 32 markers each at $d'_\infty = 0.566$, that is $\sqrt{32}\times0.566 = 3.20$, and $\Phi(1.60) = 94.5\%$. This is why <code>week11_overdispersion.py</code> uses <code>N_MARKERS = 32</code> and why the measured accuracy in the downsampling figure is high even though every individual gene has a modest ceiling. <em>Caveat, and it matters:</em> quadrature needs independence, and the biological sources of overdispersion listed in Section 3 — cell cycle, size, activation — affect <em>many genes at once</em>, in the same direction. So the per-gene dispersions are correlated, quadrature over-counts, and the true panel ceiling is lower than $\sqrt k$ times the single-gene one. Week 5's exercise 5.6 gives the cap under correlation $\rho$; naming this in the limitations section is the difference between a good report and a careful one.</p>
+
+<p><strong>Better genes: yes.</strong> $d'_\infty = 2(f-1)/((f+1)\sqrt\varphi)$ rises with the fold change and falls with the dispersion. So choose markers that are strongly differential <em>and</em> stably expressed. This is a concrete, actionable piece of experimental advice that falls straight out of the formula: <strong>rank candidate markers by fold change divided by $\sqrt{\varphi}$, not by fold change alone.</strong> That is a natural extension of Week 10's exercise 10.4 and a genuinely publishable-shaped observation for a high-school project.</p>
+
+<p><strong>More cells: yes for the population, no for the cell.</strong> This is the one that requires care, and it is Week 1's exercise 1.5 returning with real consequences.</p>
+
+<div class="box warning">
+  <span class="box-tag">More cells does not raise the ceiling on a per-cell decision</span>
+  <p>Averaging over cells does beat biological variability — that is what averaging is for. If your question is "what is the mean expression of <em>LYZ</em> in monocytes?", then $N$ cells give you a standard error falling like $\sqrt{(m + \varphi m^2)/N}$, and the $\varphi m^2$ term is beaten down like any other variance. More cells is exactly the right purchase.</p>
+  <p>But <strong>classifying one particular cell uses only the molecules from that cell.</strong> The overdispersion is not measurement noise you can average away; it is the fact that <em>this cell's own rate</em> is not the type's rate. Sequencing a million other cells tells you the type's rate very precisely and tells you nothing further about this one. Once $m_1$ and $m_2$ are known accurately — which takes only a few hundred cells — more cells buy nothing for a per-cell call.</p>
+  <p><strong>So the ceiling on per-cell classification is real.</strong> It is not an artefact of a small dataset, and it does not go away with a bigger experiment. That is what makes it worth reporting.</p>
+</div>
+
+<h2>8 &nbsp;Thinning, $\varphi$, and an approximation you must flag</h2>
+
+<p>Here is a loose end, and this chapter's instruction is to leave it loose, honestly and visibly, rather than to paper over it.</p>
+
+<p>The experiment script sweeps a keep-fraction $q$ over $\{0.02, 0.05, \dots, 1.0\}$, downsamples the count matrix at each $q$, and compares the measured accuracy against two predictions. To build the negative-binomial prediction it scales the rates, $\lambda \to q\lambda$, and <strong>keeps $\varphi$ fixed at the value measured on the full-depth data</strong>. The code says so in a comment, and it is an approximation.</p>
+
+<div class="box pitfall">
+  <span class="box-tag">Flag this in your report, in one sentence, before anyone asks</span>
+  <p>Suggested wording: "The negative-binomial prediction uses the dispersion estimated at full depth and held fixed across the downsampling sweep. Whether $\varphi$ is invariant under thinning is exercise 11.5 and is not established here; if it is not, the NB curve is biased at the shallow end of the sweep."</p>
+  <p>That sentence costs you nothing and buys you everything. A reviewer who spots an unflagged approximation concludes you did not notice. A reviewer who reads your flag concludes you did. Same code, opposite impression.</p>
+</div>
+
+<p>Exercise 11.5 asks you to work out what actually happens, and it is genuinely worth doing rather than being told — it is two applications of the law of total variance and it will take you twenty minutes. Do it before you read the solution.</p>
+
+<h3>The comparison figure</h3>
+
+<p>The second figure, <code>week11_downsample.png</code>, is the real-data centrepiece of Aim 2: measured accuracy as teal dots, the Poisson prediction as a dashed orange line, the negative-binomial prediction as a solid purple line, against the fraction of reads kept. One question: <strong>which curve tracks the data?</strong></p>
+
+<p>The script answers it quantitatively. It prints a per-point table and then two numbers:</p>
+
+<p><code>[week11] RMSE vs Poisson = ..., vs NB = ...</code></p>
+
+<p>Report both. Whichever is smaller, say so plainly, in one sentence, in the report and out loud. There is no wrong outcome here and there is no result you need to hope for:</p>
+
+<ul>
+  <li><strong>If NB wins</strong>, you have shown that adding one measured parameter to the model — not fitted to the accuracy data, but estimated independently from the count variances — improves the prediction of a quantity it was not tuned on. That is a strong form of evidence and you should say why: <em>nothing in the NB curve was fitted to the points it is being compared against</em>.</li>
+  <li><strong>If Poisson wins</strong>, that is also a result, and an interesting one: it would mean the overdispersion you measured, though real in the variances, does not bite on this particular classification at these depths — plausibly because the logistic regression is not the Poisson-optimal rule the theory describes, or because the marker panel's dispersion is low, or because at $q &lt; 1$ you are below the knee. Say which explanation you favour and what would distinguish them.</li>
+  <li><strong>If both are far off</strong>, look first at the classifier rather than at the theory: <code>LogisticRegression(lr=0.5, n_iter=1200)</code> is plain gradient descent with no regularization, and at $q = 0.02$ the features are nearly all zeros. Check convergence before blaming biology. That is Week 8's discipline, and it applies today.</li>
+</ul>
+
+<h2>9 &nbsp;Your Python laboratory</h2>
+
+<div class="box python">
+  <span class="box-tag">This week in the celldetect project</span>
+  <p>Four functions, all in <code>python/celldetect/realdata.py</code>, all short:</p>
+  <ul>
+    <li><code>estimate_rates(X, y)</code> — the $(\text{n\_types} \times \text{n\_genes})$ matrix of per-class mean counts. <code>np.vstack([X[y == c].mean(axis=0) for c in np.unique(y)])</code>.</li>
+    <li><code>gene_fano(X)</code> — variance over mean per gene, with <code>ddof=1</code>, and <code>np.nan</code> (not zero, not an exception) where the mean is zero. Guard the division: <code>np.where</code> evaluates both branches, so a bare <code>v / m</code> inside it still emits a divide-by-zero warning. Summarize with <code>np.nanmedian</code>; plain <code>np.median</code> returns <code>nan</code> the moment one gene is undetected.</li>
+    <li><code>negative_binomial_dispersion(X)</code> — $(v - m)/m^2$, then <code>np.clip(phi, 0.0, None)</code>.</li>
+    <li><code>d_prime_overdispersed(lam1, lam2, phi)</code> — pooled mean, variance $\bar\lambda + \varphi\bar\lambda^2$, same zero-guard as <code>d_prime</code>. <strong>Check yourself before running anything else:</strong> $\varphi = 0$ must reproduce <code>detection.d_prime</code> exactly, to floating-point equality.</li>
+  </ul>
+  <p><strong>Tests:</strong> <code>pytest tests/test_realdata.py</code></p>
+  <p>This is the run that turns the whole file green. The two to read carefully are <code>test_negative_binomial_dispersion_recovers_phi</code> (which builds a gamma–Poisson mixture at $\lambda = 20$, $\varphi = 0.5$ over 40,000 cells and demands 15% accuracy — note how many cells it takes to pin $\varphi$ down, and draw the obvious conclusion about your 2,700) and <code>test_d_prime_overdispersed_saturates_with_depth</code>, which is this chapter's theorem written as three assertions: still increasing, bounded by the ceiling, and increasing by less than 5% over the last factor of ten in depth.</p>
+  <p>Because M4 is a milestone, also run the whole suite: <code>pytest tests/</code></p>
+  <p><strong>Experiment:</strong> <code>python experiments/week11_overdispersion.py</code>, <strong>SEED 111</strong>, 32 markers selected on the training split only (Week 10's honest protocol, applied without being asked), keep-fractions from 0.02 to 1.0. It writes <code>figures/week11_fano.png</code> (the Fano cloud and the $\varphi$ histogram) and <code>figures/week11_downsample.png</code> (measured, Poisson, NB), and prints the median Fano, the median $\varphi$, the per-point table and both RMSEs.</p>
+  <p>Check the stamp before you commit. If <code>[week11] !! no PBMC cache</code> appeared in the output, both figures carry the red SURROGATE stamp, <code>USED_STAND_IN</code> is <code>True</code>, and <code>week14_report_figures.py</code> will refuse them. <strong>M4 cannot be passed on surrogate data</strong>, and this is the week that matters most for that rule: the surrogate is overdispersed <em>by construction</em>, with $\varphi$ drawn from a gamma the author chose, so measuring overdispersion on it proves only that the author wrote it in.</p>
+</div>
+
+<h2>10 &nbsp;Exercises</h2>
+<p class="muted">Stars mark difficulty: ★ routine · ★★ requires an idea · ★★★ challenge. Write full sentences; every claim needs a reason. Solutions are provided — attempt first, then compare.</p>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 11.1</span><span class="stars">★</span></div>
+  <div class="ex-body">A gene has mean count $m = 6$ across 2,700 cells and sample variance $21$. (a) Give the Fano factor. (b) Give $\hat\varphi$. (c) State the cell-to-cell relative spread of this gene's rate in plain English. (d) At what mean count would this gene's Fano factor be 2, and what depth change would that require?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) $F = 21/6 = 3.5$.</p>
+      <p>(b) $\hat\varphi = (21 - 6)/36 = 15/36 = 0.417$.</p>
+      <p>(c) $\sqrt{0.417} = 0.645$: cells of this type differ in their underlying rate for this gene by about 65% from cell to cell. Of the total variance of 21, six is counting and fifteen is biology — biology is contributing two and a half times as much variance as the sequencer's sampling.</p>
+      <p>(d) $F = 1 + \varphi m = 2$ requires $m = 1/\varphi = 2.4$ counts. That is $2.4/6 = 0.4$ of the current mean, so you would have to sequence at 40% of the current depth. Note the direction: <em>shallower</em> sequencing makes data look <em>more</em> Poisson.</p>
+      <p class="muted">Part (d) is the one to remember, and it is a fine answer to give someone who says "my data looks Poisson, so I do not need a negative binomial". Their data may look Poisson because it is shallow. The dispersion is still there; it is just hiding under the counting noise.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 11.2</span><span class="stars">★</span></div>
+  <div class="ex-body">The script computes <code>gene_fano(X)</code> over <em>all</em> cells, both types pooled. (a) Explain why this overestimates within-type overdispersion. (b) Derive the size of the effect: for a gene with class means $m_1, m_2$ in equal-sized classes and true within-type dispersion $\varphi$, what is the pooled dispersion? (c) Recompute the median Fano per type on your data and report both.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) Because pooling two populations with different means adds the between-population variance to the within-population variance. Some of the "extra" variance is not cells of one type differing from each other — it is monocytes differing from T cells, which is the signal, not the noise.</p>
+      <p>(b) Law of total variance again, with the "group" now being the cell type. Let $\bar m = (m_1+m_2)/2$. The within-group variances are $m_i + \varphi m_i^2$, and the between-group variance of the means is $\big((m_1-m_2)/2\big)^2$. So
+      $$\mathrm{Var}_{\rm pooled} = \bar m + \varphi\,\frac{m_1^2+m_2^2}{2} + \frac{(m_1-m_2)^2}{4}.$$
+      Setting this equal to $\bar m + \varphi_{\rm pooled}\bar m^2$ and solving,
+      $$\varphi_{\rm pooled} = \varphi\,\frac{m_1^2+m_2^2}{2\bar m^2} + \frac{(m_1-m_2)^2}{4\bar m^2}.$$
+      The second term is pure inflation. For a 2-fold marker ($m_1 = 2m_2$), $\bar m = 1.5m_2$ and that term is $m_2^2/(4\times2.25m_2^2) = 0.111$: an absolute addition of $0.11$ to $\varphi$, plus a $1.11\times$ multiplication of the real $\varphi$.</p>
+      <p>(c) <code>np.nanmedian(gene_fano(X[y == 0])[mask])</code> and the same for <code>y == 1</code>. Report both, and the pooled value, and note that the pooled one is the larger — if it is not, something is wrong with your masking.</p>
+      <p class="muted">Worth doing properly because the inflation is largest exactly for the genes you selected as markers, which are by construction the genes with the biggest between-type differences. The pooled figure is not <em>wrong</em> as a description of the whole dataset, but if you present it as "within-type biological variability" you have overstated your case on precisely the genes that matter.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 11.3</span><span class="stars">★★</span></div>
+  <div class="ex-body">Derive the depth ceiling from scratch, without looking at Section 6, and then answer: (a) with $p_1 = 0.0030$, $p_2 = 0.0036$ and $\varphi = 0.3$, what is $d'_\infty$ and the single-gene accuracy? (b) What is the knee depth? (c) How many independent markers of that quality would you need for 90% accuracy, and what does that assume?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>The derivation is the boxed one: factor $D\bar p$ out of the square root, take $D \to \infty$, get $d'_\infty = |p_1-p_2|/(\bar p\sqrt\varphi)$.</p>
+      <p>(a) $|p_1-p_2| = 0.0006$, $\bar p = 0.0033$, $\sqrt{0.3} = 0.5477$. So
+      $$d'_\infty = \frac{0.0006}{0.0033\times0.5477} = \frac{0.0006}{0.001807} = 0.332,$$
+      and the single-gene accuracy ceiling is $\Phi(0.166) = 56.6\%$.</p>
+      <p>(b) $D_{\rm knee} = 1/(\varphi\bar p) = 1/(0.3\times0.0033) = 1010$ molecules per cell. PBMC 3k's median library is a couple of thousand, so this gene is at or just past its knee in the real data.</p>
+      <p>(c) For 90% accuracy you need $\Phi(d'/2) = 0.90$, so $d'/2 = 1.2816$ and $d' = 2.563$. With quadrature, $\sqrt k \times 0.332 = 2.563$ gives $\sqrt k = 7.72$, so $k = 60$ genes.</p>
+      <p>Assumptions: the genes are independent given the cell type; each has the same $d'_\infty$; you are past the knee on all of them; and the Gaussian mapping $\Phi(d'/2)$ holds. The independence assumption is the shakiest, for the reason in Section 7 — the biological factors that cause overdispersion are shared across genes, so 60 correlated markers do less work than 60 independent ones.</p>
+      <p class="muted">Sixty markers for 90% on a pair that differs by only 20% in expression, no matter how deeply you sequence. That is a real, quotable, budget-relevant sentence, and it is the kind of number a working experimentalist would actually want. Notice it took you four lines to compute.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 11.4</span><span class="stars">★★</span></div>
+  <div class="ex-body">Show that under the negative binomial the "$4\times$ the data doubles $d'$" rule of thumb fails, by computing the factor by which $d'$ grows when depth is quadrupled, at three points: well below the knee, at the knee, and well above it. Use $\varphi = 0.5$, $\bar p = 0.005$. Then say in one sentence what the correct rule of thumb is.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>From the derivation, $d'(D) \propto \sqrt{D}/\sqrt{1+\varphi D\bar p}$, and $\varphi\bar p = 0.0025$, so $\varphi D \bar p = D/400$ and the knee is at $D = 400$.</p>
+      <p><strong>Well below</strong> ($D: 25 \to 100$): the ratio is
+      $\frac{\sqrt{100}}{\sqrt{1.25}} \big/ \frac{\sqrt{25}}{\sqrt{1.0625}} = \frac{10/1.1180}{5/1.0308} = \frac{8.944}{4.851} = 1.84$. Close to 2; the law nearly holds.</p>
+      <p><strong>At the knee</strong> ($D: 200 \to 800$): $\frac{\sqrt{800}}{\sqrt3}\big/\frac{\sqrt{200}}{\sqrt{1.5}} = \frac{28.284}{1.7321}\big/\frac{14.142}{1.2247} = \frac{16.330}{11.547} = 1.41$.</p>
+      <p><strong>Well above</strong> ($D: 4000 \to 16000$): $\frac{\sqrt{16000}}{\sqrt{41}}\big/\frac{\sqrt{4000}}{\sqrt{11}} = \frac{126.49}{6.403}\big/\frac{63.246}{3.3166} = \frac{19.755}{19.069} = 1.036$.</p>
+      <p>So quadrupling the depth multiplies $d'$ by $1.84$, then $1.41$, then $1.04$. The rule of thumb degrades from "doubles" to "adds 4%".</p>
+      <p><strong>The correct rule:</strong> quadrupling the depth doubles $d'$ only while the mean count stays well below $1/\varphi$; past that, extra depth buys a factor tending to 1, and the money should be spent on more markers or better markers instead.</p>
+      <p class="muted">Notice that the three ratios are exactly $\sqrt{4}$ discounted by $\sqrt{(1+\varphi D\bar p)/(1+4\varphi D\bar p)}$. Writing the discount factor down explicitly is a good way to convince yourself that nothing mysterious is happening — the square-root law is still in there, being divided by a growing correction.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 11.5</span><span class="stars">★★★</span></div>
+  <div class="ex-body"><strong>Open question of the week.</strong> What happens to $\varphi$ under thinning? Suppose the full-depth counts for a gene are gamma–Poisson with mean $m$ and dispersion $\varphi$, and each molecule is kept independently with probability $q$. (a) Derive the mean and variance of the thinned count. (b) Read off the thinned dispersion $\varphi_q$. (c) Is the script's assumption of a fixed $\varphi$ across the sweep conservative or anti-conservative, and at which end? (d) Design a check you can run on your own data.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p><strong>(a)</strong> Condition on the cell's rate $\Lambda$ (mean $m$, variance $\varphi m^2$). Given $\Lambda$, the count is $\mathrm{Poisson}(\Lambda)$; thinning a Poisson gives $\mathrm{Poisson}(q\Lambda)$ exactly, by Week 2's theorem. So the thinned count is again a mixed Poisson, with rate $q\Lambda$.</p>
+      <p>Now $E[q\Lambda] = qm$ and $\mathrm{Var}(q\Lambda) = q^2\varphi m^2$. Applying the theorem of Section 4 with these two moments,
+      $$E[X_q] = qm, \qquad \mathrm{Var}(X_q) = qm + q^2\varphi m^2.$$</p>
+      <p><strong>(b)</strong> Matching against $\mathrm{Var} = m_q + \varphi_q m_q^2$ with $m_q = qm$:
+      $$qm + \varphi_q q^2m^2 = qm + q^2\varphi m^2 \implies \boxed{\varphi_q = \varphi.}$$
+      <strong>The dispersion is invariant under thinning.</strong> That is a genuinely pleasant result, and the reason is visible in the definition: $\varphi$ is a <em>relative</em> variance of the rate, and multiplying the rate by a constant $q$ scales its mean by $q$ and its standard deviation by $q$, leaving the ratio alone.</p>
+      <p><strong>(c)</strong> So the script's assumption is <em>exactly right</em>, not an approximation — under this model. It remains an approximation for a different reason, which is the honest answer to give: what you plug in is not $\varphi$ but $\hat\varphi$, estimated from the full-depth data, and the <em>estimator</em> degrades badly as $q$ falls. At $q = 0.02$ the mean counts are 2% of their original values, most entries are zero, and $\hat\varphi = (v-m)/m^2$ has a tiny denominator: the estimate becomes enormously noisy and, after clipping at 0, biased upward. The script sidesteps that by estimating once at full depth, which is the right engineering choice — but it means the NB curve at the shallow end assumes a dispersion it could not have measured there.</p>
+      <p><strong>(d)</strong> Estimate $\varphi$ at each keep-fraction on your own data and plot $\hat\varphi_q$ against $q$ for the 32 markers. Theory says a flat line. What you will actually see is a flat line at the deep end that turns upward and scatters wildly at the shallow end, and the depth at which it departs is the depth below which $\hat\varphi$ is not measurable. That plot is a real, small, self-contained result and would be a good extra panel in the report.</p>
+      <p class="muted">This exercise is posed as open on purpose: the chapter asserts nothing about the answer before you derive it. Notice the shape of what you found — the <em>model parameter</em> is invariant, the <em>estimator</em> is not, and conflating those two is one of the most common errors in applied statistics. Being able to say "the parameter is scale-free but I cannot measure it at that depth" is a more sophisticated statement than either "it changes" or "it does not".</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 11.6</span><span class="stars">★★★</span></div>
+  <div class="ex-body">The theory in this chapter puts overdispersion in the <em>denominator</em> of $d'$ and stops. But a mixed Poisson is not Gaussian, and the optimal classifier for negative-binomial counts is not the Poisson naive Bayes of Week 5. (a) Write down the log-likelihood ratio for a single NB gene. (b) Explain what it does differently from the Poisson rule. (c) Predict whether the true optimal accuracy is above or below $\Phi(d'_{\rm NB}/2)$, and design a simulation to check.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p><strong>(a)</strong> The negative binomial with mean $m$ and dispersion $\varphi$ (size $r = 1/\varphi$) has
+      $$P(X = x) = \frac{\Gamma(x+r)}{x!\,\Gamma(r)}\left(\frac{r}{r+m}\right)^{r}\left(\frac{m}{r+m}\right)^{x}.$$
+      With a common $r$ for both classes, the log-likelihood ratio for class 1 versus class 2 is
+      $$\log\frac{P_1(x)}{P_2(x)} = x\,\log\frac{m_1(r+m_2)}{m_2(r+m_1)} + r\,\log\frac{r+m_2}{r+m_1},$$
+      because every $x$-dependent factor that does not involve $m$ cancels.</p>
+      <p><strong>(b)</strong> It is still linear in $x$ — so the decision rule is still "count, compare to a threshold", which is reassuring. What changes is the <em>weight</em>. The Poisson rule weights $x$ by $\log(m_1/m_2)$; the NB rule weights it by $\log\frac{m_1(r+m_2)}{m_2(r+m_1)}$, which is smaller in magnitude. In words: <strong>when counts are overdispersed, each count is less informative, so the optimal rule leans on it less.</strong> As $\varphi \to 0$ ($r\to\infty$) the two weights coincide, as they must.</p>
+      <p><strong>(c)</strong> Prediction: the true optimal accuracy should be slightly <em>above</em> $\Phi(d'_{\rm NB}/2)$, for the same reason as Week 9's low-depth finding — the NB is skewed with a lump at zero, and a Gaussian summary through mean and variance cannot exploit discrete structure the exact rule can. Do not trust that prediction; check it.</p>
+      <p><strong>The check:</strong> simulate 20,000 cells per class from gamma–Poisson at $m_1, m_2, \varphi$; classify with (i) the NB log-likelihood ratio above, (ii) the Poisson rule of Week 5, and (iii) compute $\Phi(d'_{\rm NB}/2)$. Report all three across a depth sweep. Expect (i) $\ge$ (ii), with the gap growing with $\varphi$, and (i) slightly above (iii) at low counts.</p>
+      <p class="muted">This is the natural Week 14 "future work" paragraph, and if there is time in the buffer of Week 13 it is the single best optional extension in the project: it closes the loop by asking not just "how much does overdispersion cost?" but "how much of that cost is unavoidable versus caused by using the wrong classifier?" Do not start it until M4, M5 and M6 are safely done.</p>
+    </div>
+  </details>
+</div>
+
+<h2>11 &nbsp;Research notebook</h2>
+
+<p>This is a milestone week, so the notebook does double duty as the evidence file.</p>
+
+<ul>
+  <li>The <strong>derivation of $\mathrm{Var} = m + \varphi m^2$</strong> by the law of total variance, written from memory, with the assumptions listed underneath.</li>
+  <li>The <strong>derivation of the ceiling</strong> $d'_\infty = |p_1-p_2|/(\bar p\sqrt\varphi)$, including the factoring step, and the knee depth $1/(\varphi\bar p)$.</li>
+  <li>Your <strong>measured median Fano factor and median $\hat\varphi$</strong>, each with an interval (interquartile range across genes is acceptable this week; say that is what it is), and the mask you used (<code>mean &gt; 0.05</code>, pooled or per type).</li>
+  <li>The <strong>knee depth for your own marker panel</strong>, computed from your own $\hat\varphi$ and $\bar p$, and one sentence saying whether PBMC 3k's library size is above or below it.</li>
+  <li>Both <strong>RMSEs</strong> from the downsampling run, and the one-sentence verdict on which model tracks the data.</li>
+  <li>Exercise 11.5 in full, including the distinction between the parameter and the estimator.</li>
+  <li>An update to your <strong>"assumptions I am making"</strong> list: Week 7's assumption 1 gets crossed out and replaced with the gamma–Poisson version, and two new entries appear — dispersion is constant across the depth sweep, and per-gene dispersions are treated as independent.</li>
+</ul>
+
+<p>Scan into <code>notebook/week11/</code>; fill in <code>progress/week11.md</code>.</p>
+
+<div class="box verify">
+  <span class="box-tag">MILESTONE M4 · verification (with mentor)</span>
+  <ul>
+    <li><strong>At the whiteboard, without notes: derive the negative-binomial variance.</strong> State the law of total variance in words first, then in symbols, then apply it. Finish by naming the three assumptions used.</li>
+    <li><strong>At the whiteboard, without notes: derive the $d'$ ceiling.</strong> Factor $D\bar p$ out of the square root, take the limit, and state both $d'_\infty$ and the knee depth. Then interpret it in one sentence a lab head would care about.</li>
+    <li><strong>State your measured median Fano factor and your measured median $\varphi$, each with an interval</strong>, on your own data, at SEED 111 — and say what mask you applied and why the unmasked number would be misleading.</li>
+    <li><strong>Show <code>figures/week11_downsample.png</code></strong> and say which of the two curves tracks the measured points, quoting both RMSEs. Whichever wins, defend the sentence you would put in the report.</li>
+    <li><strong>The downsampling figure is committed and is NOT stamped SURROGATE.</strong> This is the gate. If the stamp is there, M4 has not been passed, no matter how good the shapes look; say so, state when the download will happen, and record the decision in <code>progress/week11.md</code>.</li>
+    <li><strong>You can say why more cells does not raise the ceiling</strong> on a per-cell decision, and connect it explicitly to Week 1's exercise 1.5.</li>
+    <li><strong><code>pytest tests/</code> fully green</strong> — Weeks 1 through 11, in one run, in front of your mentor.</li>
+  </ul>
+  <p class="muted">Aim 2 closes here. From Week 12 onwards the project stops generating results and starts assembling them: the beads, the three-lines figure, the error bars, the report. If M4 has slipped, this is the moment to invoke the fallback ladder in <code>plans/</code> rather than to borrow time from Week 12, because Week 12 is the centrepiece and it is the one week that cannot be compressed.</p>
+</div>
+
+<h2>12 &nbsp;Going deeper</h2>
+<ul>
+  <li>Grün, Kester &amp; van Oudenaarden (2014), <em>Validation of noise models for single-cell transcriptomics</em>, <em>Nature Methods</em> 11. <span class="muted">The paper that separates technical from biological noise in single-cell counts using spike-ins, and finds exactly the two-term variance you derived today. Read the noise-model figure and the definition of their $\text{CV}^2$ decomposition. <span class="claim cited">cited</span></span></li>
+  <li>Svensson (2020), <em>Droplet scRNA-seq is not zero-inflated</em>, <em>Nature Biotechnology</em> 38. <span class="muted">You read this in Week 9. Read it again now, because its actual argument is this chapter's: a negative binomial without any extra zero-inflation term already accounts for the observed zeros. Two pages. <span class="claim cited">cited</span></span></li>
+  <li>Hafemeister &amp; Satija (2019), <em>Normalization and variance stabilization of single-cell RNA-seq data using regularized negative binomial regression</em>, <em>Genome Biology</em> 20. <span class="muted">Where the field's standard treatment of overdispersion lives. Look specifically at how they let $\varphi$ depend on the mean and why they regularize it across genes — your per-gene method-of-moments estimate is the unregularized version of the same idea, and seeing what a careful version adds is instructive.</span></li>
+  <li>Raj &amp; van Oudenaarden (2008), <em>Nature, nurture, or chance: stochastic gene expression and its consequences</em>, <em>Cell</em> 135. <span class="muted">The biology behind the $\varphi m^2$ term: transcriptional bursting, and why genetically identical cells in identical conditions have different mRNA counts. Read the first three sections. This is the paragraph of your report that explains <em>why</em> rather than <em>how much</em>. <span class="claim cited">cited</span></span></li>
+  <li>Blitzstein &amp; Hwang, <em>Introduction to Probability</em>, the section on the law of total variance (Eve's law). <span class="muted">If Section 4's proof felt like a trick rather than a tool, spend forty minutes here. It is the single most useful identity you will meet this year, and it is the same identity you used in Week 9's exercise 9.5.</span></li>
+  <li>Course extras: <a href="../extras/big-picture.html">the big picture</a> · <a href="../extras/notation.html">notation card</a> · <a href="../extras/glossary.html">glossary</a> · <a href="../extras/problem-bank.html">problem bank</a> · <a href="../extras/unstuck.html">when you are stuck</a></li>
+</ul>
+
+</div>
+
+<footer class="site">How Much Data Does It Take to Tell Two Cell Types Apart? · Week 11 · <a href="../index.html">Course home</a></footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  /* Marsaglia-Tsang gamma sampler (shape > 0), driven by a seeded uniform. */
+  function gammaSample(shape, r) {
+    if (shape < 1) return gammaSample(shape + 1, r) * Math.pow(Math.max(r(), 1e-12), 1 / shape);
+    const d = shape - 1 / 3, c = 1 / Math.sqrt(9 * d);
+    for (;;) {
+      const x = CD.randn(r);
+      let v = 1 + c * x;
+      if (v <= 0) continue;
+      v = v * v * v;
+      const u = r();
+      if (u < 1 - 0.0331 * x * x * x * x) return d * v;
+      if (Math.log(u) < 0.5 * x * x + d * (1 - v + Math.log(v))) return d * v;
+    }
+  }
+
+  /* ---------------- Lab 1: the gamma-Poisson mixture, live ---------------- */
+  (function () {
+    const N = 7000, MEANS = [2, 4, 8, 16, 32];
+    let phi = 0.5, mi = 2;
+
+    function run() {
+      const m = MEANS[mi];
+      const r = CD.rng(1110 + mi * 31);
+      const nb = [], po = [];
+      for (let i = 0; i < N; i++) {
+        const lam = phi > 0 ? gammaSample(1 / phi, r) * (phi * m) : m;
+        nb.push(CD.poisson(lam, r));
+        po.push(CD.poisson(m, r));
+      }
+      const mean = nb.reduce((a, b) => a + b, 0) / N;
+      const varr = nb.reduce((a, b) => a + (b - mean) * (b - mean), 0) / (N - 1);
+      const sd = Math.sqrt(m + phi * m * m);
+      const hi = Math.max(8, Math.ceil(m + 4.2 * sd));
+      const nbins = Math.min(60, hi);
+      const ymax = 1.35 / Math.sqrt(2 * Math.PI * Math.max(m, 1));
+
+      const P = CD.plot("w11lab1", { xmin: -0.5, xmax: hi, ymin: 0, ymax: ymax,
+                                     xlabel: "count for one gene in one cell",
+                                     ylabel: "fraction of cells" });
+      P.clear(); P.axes();
+      P.histogram(nb, nbins, { normalize: "density", color: "rgba(124,58,237,0.45)",
+                               edge: "rgba(124,58,237,0.9)" });
+      P.histogram(po, nbins, { normalize: "density", color: "rgba(0,0,0,0)",
+                               edge: CD.C.orange });
+      P.vline(m, "mean = " + m, { color: CD.C.navy });
+      P.label(hi * 0.42, ymax * 0.90, "purple: gamma-Poisson    orange outline: plain Poisson",
+              { color: CD.C.navy });
+      document.getElementById("w11lab1out").innerHTML =
+        "phi = " + phi.toFixed(2) + " &nbsp;·&nbsp; sd of the per-cell rate = " +
+        (100 * Math.sqrt(phi)).toFixed(0) + "% of its mean &nbsp;·&nbsp; measured mean = " +
+        mean.toFixed(3) + " &nbsp;·&nbsp; measured variance = " + varr.toFixed(2) +
+        " &nbsp;·&nbsp; <b>Fano = " + (varr / mean).toFixed(2) + "</b>" +
+        " &nbsp;·&nbsp; predicted 1 + phi·m = " + (1 + phi * m).toFixed(2);
+    }
+
+    CD.slider("w11lab1ctl", { label: "dispersion phi", min: 0, max: 2, step: 0.05, value: phi,
+                              fmt: v => (+v).toFixed(2) }, v => { phi = v; run(); });
+    CD.slider("w11lab1ctl", { label: "mean count m", min: 0, max: MEANS.length - 1, step: 1,
+                              value: mi, fmt: i => MEANS[i] }, i => { mi = i; run(); });
+  })();
+
+  /* ---------------- Lab 2: d' against depth, and the ceiling ------------- */
+  (function () {
+    const PHIS = [0, 0.05, 0.2, 0.5, 1.5];
+    const COLS = [CD.C.orange, CD.C.blue, CD.C.teal, CD.C.purple, CD.C.red];
+    const FOLDS = [1.1, 1.2, 1.5, 2.0, 3.0];
+    const PBAR = 0.005;
+    let fi = 2;
+
+    function run() {
+      const f = FOLDS[fi];
+      const p1 = 2 * PBAR / (1 + f), p2 = 2 * PBAR * f / (1 + f);
+      const dp = (D, ph) => {
+        const l1 = D * p1, l2 = D * p2, lb = 0.5 * (l1 + l2);
+        return Math.abs(l1 - l2) / Math.sqrt(lb + ph * lb * lb);
+      };
+      const P = CD.plot("w11lab2", { xmin: 1, xmax: 6, ymin: -2.0, ymax: 1.6,
+                                     xlabel: "log10 of sequencing depth D  (molecules per cell)",
+                                     ylabel: "log10 of d' for one gene",
+                                     xfmt: t => "1e" + t,
+                                     yfmt: t => Math.pow(10, t).toPrecision(2) });
+      P.clear(); P.axes();
+      PHIS.forEach((ph, i) => {
+        /* clamp to the top of the box: CD.plot does not clip, and the phi = 0
+           line leaves the frame at high depth (which is precisely the point). */
+        P.funcPlot(t => Math.min(1.58, Math.log10(dp(Math.pow(10, t), ph))),
+                   { color: COLS[i], width: 2.2 });
+        if (ph > 0) {
+          const ceil = 2 * (f - 1) / ((f + 1) * Math.sqrt(ph));
+          P.line([[1, Math.log10(ceil)], [6, Math.log10(ceil)]],
+                 { color: COLS[i], width: 1, dash: [5, 4] });
+        }
+      });
+      P.label(1.1, 1.44, "orange: phi = 0 (Poisson, slope 1/2, no ceiling)", { color: CD.C.orange });
+      P.label(1.1, 1.25, "dashed lines: the ceiling each phi imposes", { color: CD.C.navy });
+
+      const rows = PHIS.map((ph, i) => {
+        if (ph === 0) return ["0 (Poisson)", "none", "—", "—", "—"];
+        const ceil = 2 * (f - 1) / ((f + 1) * Math.sqrt(ph));
+        const knee = 1 / (ph * PBAR);
+        const d90 = (0.81 / 0.19) / (ph * PBAR);         // depth reaching 90% of the ceiling
+        return [ph.toFixed(2), ceil.toFixed(3),
+                CD.accuracyFromDPrime(ceil).toFixed(3),
+                Math.round(knee).toLocaleString(),
+                Math.round(d90).toLocaleString()];
+      });
+      CD.table("w11lab2out",
+        ["phi", "ceiling d'", "ceiling accuracy (1 gene)", "knee depth", "depth for 90% of ceiling"],
+        rows);
+    }
+
+    CD.slider("w11lab2ctl", { label: "fold change between the two types", min: 0,
+                              max: FOLDS.length - 1, step: 1, value: fi,
+                              fmt: i => FOLDS[i].toFixed(1) + "x" }, i => { fi = i; run(); });
+  })();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bead experiment protocol — How Much Data Does It Take to Tell Two Cell Types Apart?</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="../s/week06.html">Week 6 · the design</a><a href="../s/week12.html">Week 12 · the analysis</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge aim3">Aim 3 · Physical analog</span>
+    </div>
+    <h1 class="chapter-title">Bead experiment protocol</h1>
+    <div class="chapter-sub">The operating manual for the physical arm · jar preparation, blinding, the trial loop, the dropout rule, recording, and everything that will go wrong</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<p>This is the operating manual for Aim 3. It is written so that a <strong>helper who has read nothing else in this course</strong> can sit down at a table and run a session correctly. If you are that helper, read Section 2 and Section 6, look at the cut card in Section 7, and you are equipped. If you are the student, read all of it, twice, and read it <em>before</em> you buy beads — several of the decisions below cannot be undone after the first jar is filled.</p>
+
+<p>The theory this experiment tests, and the sample-size arithmetic that sets its budget, are in <a href="../s/week06.html">Week 6</a>. The analysis is in <a href="../s/week12.html">Week 12</a>. This page is the part in between: the several hours on a table that turn a prediction into a measurement.</p>
+
+<div class="box bead">
+  <span class="box-tag">The experiment in one paragraph</span>
+  <p>Two opaque jars of beads sit on a table. Jar&nbsp;A is 30% red; jar&nbsp;B is 35% red (or 40% — see Section 3). A helper follows a pre-printed, pre-randomized list to pick one of the two jars, draws $n$ beads from it <em>with replacement</em>, and shows them to a guesser who cannot see which jar they came from. The guesser counts the reds, applies a printed threshold rule, and says "A" or "B". That is one <strong>trial</strong>. Repeat about 40 times at each of $n = 10, 25, 50, 100, 200$, then repeat the whole thing a second time with a rule that discards 30% of the drawn beads before the guesser sees them. Four hundred trials, roughly 30,800 individual beads handled, and one number at the end: the exponent $\alpha$ in $d' \propto n^{\alpha}$, predicted to be $\tfrac12$.</p>
+</div>
+
+<div class="box warning">
+  <span class="box-tag">Why this is worth several hours of your life</span>
+  <p>Your theory and your simulator have the same author. If you misunderstood the sampling mathematics, you misunderstood it in both places, and they will agree beautifully while both being wrong. No amount of additional code can catch that.</p>
+  <p>The beads can. They are physical, nobody wrote them, and they do not share your misconceptions. This is the only line of evidence in the entire project in which <strong>nothing is simulated and no software can be wrong</strong>. Everything in this protocol exists to protect that property, which is fragile: one un-blinded trial, one un-randomized block, one "roughly a third" discarded by eye, and the arm stops being the thing that cannot be wrong.</p>
+</div>
+
+<h2>1 &nbsp;Materials</h2>
+
+<table class="simple">
+  <tr><th>Item</th><th>Specification</th><th>Why it matters</th></tr>
+  <tr><td><strong>Two opaque containers</strong></td>
+      <td>Identical in size, shape, colour, weight and lid. Wide enough to get a hand or a scoop in. Coffee tins, opaque food tubs, or jars wrapped in the same paper.</td>
+      <td>The guesser must not be able to identify a jar by sight, sound, or the helper's grip. Two visibly different jars destroys the blinding immediately and permanently.</td></tr>
+  <tr><td><strong>Beads, two colours</strong></td>
+      <td>About 750 of one colour and 1500 of the other (see Section 3 for the exact split). Plastic pony beads or similar. <strong>Identical in size, shape, mass and surface finish</strong> — same product, two colour options, same bag lot if you can manage it.</td>
+      <td>See the box below. This is the single most important material requirement on the page.</td></tr>
+  <tr><td><strong>A scoop or measured cup</strong></td>
+      <td>Something that lifts roughly 20–25 beads at a time. A tablespoon, a small medicine cup, a bottle cap.</td>
+      <td>Sets the pace of the whole experiment and makes the with-replacement rule affordable (Section 6).</td></tr>
+  <tr><td><strong>A shallow white tray</strong></td>
+      <td>A plate, a baking tray, a sheet of white paper with a raised edge.</td>
+      <td>You count reds far faster and more accurately when the beads are spread in one layer than when they are in a cup.</td></tr>
+  <tr><td><strong>A small dish</strong></td>
+      <td>Anything you can drop beads into one at a time.</td>
+      <td>The anti-lost-count device. You never count past ten in your head; you move beads.</td></tr>
+  <tr><td><strong>Printed tally sheets</strong></td>
+      <td><code>data/beads/RUNTEMPLATE_plain.csv</code> and <code>data/beads/RUNTEMPLATE_dropout.csv</code>, written by <code>experiments/week06_bead_design.py</code> at <strong>SEED 106</strong>. Print them.</td>
+      <td>The <code>true_jar</code> column is filled in <em>in advance</em> by a seeded generator. This is what makes the randomization real rather than a human pretending.</td></tr>
+  <tr><td><strong>A printed cut card</strong></td>
+      <td>Section 7. Tape it in front of the guesser.</td>
+      <td>Removes human judgement from the decision, so the arm measures the sampling law and not the guesser's intuition.</td></tr>
+  <tr><td><strong>A printed discard mask</strong> (dropout sessions only)</td>
+      <td>Section 8. A strip of 0s and 1s from a seeded generator, with the seed printed on it.</td>
+      <td>Makes "discard with probability 0.3" a thing you can reproduce and audit rather than a thing you assert.</td></tr>
+  <tr><td><strong>A timer</strong></td>
+      <td>A kitchen timer or a phone, face down.</td>
+      <td>You will run in fixed blocks with fixed breaks. Fatigue is a source of miscounts, and miscounts are a source of results.</td></tr>
+  <tr><td><strong>A kitchen scale</strong> (optional, strongly recommended)</td>
+      <td>1&nbsp;g resolution is enough; 0.1&nbsp;g is better.</td>
+      <td>Lets you verify a jar's contents in thirty seconds instead of thirty minutes (Section 3).</td></tr>
+  <tr><td><strong>A camera</strong></td>
+      <td>Your phone.</td>
+      <td>You photograph the blank sheet before the run and the filled sheet after it. Section 9 explains why both.</td></tr>
+</table>
+
+<div class="box pitfall">
+  <span class="box-tag">Why "identical feel" is a scientific requirement and not fussiness</span>
+  <p>Suppose the red beads are very slightly larger, or glossier, or heavier than the white ones. Two separate things break, and only the first is obvious.</p>
+  <p><strong>The obvious one: the blinding leaks.</strong> A guesser who can feel the difference — or who catches the different sound the jars make when shaken, or sees a size difference in the tray — is no longer reading the sample. They are reading the beads. And because a leak is systematic rather than random, it does not add noise to your accuracy; it adds <em>bias</em>, in the direction that makes the experiment look like it worked.</p>
+  <p><strong>The one that actually ruins the experiment: the draw stops being random.</strong> Granular mixtures segregate. Shake a jar containing beads of two sizes and the larger ones migrate upward — this is the "Brazil-nut effect", and it is fast, robust and completely invisible from outside an opaque jar. Now every scoop taken from the top is enriched in one colour, and the fraction you are sampling is not the jar's fraction $p$. Every formula in Week 6 assumes each drawn bead is red with probability exactly $p$, independently. Segregation makes that false at the first line, and no amount of care later can repair it.</p>
+  <p>The check: pour a jar into a tray, count the reds, pour it back, shake for ten seconds, take five scoops off the top, and count those. If the top-scoop fraction is consistently above or below the jar fraction, your beads are not identical enough, and the entire arm is unusable until you fix it. Do this once, before you start, and write the numbers in the notebook.</p>
+</div>
+
+<h2>2 &nbsp;The helper's job, in full</h2>
+
+<p>Hand this section to whoever is helping. It is everything they need and nothing they do not.</p>
+
+<div class="box bead">
+  <span class="box-tag">If you are the helper: this is your entire job</span>
+  <ol>
+    <li>You have a printed sheet with a column headed <code>true_jar</code>, already filled in with A's and B's. <strong>Fold the sheet so the guesser cannot see that column</strong>, or hold it against your chest. You will follow it exactly, in order, top to bottom. You will not skip, reorder, or "improve" it. If it says A four times in a row, you use jar A four times in a row.</li>
+    <li>For each row: read the letter, take that jar, and draw the number of beads the row's <code>n</code> column says — in scoops of about 25, spreading each scoop on the tray, and <strong>returning each scoop to the jar and shaking before you take the next one</strong>. Section 6 has the exact loop.</li>
+    <li>Present the drawn beads to the guesser without touching the jars again and without saying anything. Keep both jars out of the guesser's line of sight, or behind a book, or under the table.</li>
+    <li>The guesser will count them and say "A" or "B". Write that letter in the <code>guess</code> column. <strong>Do not react.</strong> Not a smile, not a pause, not a "hmm". Your face is data leakage.</li>
+    <li><strong>Never tell the guesser whether they were right</strong> — not after a trial, not after ten, not until the whole block is finished and the sheet is put away.</li>
+    <li>If anything unusual happens — a dropped bead, a doorbell, a scoop that came out with the wrong number, the guesser catching sight of a jar — say so out loud, write a note in the sheet's margin, and <strong>do not delete the row</strong>. Every row that gets started gets finished and recorded.</li>
+  </ol>
+  <p>That is the job. It requires no biology, no statistics, and no interest in the project. It requires attention and honesty, and about two hours at a time before you need a break.</p>
+</div>
+
+<div class="box warning">
+  <span class="box-tag">The one thing that would destroy the experiment</span>
+  <p>If the helper stops following the printed sequence and starts choosing jars themselves — even with the best intentions, even "randomly" — the experiment is over and nothing in the data will tell you. People are famously bad at generating random sequences: they alternate far too much, because a run of four A's "doesn't feel random". A guesser who unconsciously picks up on excessive alternation scores above chance <em>without using the beads at all</em>, which corrupts every point in the same direction and produces a beautiful, false, upward curve.</p>
+  <p><code>beads.validate_tally</code> catches the extreme version (a run whose jar never changes). It does <strong>not</strong> catch alternation, so Section 10 gives you a hand check that does.</p>
+</div>
+
+<h2>3 &nbsp;Jar preparation, with exact counts</h2>
+
+<p>Two designs are on the table. Week 6, Section 6 recommends the second on power grounds; the first is what the original plan specified and what the constants at the top of <code>experiments/week12_beads.py</code> currently say. <strong>Decide before you fill anything, and write the decision and the reason in the notebook.</strong></p>
+
+<table class="simple">
+  <tr><th>Design</th><th>Jar</th><th>Red</th><th>White</th><th>Total</th><th>$p$</th></tr>
+  <tr><td rowspan="2"><strong>30/35</strong> (original plan)</td><td>A</td><td>300</td><td>700</td><td>1000</td><td>0.300</td></tr>
+  <tr><td>B</td><td>350</td><td>650</td><td>1000</td><td>0.350</td></tr>
+  <tr><td rowspan="2"><strong>30/40</strong> (recommended)</td><td>A</td><td>300</td><td>700</td><td>1000</td><td>0.300</td></tr>
+  <tr><td>B</td><td>400</td><td>600</td><td>1000</td><td>0.400</td></tr>
+</table>
+
+<p>Beads required: 650 red and 1350 white for the 30/35 design, 700 red and 1300 white for 30/40. Buy about 10% extra of each — beads get lost, and a bead you cannot find is a bead that has changed your jar's composition.</p>
+
+<p><strong>A half-size version</strong> is acceptable if beads are expensive or counting 1000 of them is more than you can face: 500 per jar, so 150/350 and 175/325 for 30/35, or 150/350 and 200/300 for 30/40. It costs you a little (Section 6 explains exactly how much, and it is under one accuracy point), and it makes a lost bead twice as damaging. Do not go below 500 per jar.</p>
+
+<div class="box example">
+  <span class="box-tag">How to count out a thousand beads without losing your mind</span>
+  <p><strong>Method 1 — the ten-cup method.</strong> Use a muffin tin or an egg carton. Fill each cup with exactly ten beads, checking each cup by eye (ten is small enough to verify at a glance). A twelve-cup tin holds 120; twelve passes gives you 1440. Count in tens, then count the tens. You will make errors at the level of one cup, and a miscounted cup is ten beads, which is why you also do Method 2.</p>
+  <p><strong>Method 2 — the scale check.</strong> Count out exactly 100 beads of one colour by the ten-cup method and weigh them: call it $m_{100}$. A typical plastic pony bead is around 0.2&nbsp;g, so $m_{100} \approx 20$&nbsp;g. Now weigh the whole counted pile: if it should be 300 beads it should weigh $3 m_{100}$. On a 1&nbsp;g scale with 0.2&nbsp;g beads you can resolve about 5 beads, which is exactly the tolerance you need (see below). If the mass says 295 beads and your count says 300, count again — the scale is not the one that got bored.</p>
+  <p><strong>Both, always.</strong> Two independent methods that agree is a verified jar. One method is a hope.</p>
+</div>
+
+<h3>The arithmetic that tells you the jar is what you think it is</h3>
+
+<p>Four checks, in this order, recorded in the notebook with the actual numbers:</p>
+
+<ol>
+  <li><strong>Totals match.</strong> $R_A + W_A = 1000$ and $R_B + W_B = 1000$. Equal totals are not cosmetic: they make the two jars weigh and sound the same, which is part of the blinding.</li>
+  <li><strong>Fractions match.</strong> $\hat p_A = R_A / (R_A + W_A)$ and likewise for B. Tolerance: $|\hat p - p_{\text{target}}| \le 0.005$, i.e. no more than 5 beads out of 1000.</li>
+  <li><strong>The contrast matches — check it directly.</strong> $R_B - R_A$ must be exactly 50 (30/35 at $N=1000$) or exactly 100 (30/40). This is the check that matters most, because $d'$ depends on $|p_A - p_B|$ and on nothing else about the jars. Checking the two fractions separately can pass while their difference is wrong.</li>
+  <li><strong>Recount by the other person.</strong> One person counts, the other verifies at least the red counts independently. If the two counts differ by even one bead, both recount. This takes twenty minutes once and protects a fifteen-hour experiment.</li>
+</ol>
+
+<div class="box warning">
+  <span class="box-tag">What a five-bead miscount actually costs</span>
+  <p>Suppose jar B is meant to be 350 red out of 1000 but is actually 345. Then $p_B = 0.345$, the contrast is $0.045$ instead of $0.050$, and</p>
+  $$\bar p = 0.3225, \qquad \sqrt{\bar p(1-\bar p)} = \sqrt{0.21850} = 0.46744, \qquad d'(200) = \frac{\sqrt{200}\times 0.045}{0.46744} = 1.361,$$
+  <p>against the intended $1.510$. The predicted accuracy at $n = 200$ falls from $\Phi(0.755) = 0.775$ to $\Phi(0.681) = 0.752$ — a 2.3-point shift, comfortably inside your error bars and therefore <strong>completely invisible</strong>. You would draw the theory curve in the wrong place and never find out.</p>
+  <p>The general rule: a miscount of $\Delta$ beads in a jar of $N$ changes the contrast by $\Delta/N$, so the <em>relative</em> error in $d'$ is $(\Delta/N)/|p_A - p_B|$. At $N = 1000$ and a 0.05 contrast, five beads is a 10% error in $d'$. At a 0.10 contrast it is 5%. <strong>The wider contrast is not only more powerful, it is also more forgiving of your counting.</strong> That is a second, independent reason to prefer 30/40.</p>
+</div>
+
+<h3>Labelling and storage</h3>
+
+<p>Label the jars <strong>underneath</strong>, on the base, not on the side — a side label is a blinding leak the moment the helper turns a jar. Write the date, the red count, the white count and the fraction on a strip of tape on the base of each. Between sessions, store both jars closed, together, away from anywhere a bead can escape into. Recount (or reweigh) at the end of every session and record the numbers; Section 10 explains what to do when they have drifted.</p>
+
+<h2>4 &nbsp;The blinding procedure</h2>
+
+<p>Blinding is two people with two jobs and one rule between them. Assign the roles out loud at the start of every session and do not swap them mid-block.</p>
+
+<table class="simple">
+  <tr><th></th><th>Role H — the helper (dealer)</th><th>Role G — the guesser</th></tr>
+  <tr><td><strong>Sees</strong></td><td>The tally sheet including <code>true_jar</code>; both jars; the drawn beads.</td><td>Only the drawn beads on the tray, and the cut card.</td></tr>
+  <tr><td><strong>Does not see</strong></td><td>Nothing is hidden from H.</td><td>The jars, the helper's hands during the draw, the tally sheet, and any indication of whether previous guesses were right.</td></tr>
+  <tr><td><strong>Writes</strong></td><td><code>guess</code>, dictated by G. Notes in the margin.</td><td>Nothing during the block. G may keep a private tick sheet of their own guesses if they want, but does not touch the tally sheet.</td></tr>
+  <tr><td><strong>Says</strong></td><td>"Ready" when the tray is presented. Nothing else.</td><td>"A" or "B". Nothing else.</td></tr>
+</table>
+
+<div class="box definition">
+  <span class="box-tag">The one rule</span>
+  <strong>No information about the true jar reaches G until the block is over.</strong> Not the label, not the correctness of a guess, not a reaction, not a running score. Everything else in this section is a means to that end.
+</div>
+
+<p>Practical measures, in decreasing order of importance:</p>
+
+<ul>
+  <li><strong>Physical separation.</strong> H draws with the jars below the table edge, behind a propped-up book, or in the next room. G looks at the tray, not at H.</li>
+  <li><strong>Identical presentation.</strong> Every trial's beads arrive on the same white tray, spread in one layer, by the same motion. If the $n = 200$ trials arrive in a bowl and the $n = 10$ trials on a saucer, that is fine — but it must depend only on $n$, which G already knows.</li>
+  <li><strong>The <code>correct</code> column is filled in later.</strong> H writes only <code>guess</code> during the block. At the end of the block, H unfolds the sheet and fills the <code>correct</code> column from <code>true_jar</code> and <code>guess</code>. Doing it per-trial is a temptation to react.</li>
+  <li><strong>Both jars are handled every trial.</strong> A useful trick: H picks up both jars, then draws from the one the sheet names. Otherwise the sound of a single jar being lifted, or a fixed hand, becomes a cue.</li>
+  <li><strong>G knows the decision rule and should.</strong> Blinding is about the <em>true label only</em>. G should have the cut card in front of them and should apply it mechanically. Withholding the rule does not make the experiment purer; it just means you measure G's intuition instead of the sampling law, which is not what the arm exists for.</li>
+</ul>
+
+<div class="box example">
+  <span class="box-tag">The blinding smoke test, and what it can and cannot detect</span>
+  <p>Before the first real block, run <strong>20 trials at $n = 0$</strong>: H follows the sheet, picks up both jars, goes through the whole motion, and presents an <em>empty</em> tray. G guesses anyway. There is no information in an empty tray, so G should score about 50%.</p>
+  <p>Be honest about what this buys. With 20 trials the 95% Wilson interval around an observed 10/20 runs from 0.30 to 0.70, and even 14 correct out of 20 gives $[0.48,\ 0.86]$, which does not exclude chance. So the smoke test catches a <em>blatant</em> leak — G scoring 18/20 because one jar squeaks — and nothing subtler. The real defence against a subtle leak is procedural: identical jars, identical beads, physical separation, no feedback. Statistics cannot rescue a leaky procedure at 20 trials, or at 400.</p>
+  <p>Record the control in the notebook. If you also want it in the repository, put it in <code>notebook/beads/</code> rather than <code>python/data/beads/</code>: <code>experiments/week12_beads.py</code> reads <em>every</em> <code>*.csv</code> in the data directory and skips only rows whose <code>run</code> column starts with <code>RUNTEMPLATE</code>, so a control run left there would be pooled into the plain arm and appear as an $n = 0$ point. That would not corrupt the fit — <code>fit_power_law</code> keeps only strictly positive $n$, so the point is dropped automatically — but it would appear in the <code>accuracy_by_n</code> printout and in the figure without explanation, and an unexplained point is worse than no point.</p>
+</div>
+
+<h2>5 &nbsp;Drawing with replacement, and how to afford it</h2>
+
+<p>Every formula in Week 6 assumes the $n$ beads in a trial are <strong>independent draws with replacement</strong>: each one red with probability exactly $p$, regardless of what came before. Without replacement the count is hypergeometric rather than binomial, the variance picks up a finite-population correction, and every number on the design page is quietly wrong.</p>
+
+<p>The literal implementation — draw one bead, record its colour, put it back, shake, repeat — is exactly right and completely impractical. At three seconds per cycle, one $n = 200$ trial takes ten minutes of drawing alone, and there are eighty such trials in the plan. That is thirteen hours for one draw size.</p>
+
+<div class="box definition">
+  <span class="box-tag">The scoop rule — the compromise this protocol uses</span>
+  <p>Draw in <strong>scoops of 20–25 beads</strong>. Spread a scoop on the tray, count its reds, return the whole scoop to the jar, close the jar and shake for five seconds, then take the next scoop. Add the sub-counts to get the trial's red total.</p>
+  <table class="simple">
+    <tr><th>$n$</th><td>10</td><td>25</td><td>50</td><td>100</td><td>200</td></tr>
+    <tr><th>scoops (of 25)</th><td>1 (count out 10)</td><td>1</td><td>2</td><td>4</td><td>8</td></tr>
+  </table>
+  <p>Within a scoop the draws are <em>without</em> replacement; between scoops they are independent, because everything went back and the jar was shaken. So the trial's total is a sum of independent, slightly-under-dispersed sub-counts rather than an exactly binomial count.</p>
+</div>
+
+<p>How much does that cost? The finite-population correction multiplies the variance of a sub-count of size $s$ from a jar of $N$ by $(N-s)/(N-1)$, so the standard deviation shrinks by $\sqrt{(N-s)/(N-1)}$ and $d'$ is inflated by the reciprocal:</p>
+
+<table class="simple">
+  <tr><th>Jar size $N$</th><th>Scoop $s$</th><th>$\sqrt{(N-s)/(N-1)}$</th><th>$d'$ inflated by</th><th>Effect on predicted accuracy at $n = 200$ (30/35)</th></tr>
+  <tr><td>1000</td><td>25</td><td>0.9879</td><td>+1.2%</td><td>$0.7748 \to 0.7776$</td></tr>
+  <tr><td>1000</td><td>50</td><td>0.9746</td><td>+2.6%</td><td>$0.7748 \to 0.7806$</td></tr>
+  <tr><td>500</td><td>25</td><td>0.9757</td><td>+2.5%</td><td>$0.7748 \to 0.7805$</td></tr>
+  <tr><td>500</td><td>100</td><td>0.8955</td><td>+11.7%</td><td>$0.7748 \to 0.8005$</td></tr>
+</table>
+
+<p>The first three rows are shifts of well under one accuracy point, an order of magnitude smaller than your $\pm 0.15$ error bars, and they are <em>documented</em> rather than hidden. The last row is not: a scoop of 100 from a jar of 500 is a fifth of the jar and the correction is real. <strong>Keep the scoop at or below 25, and keep the jar at or above 500.</strong> Then write one sentence in the report saying you drew in scoops of 25 with replacement between scoops, and that the residual finite-population effect inflates $d'$ by about 1%. A reviewer who spots it will find you already there.</p>
+
+<div class="box pitfall">
+  <span class="box-tag">The tempting shortcut, and why it is not available</span>
+  <p>"Just scoop all 200 at once, count, and put them back." From a jar of 1000 that is a fifth of the jar in one grab: $\sqrt{(1000-200)/999} = 0.895$, so your $d'$ is 11.7% larger than the formula says at $n = 200$ and unchanged at $n = 10$. That is not a constant offset you can wave at — it is a <em>distortion of the shape of the curve</em>, biasing the fitted exponent upward, in exactly the direction that makes the result look better. A systematic error that flatters your hypothesis is the worst kind there is.</p>
+</div>
+
+<h2>6 &nbsp;The trial loop, step by step</h2>
+
+<p>One trial. H and G both work from this list until it is automatic.</p>
+
+<div class="box bead">
+  <span class="box-tag">The loop</span>
+  <ol>
+    <li><strong>H</strong> reads the next row of the sheet: its <code>trial</code> number, its <code>n</code>, and its <code>true_jar</code> letter. Says the trial number and $n$ out loud ("trial 43, twenty-five beads") so that G writes nothing down wrong later. Does <em>not</em> say the letter.</li>
+    <li><strong>H</strong> picks up both jars, takes the one the sheet names, and shakes it for five seconds with the lid on.</li>
+    <li><strong>H</strong> draws one scoop (20–25 beads) and levels it off. <strong>Counts the total.</strong> If it is not the intended scoop size, tips the whole scoop back, shakes, and draws again — this is legitimate, because the decision to redraw was made on the <em>number</em> of beads before anybody looked at the colours.</li>
+    <li><strong>H</strong> spreads the scoop on the tray. If this is a dropout trial, apply the discard mask now (Section 8) before going on.</li>
+    <li><strong>G</strong> counts the reds by moving them one at a time into the small dish. Never count past ten in your head. Says the sub-count out loud; H writes it in the margin.</li>
+    <li><strong>H</strong> sweeps the whole scoop — reds and whites, from tray and dish — back into the jar, closes it, and shakes for five seconds.</li>
+    <li>Repeat steps 3–6 until the trial's $n$ beads have been drawn. Add the sub-counts. For $n = 10$, count exactly ten beads out rather than using the scoop.</li>
+    <li><strong>G</strong> reads the total red count against the cut card (Section 7), says "A" or "B", and says nothing else.</li>
+    <li><strong>H</strong> writes the letter in the <code>guess</code> column, says "next", and shows no reaction of any kind.</li>
+  </ol>
+  <p>At the end of the block, and only then: H unfolds the sheet and fills in the <code>correct</code> column, $1$ where <code>guess</code> matches <code>true_jar</code> and $0$ otherwise.</p>
+</div>
+
+<div class="box warning">
+  <span class="box-tag">The redraw rule, stated precisely, because it is the one that can quietly corrupt everything</span>
+  <p>You may abandon and redraw a scoop <strong>only for a mechanical reason declared before anyone has looked at the colours</strong>: the scoop came out with the wrong number of beads, a bead fell on the floor, two beads were stuck together, the tray was knocked.</p>
+  <p>You may <strong>never</strong> redraw because the count looked surprising. "That can't be right, there are hardly any reds" is the sound of a result being manufactured. Surprising counts are what a random sample produces, and discarding the surprising ones narrows your distribution and inflates your accuracy — the exact effect you are trying to measure, arriving from the wrong source.</p>
+  <p>If you catch yourself wanting to redraw for that reason, record the trial as it stands and write "wanted to redraw here, did not" in the margin. That note is worth more to the project than the trial is.</p>
+</div>
+
+<h3>Session structure</h3>
+
+<p>Work in blocks of one draw size at a time, in whatever order the printed sheet has them (the template groups them by $n$). Set the timer for 45 minutes; take a real 10-minute break; recount nothing from memory afterwards. Two blocks per sitting is a good day; three is where mistakes start.</p>
+
+<h2>7 &nbsp;The cut card</h2>
+
+<p>G does not decide anything. G applies a threshold. The optimal rule for this problem is Week 5's log-likelihood ratio specialized to the binomial, and it comes out as a single threshold on the red count: <strong>guess B if reds $\ge$ cut</strong>. Setting the log-likelihood ratio to zero with equal priors gives the cut as a fraction of the number of beads,</p>
+
+$$f \;=\; \frac{\log\!\big((1-p_A)/(1-p_B)\big)}{\log\!\big(p_B(1-p_A) \,/\, p_A(1-p_B)\big)},$$
+
+<p>which is $f = 0.32462$ for the 30/35 jars and $f = 0.34889$ for 30/40. Both are within $0.002$ of the obvious midpoint $\bar p$, which is a pleasant fact and not a coincidence — the two agree exactly in the limit of small contrast.</p>
+
+<table class="simple">
+  <tr><th>$n$ (beads seen)</th><td>10</td><td>25</td><td>50</td><td>100</td><td>200</td></tr>
+  <tr><th>30/35 jars: guess B if reds $\ge$</th><td>4</td><td>9</td><td>17</td><td>33</td><td>65</td></tr>
+  <tr><th>30/40 jars: guess B if reds $\ge$</th><td>4</td><td>9</td><td>18</td><td>35</td><td>70</td></tr>
+</table>
+
+<p>Print the row for the design you are running, in large type, and tape it where G can see it without moving. That both removes a source of human variability and keeps the arm a test of the <em>sampling</em>, which is the only thing it was ever able to test.</p>
+
+<div class="box example">
+  <span class="box-tag">The dropout arm needs a cut card indexed on survivors, not on $n$</span>
+  <p>In the dropout arm G does not see $n$ beads; G sees $m$ survivors, and $m$ is itself random (Section 8). The rule is the same fraction applied to the number actually seen: <strong>guess B if reds $\ge \lceil f \cdot m \rceil$</strong>. Generate the full lookup table once and print it:</p>
+  <pre><code>import math
+F = 0.324621          # 30/35 jars;  use 0.348889 for 30/40 jars
+for m in range(1, 171):
+    print(m, math.ceil(F * m))</code></pre>
+  <p>An excerpt, for the 30/35 jars: $m = 7 \to 3$, $m = 18 \to 6$, $m = 35 \to 12$, $m = 70 \to 23$, $m = 140 \to 46$. If the printed table is ever unavailable, the fraction rule "guess B if the red <em>fraction</em> is at least 0.325" is equivalent to within one bead at every survivor count you will meet, and one bead of threshold error moves the predicted accuracy by less than 0.002.</p>
+</div>
+
+<h2>8 &nbsp;The dropout arm</h2>
+
+<p>Half the trials are run with a discard rule: draw $n$ beads, then throw each one away independently with probability $q = 0.30$, and let G see only the survivors. This exists to test, physically and with no software involved, the theorem from Week 9 that dropout is simply a relabelling of the data axis:</p>
+
+$$d'(n, q) \;=\; \sqrt{n(1-q)}\;\frac{|p_A-p_B|}{\sqrt{\bar p(1-\bar p)}},$$
+
+<p>so that plotting both arms against the <strong>effective draw size</strong> $n(1-q)$ should make them fall on top of each other. That prediction has teeth only if $q$ is genuinely 0.30, genuinely independent bead by bead, and genuinely blind to colour.</p>
+
+<div class="box warning">
+  <span class="box-tag">"Discard roughly a third by eye" is not an implementation. Three reasons.</span>
+  <ol>
+    <li><strong>It is not blind to colour, and you cannot make it so by intending to be.</strong> This is the fatal one. If your hand is even slightly more likely to sweep away a white bead than a red one, the surviving sample is no longer an unbiased draw from the jar: the survivors' red fraction is not $p$. That does not widen the two distributions, it <em>moves</em> them, and the whole Week 9 theorem — which depends on the discard rule not looking at the bead — is false. You would be measuring something, but not dropout.</li>
+    <li><strong>It has the wrong variance.</strong> True Bernoulli thinning discards a random number of beads, with standard deviation $\sqrt{nq(1-q)}$ — about 6.5 beads at $n = 200$. An eyeballed "about a third" produces very nearly the same number every time. The fluctuation in the survivor count is part of what you are testing (exercise 12.3 asks whether it matters); removing it means you are not testing it.</li>
+    <li><strong>It is not reproducible and not reportable.</strong> You cannot write down what $q$ was, so you cannot plot against $n(1-q)$, so the entire point of the arm evaporates. "Approximately a third" is not a number that can appear in the <code>dropout</code> column of a CSV.</li>
+  </ol>
+</div>
+
+<h3>Two acceptable implementations</h3>
+
+<div class="box definition">
+  <span class="box-tag">Method A · the ten-sided die (conceptually cleanest)</span>
+  <p>Roll a d10 once per drawn bead. Discard the bead if it shows 1, 2 or 3. That is exactly $q = 0.30$, exactly independent, and exactly blind to colour <em>provided you roll before you look at the bead</em> — deal the drawn beads into a row without sorting them, then walk down the row rolling once per bead.</p>
+  <p>A six-sided die cannot produce 0.30: its available probabilities are multiples of $1/6$. If a d6 is all you have, use $q = 2/6 = 0.3333$ (discard on 1 or 2), record <code>0.333333</code> in the <code>dropout</code> column of every affected row, and change <code>DROPOUT</code> at the top of <code>week12_beads.py</code> to match. Do <em>not</em> record 0.30 and use a d6 — <code>accuracy_by_n</code> compares the dropout column to the requested level with a $10^{-9}$ tolerance, so mismatched rows silently vanish from the analysis.</p>
+  <p>The cost: 200 die rolls in an $n = 200$ trial, which roughly doubles the time for that block. Real, but honest.</p>
+</div>
+
+<div class="box definition">
+  <span class="box-tag">Method B · the pre-printed discard mask (recommended)</span>
+  <p>Generate a long strip of 0s and 1s from a seeded generator, with $P(\text{discard}) = 0.30$, print it in blocks of ten with the seed and the date at the top, and walk down it one entry per bead. Cross off each entry as you use it so you never reuse a position.</p>
+  <pre><code>import numpy as np
+rng = np.random.default_rng(2026)      # write this seed on the printed strip
+mask = (rng.random(4000) &lt; 0.30).astype(int)
+print("".join(map(str, mask)))</code></pre>
+  <p>Why this is better than the die in practice: it is <strong>auditable</strong>. The mask is a file, produced by a named seed, committed alongside the tally. Anyone can regenerate it and check that the number of survivors you recorded is consistent with the mask you say you used. A die roll leaves no trace.</p>
+  <p>Why it is still blind to colour: the mask is generated before any bead is drawn and consumed strictly in order. Lay the drawn beads in a row in the order they came off the tray, without rearranging them, and apply the mask left to right.</p>
+</div>
+
+<div class="box example">
+  <span class="box-tag">The survivor-count check — do this at the end of every dropout block</span>
+  <p>Write each trial's survivor count $m$ in the margin. The number of survivors is $\mathrm{Binomial}(n, 0.7)$, so at $n = 200$ you expect $140$ with a standard deviation of $\sqrt{200 \times 0.3 \times 0.7} = \sqrt{42} = 6.48$. Averaged over the 40 trials of a block, the mean survivor count has a standard deviation of $6.48/\sqrt{40} = 1.02$.</p>
+  <p><strong>So a block whose mean survivor count is outside $140 \pm 2$ is a block with a broken discard procedure</strong> — you skipped mask entries, reused them, or drifted into eyeballing. That is a two-sigma check on a quantity you get for free, and it is the only independent evidence you will ever have that $q$ was really 0.30.</p>
+  <p>The same check at the other draw sizes: expect $7 \pm 0.2$, $17.5 \pm 0.4$, $35 \pm 0.5$, $70 \pm 0.7$ (mean over 40 trials, one standard deviation).</p>
+</div>
+
+<h2>9 &nbsp;Recording</h2>
+
+<p>The paper sheet is the primary record. The CSV is a transcription of it. Both are kept forever.</p>
+
+<div class="box python">
+  <span class="box-tag">The CSV format — exactly what <code>celldetect.beads</code> expects</span>
+  <p>Seven columns, these names, in this order (this is <code>beads.TALLY_FIELDS</code>):</p>
+  <pre><code>run,n,dropout,trial,true_jar,guess,correct
+run01,10,0.0,1,A,B,0
+run01,10,0.0,2,B,B,1</code></pre>
+  <table class="simple">
+    <tr><th>Column</th><th>Type</th><th>Meaning and rules</th></tr>
+    <tr><td><code>run</code></td><td>text</td><td>A label for the sitting, e.g. <code>run03</code>. Unique per file. Must not start with <code>RUNTEMPLATE</code> unless the file really is a blank template — <code>week12_beads.py</code> skips those rows.</td></tr>
+    <tr><td><code>n</code></td><td>integer</td><td>Beads <em>drawn</em> for the trial — the nominal $n$, not the number that survived dropout. The effective size $n(1-q)$ is computed in the analysis, not recorded here.</td></tr>
+    <tr><td><code>dropout</code></td><td>float</td><td><code>0.0</code> for the plain arm, <code>0.3</code> for the dropout arm. Whatever value you actually used, to the digit. Compared with a $10^{-9}$ tolerance in <code>accuracy_by_n</code>.</td></tr>
+    <tr><td><code>trial</code></td><td>integer</td><td>Trial number within the run, starting at 1 and <strong>continuing across draw sizes</strong> — the template numbers 1 to 200 straight through, and <code>validate_tally</code> flags duplicate <code>(run, trial)</code> pairs.</td></tr>
+    <tr><td><code>true_jar</code></td><td><code>A</code> or <code>B</code></td><td>Pre-randomized, filled in by <code>write_tally_template</code> before the run, covered during it.</td></tr>
+    <tr><td><code>guess</code></td><td><code>A</code> or <code>B</code></td><td>What G said, before anyone looked. Never left blank.</td></tr>
+    <tr><td><code>correct</code></td><td><code>0</code> or <code>1</code></td><td>$1$ if <code>guess == true_jar</code>. Deliberately redundant.</td></tr>
+  </table>
+  <p>The redundancy in <code>correct</code> is a <strong>checksum</strong>, not sloppiness. A typo in <code>guess</code> that is not matched by a typo in <code>correct</code> shows up as a validator error instead of silently shifting your accuracy by 2.5 percentage points. <code>beads.validate_tally</code> checks it on every row, and that is the check that fires most often in practice.</p>
+</div>
+
+<div class="box warning">
+  <span class="box-tag">The same-day transcription rule</span>
+  <p><strong>Photograph the paper sheet and type it into a CSV on the day you fill it in.</strong> Not the next weekend. A tally sheet you cannot read in a month is a dataset you no longer have, and "is that a 6 or a b" is not a question with a scientific answer.</p>
+  <p>The full sequence, every session, in this order:</p>
+  <ol>
+    <li>Photograph the <em>blank</em> sheet, <code>true_jar</code> column visible, <strong>before</strong> the session starts. This timestamps the randomization and makes it impossible to retro-fit the true labels afterwards. Save it to <code>notebook/beads/</code>.</li>
+    <li>Run the session.</li>
+    <li>Photograph the <em>completed</em> sheet, including the margin notes and the sub-counts. Save it to <code>notebook/beads/</code>.</li>
+    <li>Type the rows into <code>python/data/beads/runNN.csv</code> the same day.</li>
+    <li>Check the row count against the sheet, out loud, twice.</li>
+    <li>Run the validator and read its output — including the times you are certain it is fine:
+    <pre><code>python -c "from celldetect.beads import load_tally, validate_tally; \
+p = validate_tally(load_tally('data/beads/run01.csv')); \
+print('\n'.join(p) if p else 'clean')"</code></pre>
+    (or simply run <code>python experiments/week12_beads.py</code>, which validates before it plots anything).</li>
+    <li>Record in <code>progress/weekNN.md</code>: trials completed at each $n$, the cumulative total, who ran them, the tally file name, the scan file name, the validator's output, and anything that went wrong.</li>
+    <li>Commit the CSV and the scan.</li>
+  </ol>
+</div>
+
+<div class="box pitfall">
+  <span class="box-tag">Never edit a committed tally to make a message go away</span>
+  <p>When the validator fires, go back to the photograph. If the paper is unambiguous, correct the transcription and record the correction in the progress log, naming the line and the change. If the paper is ambiguous, keep the row and note it as an unresolved discrepancy. If a whole run is compromised, exclude it <em>by name</em> in the analysis, say so in the report, and state how many trials that cost you.</p>
+  <p>All four of those are defensible in front of a reviewer. Silently editing the file is not, and it is precisely how a null result quietly becomes a positive one.</p>
+</div>
+
+<h2>10 &nbsp;Things that will go wrong</h2>
+
+<p>Every item here has happened to somebody. None of them is a disaster if you know the response in advance, and all of them are a disaster if you improvise.</p>
+
+<h3>10.1 &nbsp;The helper starts alternating jars</h3>
+
+<p><strong>What it looks like:</strong> H stops trusting the sheet. "It's said A three times, that can't be right." Or the sheet gets set down during a break and H carries on from memory. Or H is genuinely following it but has lost their place and is off by a row, which is worse, because then every subsequent <code>true_jar</code> is wrong by one.</p>
+
+<p><strong>Why it is fatal:</strong> a guesser who unconsciously detects excessive alternation scores above chance without using the beads, biasing every point upward. <code>validate_tally</code> catches only the extreme case of a run whose jar never changes; it does not catch alternation at all.</p>
+
+<div class="box example">
+  <span class="box-tag">The switch count — a hand check that does catch it</span>
+  <p>In a block of $T$ trials, count how many times the <code>true_jar</code> letter <em>changes</em> from one row to the next. Under fair randomization that count is $\mathrm{Binomial}(T-1, \tfrac12)$:</p>
+  $$E[\text{switches}] = \frac{T-1}{2}, \qquad \mathrm{sd} = \frac{\sqrt{T-1}}{2}.$$
+  <p>For a 40-trial block: expect $19.5 \pm 3.1$. Thirty switches is a $3.4$-sigma event and means somebody was alternating. Fewer than 10 means somebody was streaking. Across a full 200-row sheet: expect $99.5 \pm 7.0$.</p>
+  <p>A second, cruder check: the longest run of identical letters in 40 fair flips is usually 5 or 6. A longest run of 1 (perfect alternation) or of 12 both scream, from opposite directions.</p>
+  <p><strong>Do this check on the pre-printed sheet before the session</strong> as well as after. The sheet comes from a seeded generator and will pass; the point of checking before is that you learn what a passing number looks like, so the failing one is recognizable.</p>
+</div>
+
+<p><strong>Response:</strong> if you find the sheet was not followed, the affected block is compromised. Keep every row, mark the block in the progress log, and report the analysis both with and without it — "the fitted exponent was 0.41 with run 03 included and 0.44 with it excluded" is an honest sentence and a strong one. To prevent recurrence: H reads the trial number out loud every trial, and G writes it on their private tick sheet, so a lost place is caught within one row.</p>
+
+<h3>10.2 &nbsp;The guesser can tell the difference</h3>
+
+<p><strong>What it looks like:</strong> G is scoring far above the predicted accuracy, especially at small $n$ where the prediction is barely above chance. At $n = 10$ the theory says 57%; if G is running at 80% over 40 trials, they are not reading the beads. (Quantitatively: 32/40 correct has a Wilson interval of $[0.65, 0.90]$, which excludes 0.567 — that is a real signal, not luck.)</p>
+
+<p><strong>Where the leak usually is,</strong> in order of frequency: the two jars are not identical (different weight when lifted, different sound, one lid is stiffer); the beads are not identical (size or gloss differs, so G is reading the beads rather than the count); H reacts (a pause before writing, a glance); H's grip or position differs between jars; the tally sheet is visible in a reflection or from an angle; the fill levels differ because the jars have unequal totals.</p>
+
+<p><strong>Response:</strong> stop the session. Do not finish the block "since we're here" — every additional trial is contaminated data you will then have to argue about. Find the leak, fix it, and start a <em>new run</em> with a new label. Keep the compromised run in the repository with a note in the progress log saying what the leak was and when it was found. Then repeat the $n = 0$ smoke test before restarting.</p>
+
+<h3>10.3 &nbsp;Beads stick together</h3>
+
+<p><strong>What it looks like:</strong> a scoop meant to hold 25 delivers 26 or 24, or two beads come out fused by static and get counted as one. Plastic in dry air is the usual culprit; beads straight out of a plastic bag are the worst.</p>
+
+<p><strong>Why it matters:</strong> if the scoop's true size wobbles, the trial's $n$ is not the $n$ you recorded, and the schema has nowhere to record the real one. And a stuck pair counted as one bead undercounts the total, which shifts the red <em>fraction</em> in whichever direction the stuck pair happened to be — a small, random, but avoidable error.</p>
+
+<p><strong>Response:</strong> count the total in every scoop, not just the reds — you are spreading them on a tray anyway, and counting to 25 costs three seconds. If the total is wrong, tip the whole scoop back, shake, and redraw (legitimate under the redraw rule, because the decision was made on the count and not on the colours). Prevention: wipe the beads down before the first session and let them sit out of the bag overnight; a slightly humid room is your friend; do not run the experiment on a carpet in winter.</p>
+
+<h3>10.4 &nbsp;A trial is interrupted</h3>
+
+<p><strong>What it looks like:</strong> the doorbell, a sibling walking through, a phone call mid-count, someone picking up a jar to look at it.</p>
+
+<p><strong>Response, by case:</strong></p>
+<ul>
+  <li><strong>Interrupted mid-draw, nothing revealed:</strong> return everything to the jar, shake, and restart the trial from step 2. Note it in the margin. The trial is not compromised — no information about the true jar reached G.</li>
+  <li><strong>Interrupted after the beads are presented but before the guess:</strong> finish the trial. G has already seen what they will see; delay does not corrupt it. Note the delay.</li>
+  <li><strong>The true jar was revealed</strong> (someone said the letter, G saw the sheet, H reacted): the trial is compromised. <strong>Record it anyway</strong>, with whatever guess G makes, and mark it in the margin and in the progress log with the trial number. Never leave a blank and never delete the row.</li>
+</ul>
+
+<p><strong>What an exclusion costs, so you can say it:</strong> dropping 3 compromised trials from a 40-trial block leaves 37; if the accuracy was 26/40 = 0.650 and the excluded trials were all correct, it becomes 23/37 = 0.622. The Wilson half-width grows from about 0.142 to about 0.149. So a handful of exclusions moves a point by a few percentage points and widens its interval slightly — small compared to the interval itself. Say so, with those numbers, rather than agonizing.</p>
+
+<h3>10.5 &nbsp;You lose count</h3>
+
+<p><strong>What it looks like:</strong> half way through a scoop of 25 you cannot remember whether you were at 12 or 13. Or you counted a trial's five sub-counts and the running total does not match what you wrote.</p>
+
+<p><strong>Response:</strong> this is why the small dish exists. Never hold a count in your head past ten — move each red bead physically into the dish as you count it, so the count is a pile and not a memory, and if you are interrupted the pile is still there. If you lose count anyway, tip that <em>scoop</em> back, shake, and redraw it (mechanical reason, declared before the colours were resolved). The other scoops of the trial stand: they were independent draws, and the redrawn scoop is a fresh independent draw from the same jar.</p>
+
+<p>Write sub-counts down as you go — that is what the margin is for. "17 = 6+5+3+3" is a checkable record; "17" is a claim.</p>
+
+<h3>10.6 &nbsp;A bead escapes</h3>
+
+<p><strong>What it looks like:</strong> a bead rolls under the fridge and is gone.</p>
+
+<p><strong>Why it matters, quantitatively:</strong> losing one red from a jar of 1000 moves $p_A$ from $0.3000$ to $299/999 = 0.29930$, a change of $0.0007$ — negligible against a contrast of $0.05$. Losing ten reds moves it to $290/990 = 0.29293$, a change of $0.007$, which is 14% of the contrast and therefore 14% of $d'$. <strong>One bead is noise; ten beads is a wrong theory curve.</strong></p>
+
+<p><strong>Response:</strong> look for it. If it is unrecoverable, note the colour and the jar in the log immediately — the count on the jar's base label is now wrong and must be updated. Recount or reweigh both jars at the end of every session; if a jar has drifted by more than 5 beads from spec, restore it to spec, record the date, and note which sessions fell on which side of the correction.</p>
+
+<h3>10.7 &nbsp;There is nobody to be the helper</h3>
+
+<p><strong>Response:</strong> the helper's job needs no understanding of the project — Section 2 is the whole thing, and it takes two minutes to read. A parent, a sibling, a friend, or a classmate can do it. Twenty minutes of somebody's time gets you a block.</p>
+
+<p>What you must <em>not</em> do is run both roles yourself. There is no self-blinding scheme that survives contact with a person who knows the design, and the arm's entire value is that its result cannot be explained by the experimenter. If you genuinely cannot recruit anyone, say so, run the arm as an unblinded demonstration, and label every claim from it <span class="claim observed">observed</span> with the word "unblinded" attached — a weaker result honestly labelled is worth more than a strong one that a reviewer can dismiss in one sentence.</p>
+
+<h2>11 &nbsp;How long this actually takes</h2>
+
+<p>Do this arithmetic before you commit to a design, because the answer is the reason the trial budget is 40 and not 350.</p>
+
+<div class="box example">
+  <span class="box-tag">The time model</span>
+  <p><strong>Per scoop of 25 beads:</strong> scoop and level 5&nbsp;s, spread on tray 3&nbsp;s, count reds into the dish 8&nbsp;s, sweep back 4&nbsp;s, close and shake 5&nbsp;s $=$ <strong>25&nbsp;s, or 1.0&nbsp;s per bead handled.</strong> That is a brisk but sustainable pace, and it is faster than you will manage in the first half hour.</p>
+  <p><strong>Fixed overhead per trial:</strong> H reads the sheet and fetches the jar 10&nbsp;s, G applies the cut card and answers 5&nbsp;s, both write 10&nbsp;s, settling and jar swap 10&nbsp;s $\approx$ <strong>40&nbsp;s.</strong></p>
+  <p>So a trial costs about $n \times 1.0 + 40$ seconds:</p>
+  <table class="simple">
+    <tr><th>$n$</th><th>seconds per trial</th><th>40 trials</th><th>share of the arm</th></tr>
+    <tr><td>10</td><td>50</td><td>33 min</td><td>9%</td></tr>
+    <tr><td>25</td><td>65</td><td>43 min</td><td>11%</td></tr>
+    <tr><td>50</td><td>90</td><td>60 min</td><td>15%</td></tr>
+    <tr><td>100</td><td>140</td><td>93 min</td><td>24%</td></tr>
+    <tr><td>200</td><td>240</td><td>160 min</td><td>41%</td></tr>
+    <tr><th>Plain arm total</th><td></td><th>389 min $\approx$ 6 h 30 m</th><td>100%</td></tr>
+  </table>
+  <p>The dropout arm draws the same beads and then applies the mask (roughly $+0.3$&nbsp;s per bead) but has 30% fewer beads to count (roughly $-0.25$&nbsp;s per bead), so it comes out at very nearly the same cost. <strong>Both arms: about 13 hours of table time</strong>, before breaks, setup, transcription or anything going wrong. With realistic breaks and the inevitable restarts, budget <strong>16 to 18 hours</strong>, spread over 8 to 10 sittings across Weeks 11 and 12.</p>
+  <p>Week 6's chapter quotes "six to ten hours". That is the optimistic end of this same arithmetic and it holds only if you can sustain 25 beads a minute without error for two hours at a stretch. Plan for the larger number and be pleased if you beat it.</p>
+</div>
+
+<p>Two consequences you should take seriously.</p>
+
+<p><strong>The $n = 200$ block is 41% of the arm.</strong> Two-thirds of your table time goes on the two largest draw sizes. That is not waste — the top of the range is where the curve has risen far enough to be measurable, and dropping the endpoint is the worst possible cut for a slope fit — but it does mean that if a session collapses, it will be that one.</p>
+
+<p><strong>And here is why the budget is 40.</strong> Week 6's sample-size calculation says pinning an accuracy near 0.65 to $\pm 0.05$ needs <code>trials_needed(0.65, 0.05)</code> $= 350$ trials <em>per point</em>. Scale the table above by $350/40 = 8.75$: the plain arm alone becomes 57 hours, both arms 113 hours, roughly a quarter of a million bead draws. That is not a student project; it is a summer job. So the honest options are the three in Week 6, Section 6 — and the free one, the one that costs nothing but a different bead count when you fill the jars, is to <strong>widen the contrast to 30/40</strong>, which buys about 94% power at the same 40 trials per point.</p>
+
+<div class="box bead">
+  <span class="box-tag">The design numbers, in one place</span>
+  <p>Predicted accuracy $\Phi(d'/2)$ with $d' = \sqrt{n(1-q)}\,|p_A-p_B| / \sqrt{\bar p(1-\bar p)}$. These are the numbers <code>experiments/week06_bead_design.py</code> prints, and they were written down before a single bead was drawn — which is what makes Week 12 a test rather than a description.</p>
+  <table class="simple">
+    <tr><th>$n$</th><th>30/35, $q=0$</th><th>30/35, $q=0.3$</th><th>30/40, $q=0$</th><th>30/40, $q=0.3$</th><th>trials for $\pm0.05$</th></tr>
+    <tr><td>10</td><td>0.567</td><td>0.556</td><td>0.630</td><td>0.609</td><td>378</td></tr>
+    <tr><td>25</td><td>0.605</td><td>0.588</td><td>0.700</td><td>0.670</td><td>368</td></tr>
+    <tr><td>50</td><td>0.647</td><td>0.624</td><td>0.771</td><td>0.732</td><td>351</td></tr>
+    <tr><td>100</td><td>0.703</td><td>0.672</td><td>0.853</td><td>0.810</td><td>321</td></tr>
+    <tr><td>200</td><td>0.775</td><td>0.736</td><td>0.931</td><td>0.893</td><td>269</td></tr>
+  </table>
+  <p>Planned budget: 5 draw sizes $\times$ 40 trials $\times$ 2 arms $= 400$ trials, and $2 \times 40 \times (10+25+50+100+200) = 30{,}800$ individual bead draws. At 40 trials each point carries a 95% interval of roughly $\pm 0.15$, which is wider than the whole 30/35 effect and about half the 30/40 effect. Plot those bars, make them visible, and do not apologize for them: you predicted their width in Week 6, which converts "my experiment was underpowered" into "my experiment was correctly characterized before I ran it".</p>
+</div>
+
+<h2>12 &nbsp;Pre-flight checklist</h2>
+
+<div class="box verify">
+  <span class="box-tag">Before the helper sits down — tick every line</span>
+  <ul>
+    <li><strong>Jars.</strong> Both counted, both verified by two methods, both totals equal, the difference in red counts checked directly against spec. Counts written on the base label with today's date.</li>
+    <li><strong>Containers.</strong> Identical, opaque, same lid, same fill level. Labels underneath only.</li>
+    <li><strong>Beads.</strong> Segregation check done at least once (top scoops match the jar fraction). Beads wiped, not straight from the bag.</li>
+    <li><strong>Sheet.</strong> Printed from <code>experiments/week06_bead_design.py</code> (SEED 106). Switch count checked and in range ($19.5 \pm 3.1$ per 40 rows). Folded so <code>true_jar</code> is hidden. <strong>Photographed blank, with the true labels visible, and saved to <code>notebook/beads/</code>.</strong></li>
+    <li><strong>Cut card.</strong> Printed for the design you are actually running, taped where G can see it without moving.</li>
+    <li><strong>Dropout sessions.</strong> Mask strip printed with its seed on it, or the d10 located. The <code>dropout</code> value you will record decided and written at the top of the sheet.</li>
+    <li><strong>Kit.</strong> Scoop, tray, small dish, pen, timer, camera. Phone face down.</li>
+    <li><strong>Roles.</strong> Assigned out loud. H has read Section 2. The no-feedback rule stated by both people.</li>
+    <li><strong>Stopping point.</strong> Which block, how many trials, written down <em>before</em> starting. Stopping when the numbers look good is how a result gets manufactured.</li>
+    <li><strong>Smoke test.</strong> If this is the first session, or anything about the jars has changed, run the 20 trials at $n = 0$ first.</li>
+  </ul>
+</div>
+
+<h2>13 &nbsp;Post-session checklist</h2>
+
+<div class="box verify">
+  <span class="box-tag">Before you leave the table — and all of it the same day</span>
+  <ul>
+    <li><strong>No blanks.</strong> Every started row has a <code>guess</code>. Every row has a <code>correct</code>, filled in after the block, not during it.</li>
+    <li><strong>Photograph the completed sheet</strong>, margin notes and sub-counts included, into <code>notebook/beads/</code>.</li>
+    <li><strong>Switch count</strong> on the block's <code>true_jar</code> column: within $19.5 \pm 3.1$ for 40 rows? Record the number, not just "fine".</li>
+    <li><strong>Survivor-count check</strong> (dropout sessions): block mean within $\pm 2$ of $0.7n$? Record it.</li>
+    <li><strong>Recount or reweigh both jars.</strong> Record the counts. Note any bead lost during the session and which jar it came from.</li>
+    <li><strong>Transcribe</strong> to <code>python/data/beads/runNN.csv</code>. Check the row count against the sheet twice, out loud.</li>
+    <li><strong>Validate.</strong> Run <code>validate_tally</code> and paste its output into the progress log — including when it says nothing.</li>
+    <li><strong>Log it.</strong> <code>progress/weekNN.md</code>: trials completed at each $n$, cumulative total against the 500-draw cap in the template, who ran them, the tally file, the scan file, the validator output, and every margin note transcribed.</li>
+    <li><strong>Commit</strong> the CSV and the scan. The tally is the only data in this project that cannot be regenerated; an uncommitted tally is a tally you are one spilled drink away from losing.</li>
+  </ul>
+</div>
+
+<h2>14 &nbsp;The five rules, if you remember nothing else</h2>
+
+<ol>
+  <li><strong>Randomize in advance.</strong> The sheet decides the jar. No human picks "randomly" in the moment.</li>
+  <li><strong>Blind the guesser.</strong> No label, no feedback, no reaction, until the block is over.</li>
+  <li><strong>Draw with replacement.</strong> Every scoop goes back and the jar is shaken before the next one.</li>
+  <li><strong>Never delete a trial.</strong> Annotate, exclude explicitly, report both ways. A deleted trial is invisible; an annotated one is data about your procedure.</li>
+  <li><strong>Transcribe the same day,</strong> validate immediately, and commit.</li>
+</ol>
+
+<p class="muted">Related pages: <a href="../s/week06.html">Week 6</a> for the design and the sample-size arithmetic · <a href="../s/week12.html">Week 12</a> for the analysis, the accuracy-to-$d'$ conversion and the four-arm figure · <a href="problem-bank.html">problem bank</a>, section on the bead experiment · <a href="glossary.html">glossary</a> for any term above · <code>python/data/beads/README.md</code> for the rules as they appear next to the data itself.</p>
+
+</div>
+
+<footer class="site">How Much Data Does It Take to Tell Two Cell Types Apart? · Bead experiment protocol · <a href="../index.html">Course home</a></footer>
+</body>
+</html>

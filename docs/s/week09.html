@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 9 — Dropout, and Where the Law Bends</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="week08.html">← Week 8</a><a href="week10.html">Week 10 →</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Week 9</span>
+      <span class="badge mile">MILESTONE M3</span>
+      <span class="badge aim2">Aim 2 · Simulation</span>
+      <span class="badge win">git tag <code>simulator-validated</code></span>
+    </div>
+    <h1 class="chapter-title">Dropout, and Where the Law Bends</h1>
+    <div class="chapter-sub">Dropout is a relabelling of the depth axis, proved · the collapse test · and the low-depth regime where $\Phi(d'/2)$ fails while the $\sqrt{\text{depth}}$ law does not</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<h2>Objectives</h2>
+<ul class="objectives">
+  <li>Say what dropout is biologically, and quote the rough range of molecular capture efficiency for droplet protocols with the caveat that the number is protocol-dependent and contested.</li>
+  <li>Prove, from Week 2's thinning theorem, that dropout at rate $q$ applied to data of depth $D$ gives exactly the distribution of depth $D(1-q)$ — and name the assumption that makes it work.</li>
+  <li>Explain why that assumption is the suspicious one, in terms of what real dropout actually depends on.</li>
+  <li>Run the collapse test: accuracy against nominal depth for several $q$, then against $D(1-q)$, and show the curves superimposing.</li>
+  <li>Distinguish sharply between "the $\sqrt{\text{depth}}$ law fails" (it does not, in this model) and "the accuracy formula $\Phi(d'/2)$ fails" (it does, at low depth), and say which one the low-depth residual is evidence for.</li>
+  <li>Extend to more than two cell types with <code>multi_type_profiles</code> and <code>posterior_log_odds</code>, and state what changes and what does not.</li>
+  <li>Implement <code>apply_dropout</code>, get <code>tests/test_simulate.py</code> and all earlier tests green, produce the M3 figures and table with SEED 109, and either pass the M3 gate or state precisely why you did not.</li>
+</ul>
+
+<h2>1 &nbsp;What dropout is, before it is mathematics</h2>
+
+<p>Between a messenger RNA molecule sitting in a cell and a count appearing in your matrix, a lot has to go right. The cell has to be captured in a droplet with a barcoded bead. The molecule has to bind an oligo-dT primer. Reverse transcriptase has to convert it to cDNA without falling off. The cDNA has to be amplified without being lost in the reaction, and the resulting fragment has to be sequenced deeply enough to be seen at all.</p>
+
+<p>Each of those steps has an efficiency below 1, and they multiply.</p>
+
+<div class="box biology">
+  <span class="box-tag">Capture efficiency, and how uncertain it is <span class="claim cited">cited</span></span>
+  <p>The fraction of a cell's mRNA molecules that end up as counted UMIs — the <strong>molecular
+  capture efficiency</strong> — is usually quoted for droplet protocols as somewhere in the range of
+  <strong>roughly 10% to 30%</strong>. So a cell containing 300,000 transcripts contributes something
+  like 30,000–90,000 counted molecules, and the "depth" you nominally paid for is not the depth you
+  effectively have.</p>
+  <p>Treat that range with suspicion, and say so out loud when you present it. The number is
+  <em>protocol-dependent</em> (Smart-seq-style plate protocols are usually credited with higher
+  efficiency than droplet ones), it is <em>estimate-dependent</em> (most measurements come from
+  spiked-in synthetic RNA of known concentration, which may not behave like cellular mRNA), it is
+  <em>version-dependent</em> within a single vendor's chemistry, and published values for
+  nominally the same platform differ by more than a factor of two. See Svensson et al. (2017),
+  <em>Nature Methods</em>, and Zheng et al. (2017), <em>Nature Communications</em>, in Section 12.</p>
+  <p class="muted">This is the first place in the project where you have to cite a number you cannot
+  derive. Label it <span class="claim cited">cited</span>, give the range rather than a point value,
+  and — the important part — design the analysis so that nothing depends on which value inside the
+  range is right. Section 2 is what makes that possible.</p>
+</div>
+
+<p>The modelling question is what dropout <em>does</em> to the counts. And the answer, which is the reason this chapter exists, is: nothing you have not already studied.</p>
+
+<h2>2 &nbsp;Dropout is a relabelling of the horizontal axis</h2>
+
+<div class="box theorem">
+  <span class="box-tag">Theorem · dropout equals reduced depth &nbsp;<span class="claim proved">proved</span></span>
+  <p>Let a cell of type $c$ be sequenced to depth $D$, so that its count for gene $g$ is
+  $X_g \sim \mathrm{Poisson}(D p_g^{(c)})$, independently across genes. Suppose each captured
+  molecule is then independently lost with probability $q$, and let $Y_g$ be the surviving count.
+  Then</p>
+  $$Y_g \sim \mathrm{Poisson}\big(D(1-q)\,p_g^{(c)}\big) \quad\text{independently across genes.}$$
+  <p>That is <em>exactly</em> the distribution of a dropout-free experiment run at depth
+  $D_{\text{eff}} = D(1-q)$. No experiment, no statistic, no classifier can tell the two apart,
+  because they are the same probability distribution.</p>
+</div>
+
+<div class="box proof">
+  <span class="box-tag">Proof · it is the thinning theorem, applied once per gene</span>
+  <p>Week 2 proved: if $X \sim \mathrm{Poisson}(\lambda)$ and each of the $X$ items survives
+  independently with probability $s$, then the number of survivors is exactly
+  $\mathrm{Poisson}(s\lambda)$. (Recall the shape of the argument: condition on $X = n$, so the
+  survivors are $\mathrm{Binomial}(n, s)$; sum over $n$; the $n!$ in the Poisson pmf cancels the
+  $n!$ in the binomial coefficient; a change of variable $j = n-m$ turns what is left into the
+  Taylor series for $e^{\lambda(1-s)}$.)</p>
+  <p>Apply that with $\lambda = D p_g^{(c)}$ and survival probability $s = 1-q$:
+  $$Y_g \sim \mathrm{Poisson}\big((1-q)\,D\,p_g^{(c)}\big) = \mathrm{Poisson}\big(D_{\text{eff}}\,p_g^{(c)}\big),
+  \qquad D_{\text{eff}} = D(1-q).$$</p>
+  <p>Independence across genes survives too: the counts $X_1,\dots,X_k$ were independent to begin
+  with, and each is thinned using its own coin flips, so the survivor counts are functions of
+  disjoint collections of independent random variables and are therefore independent.
+  <span class="qed">∎</span></p>
+  <p><strong>Assumptions used:</strong> (i) the counts are Poisson; (ii) each molecule is lost
+  <em>independently</em> of every other molecule; (iii) the loss probability $q$ is the
+  <em>same for every molecule</em> — in particular it does not depend on which gene the molecule
+  belongs to, on how highly that gene is expressed, or on the cell.</p>
+</div>
+
+<p>Three consequences follow immediately, and they are the reason this theorem is worth a whole chapter rather than a footnote.</p>
+
+<div class="box win">
+  <span class="box-tag">What the theorem buys you</span>
+  <ul>
+    <li><strong>Dropout is not a new phenomenon.</strong> It is the depth axis with different tick
+    labels. Every result you have already derived — $d' \propto \sqrt{D}$, $d'\propto\sqrt k$,
+    accuracy $= \Phi(d'/2)$ — carries over unchanged with $D$ replaced by $D(1-q)$. In particular
+    $d'$ falls by a factor $\sqrt{1-q}$: <em>60% dropout costs you a factor $\sqrt{0.4} = 0.63$ in
+    separation, not a factor 0.4.</em></li>
+    <li><strong>You no longer need to know $q$ to test the theory.</strong> Section 1's honest
+    admission that capture efficiency is somewhere between 10% and 30% would be fatal if dropout had
+    its own separate effect. It does not. Whatever $q$ is, it moves you along a curve you have
+    already predicted.</li>
+    <li><strong>The bead experiment tests the same law.</strong> Week 12's physical protocol draws
+    $n$ beads and then discards some by a die roll. That is thinning with the same theorem behind it,
+    so the beads are not a separate analogy — they are the same mathematics with nothing simulated.</li>
+  </ul>
+</div>
+
+<div class="box warning">
+  <span class="box-tag">Now attack assumption (iii), because it is the weak one</span>
+  <p>Real dropout is <strong>not</strong> a single per-molecule coin with a gene-independent
+  probability. At least three things break assumption (iii):</p>
+  <ul>
+    <li><strong>Gene length and sequence.</strong> Reverse transcription efficiency and priming
+    depend on transcript length, GC content and secondary structure, so different genes are
+    genuinely lost at different rates.</li>
+    <li><strong>Expression level.</strong> Much of what the literature calls "dropout" — the excess
+    of zeros in scRNA-seq — is simply what a Poisson at $\lambda = 0.3$ looks like, and needs no
+    extra mechanism at all. Deciding how much is sampling and how much is a real capture failure is
+    a live argument in the field, and the honest position is that the sampling part explains most of
+    it. <span class="claim cited">cited</span></li>
+    <li><strong>Cell-to-cell variation.</strong> Droplets differ in bead quality, lysis and reaction
+    volume, so $q$ varies from cell to cell. A per-cell $q$ that varies is <em>not</em> the same as a
+    fixed average $q$, because the mixture of Poissons it produces is overdispersed.</li>
+  </ul>
+  <p>That last point is the important one, and it is the bridge to Week 11: constant-$q$ dropout
+  preserves the Fano factor at 1 (Week 2's corollary), while <em>variable</em> dropout inflates it
+  above 1. So the failure of assumption (iii) does not show up as "the collapse is slightly off" —
+  it shows up two weeks later as overdispersion, which is a different and much more damaging failure.
+  Write the assumption in your notebook now so that in Week 11 you can point at the line it breaks.</p>
+</div>
+
+<h2>3 &nbsp;The collapse test, and what it looks like as a figure</h2>
+
+<p>A theorem that says "these two things are the same distribution" makes a very specific graphical prediction, and it is one of the most satisfying kinds of figure in science: a <strong>collapse</strong>.</p>
+
+<div class="box definition">
+  <span class="box-tag">The protocol</span>
+  <ol>
+    <li>For each dropout level $q \in \{0, 0.3, 0.6\}$ and each nominal depth $D$, simulate cells,
+    apply dropout, classify with the optimal rule at the <em>effective</em> rates, and measure the
+    test accuracy.</li>
+    <li>Plot accuracy against $D$. You get three separate curves, the higher-$q$ ones shifted down
+    and to the right.</li>
+    <li>Now plot the identical accuracies against $D(1-q)$ instead. If the theorem is right, the
+    three curves land on top of one another, and on the no-dropout theory curve.</li>
+  </ol>
+  Nothing is fitted. There is no scaling parameter chosen to make it work: $1-q$ is known in advance
+  because you chose it.
+</div>
+
+<p>Do it in the lab first, then reproduce it with the experiment script.</p>
+
+<div class="lab">
+  <div class="lab-title">Lab 1 · The collapse, with a switch for the horizontal axis</div>
+  <div class="lab-desc">Blue: measured accuracy with dropout $q$, at each nominal depth. Grey: the same measurement with no dropout at all, as a reference. Orange: the theory curve $\Phi(d'/2)$, which knows nothing about dropout. Move the dropout slider and the blue curve falls away from the grey one. Then tick the box: the horizontal axis becomes the <em>effective</em> depth $D(1-q)$ and the blue points snap onto the grey curve and the orange line. Both axes are $\log_{10}$ of depth, since these plots are only readable on a log axis.</div>
+  <canvas id="w9lab1" height="360"></canvas>
+  <div class="controls" id="w9lab1ctl"></div>
+  <div class="readout" id="w9lab1out"></div>
+</div>
+
+<p>Push the dropout up to 0.8 and look again. The blue curve on the nominal axis has moved a long way — at $D = 1000$ you have lost about nine points of accuracy — and yet on the effective axis it is still sitting on the theory line, just further to the left along it. That is what "the same law" means. The classifier is not doing worse because dropout is a different kind of damage; it is doing worse because it is being handed a shallower experiment.</p>
+
+<div class="box pitfall">
+  <span class="box-tag">The mistake that makes the collapse look broken</span>
+  <p>When you classify dropped-out data, the rule must use the <strong>effective</strong> rates
+  $D(1-q)p_g$, not the nominal ones $Dp_g$. Feed it $Dp_g$ and you have a classifier with the wrong
+  intercept: $b = -\sum_g(\lambda_{1g}-\lambda_{2g})$ is off by a factor $1/(1-q)$, so the threshold
+  sits in the wrong place and the accuracy drops for a reason that has nothing to do with dropout.</p>
+  <p>Look at how <code>_measure</code> in <code>week09_dropout.py</code> does it: it computes
+  <code>eff = depth * (1.0 - dropout)</code> and passes <code>eff * p1, eff * p2</code> into
+  <code>log_likelihood_ratio</code>. In simulation you know $q$, so this is legitimate. On real data
+  you would have to estimate the effective rates from the data itself, which is exactly Week 10's
+  problem.</p>
+  <p>A related trap: <code>apply_dropout(X, dropout, rng)</code> takes the probability of
+  <em>loss</em>, while <code>downsample_counts(counts, keep_prob, rng)</code> underneath it takes the
+  probability of <em>survival</em>. The one-line implementation must invert. Getting it backwards
+  produces a figure that looks completely reasonable and is wrong, which is the worst kind of bug —
+  <code>test_apply_dropout_never_increases_counts</code> checks that the mean ratio is
+  $1-q$ and not $q$.</p>
+</div>
+
+<h2>4 &nbsp;The other failure, which is not the $\sqrt{\text{depth}}$ law at all</h2>
+
+<p>This section is the single most valuable thing in the chapter, and it is a question you <em>will</em> be asked in the Week 15 Q&amp;A, in roughly these words: <em>"you said the square-root law breaks down at low depth — where exactly does it break?"</em> The correct answer begins by rejecting the premise.</p>
+
+<div class="box definition">
+  <span class="box-tag">Two different claims, which students merge and must not</span>
+  <table class="simple">
+    <tr><th></th><th>Claim A · the scaling law</th><th>Claim B · the accuracy formula</th></tr>
+    <tr><td>What it says</td>
+        <td>$d' \propto \sqrt{D\,k}$ — separation grows as the square root of depth and of the number of genes.</td>
+        <td>accuracy $= \Phi(d'/2)$ — the optimal rule's error probability is a Gaussian tail.</td></tr>
+    <tr><td>What it rests on</td>
+        <td>Poisson counts (variance = mean) and independence across genes. Nothing else.</td>
+        <td>All of that, <em>plus</em> the Gaussian approximation to the Poisson, <em>plus</em> pooling the two variances.</td></tr>
+    <tr><td>At low depth</td>
+        <td><strong>Exactly true.</strong> $d'$ is defined by means and variances, and Poisson means and variances are exact at every $\lambda$.</td>
+        <td><strong>Wrong, measurably.</strong> A Poisson with $\lambda \approx 1$ looks nothing like a bell curve.</td></tr>
+    <tr><td>Where it does fail</td>
+        <td>Week 11: real counts are overdispersed, so $d'$ saturates and depth stops buying separation.</td>
+        <td>Here, this week, at low depth — and the failure is in a known direction.</td></tr>
+  </table>
+</div>
+
+<p>Why Claim A survives: $d'_g = |\lambda_{1g}-\lambda_{2g}|/\sqrt{\bar\lambda_g}$ is built from a difference of means and a variance. For a Poisson, $E[X] = \lambda$ and $\mathrm{Var}(X)=\lambda$ are exact identities — they are true at $\lambda = 0.03$ just as they are at $\lambda = 3000$. Substituting $\lambda_{cg} = D p_g^{(c)}$ gives $d'_g = \sqrt{D}\,|p^{(1)}_g - p^{(2)}_g|/\sqrt{\bar p_g}$, and the $\sqrt D$ is exact. Nothing in that chain of reasoning approximates anything.</p>
+
+<p>Why Claim B does not survive: $\Phi(d'/2)$ came from replacing each Poisson by a normal distribution with the same mean and variance, and then integrating a Gaussian tail. At $\lambda = 15$ that substitution is excellent. At $\lambda = 0.3$ the Poisson puts 74% of its mass on the single value $0$ and the "distribution" is a spike, not a bell. A continuous symmetric curve cannot represent a spike at zero, and the error it makes is not random — it is systematic and it has a sign.</p>
+
+<div class="box theorem">
+  <span class="box-tag">The exact answer, for the case this chapter needs &nbsp;<span class="claim proved">proved</span></span>
+  <p>Suppose all $k$ marker genes are identical: rate $\lambda_1$ per gene under type 1 and
+  $\lambda_2$ per gene under type 2. Then the optimal rule depends on the counts only through the
+  <strong>total</strong> $S = \sum_{g=1}^k x_g$, and</p>
+  $$S \sim \mathrm{Poisson}(k\lambda_1) \ \text{ under type 1}, \qquad
+    S \sim \mathrm{Poisson}(k\lambda_2)\ \text{ under type 2},$$
+  <p>so the exact optimal accuracy for $k$ genes is the exact <em>single-gene</em> answer at the
+  rates $k\lambda_1$ and $k\lambda_2$:</p>
+  $$\text{accuracy}_{\text{exact}} = 1 - \tfrac12\sum_{s=0}^{\infty}\min\!\big(P_{k\lambda_1}(s),\,P_{k\lambda_2}(s)\big).$$
+</div>
+
+<div class="box proof">
+  <span class="box-tag">Proof · equal weights, then superposition</span>
+  <p>Week 5's rule is $\mathrm{LLR}(x) = \sum_g x_g \log(\lambda_{1g}/\lambda_{2g}) - \sum_g(\lambda_{1g}-\lambda_{2g})$.
+  With every gene identical, $\log(\lambda_1/\lambda_2)$ is the same constant $w$ for all $g$, so
+  $$\mathrm{LLR}(x) = w\sum_g x_g - k(\lambda_1-\lambda_2) = wS - k(\lambda_1-\lambda_2),$$
+  which is a strictly increasing function of $S$ when $\lambda_1 > \lambda_2$ (so $w > 0$). A rule
+  that thresholds a strictly increasing function of $S$ is a rule that thresholds $S$, so $S$ is all
+  the classifier ever uses. (This is exercise 5.3(d) — the total count is sufficient exactly when
+  every gene has the same fold change.)</p>
+  <p>And a sum of independent Poissons is Poisson with the sum of the rates: $S$ is
+  $\mathrm{Poisson}(k\lambda_c)$ under type $c$. Substituting into Week 4's exact expression for the
+  optimal error, $\varepsilon^\star = \tfrac12\sum_s\min(P_1(s),P_2(s))$, gives the statement.
+  <span class="qed">∎</span></p>
+  <p class="muted"><strong>Assumptions used:</strong> all $k$ genes identical; equal priors; the
+  rates known. The identical-genes condition is exactly what <code>marker_profiles</code> constructs,
+  so this is not a special case invented for convenience — it is the case your simulator produces.
+  For unequal genes there is no closed form, which is why <code>week09_dropout.py</code> reports the
+  single-gene exact value as a diagnostic rather than trying to compute the general one.</p>
+</div>
+
+<p>So now you have three numbers for the same quantity — measured, Gaussian, exact — and disagreements between them mean different things:</p>
+
+<ul>
+  <li><strong>measured vs exact:</strong> a check on your <em>code</em>. These must agree to within sampling error. If they do not, you have a bug, and the number of cells tells you how big a discrepancy is allowed.</li>
+  <li><strong>exact vs Gaussian:</strong> a measurement of <em>the approximation's error</em>. It is not a bug in anything, it is a property of the formula, and it is the result this section exists to produce.</li>
+  <li><strong>measured vs Gaussian:</strong> the sum of both, which is what <code>week09_breakdown.png</code>'s residual panel plots. Only worth interpreting once the first comparison has ruled out code.</li>
+</ul>
+
+<div class="lab">
+  <div class="lab-title">Lab 2 · Where the closed form stops being right</div>
+  <div class="lab-desc">Accuracy against depth, low-depth end. Blue circles: measured, by simulating cells and classifying them optimally. Green: the exact Bayes accuracy from the theorem above. Orange dashed: the closed form $\Phi(d'/2)$. The lower panel is the residual, measured minus Gaussian, with a $\pm0.01$ band. The fold-change slider matters more than you expect: at fold 1.5 the Gaussian formula is nearly perfect even at $\bar\lambda = 0.1$, and at fold 5 it is wrong by three points. The readout prints the per-gene pooled rate $\bar\lambda$ so you can see when you have crossed into the bad regime.</div>
+  <canvas id="w9lab2" height="400"></canvas>
+  <div class="controls" id="w9lab2ctl"></div>
+  <div class="readout" id="w9lab2out"></div>
+</div>
+
+<div class="box example">
+  <span class="box-tag">Result · the residual has a sign <span class="claim observed">observed</span></span>
+  <p>The Gaussian formula is <strong>pessimistic</strong>: the exact accuracy is <em>above</em>
+  $\Phi(d'/2)$ almost everywhere in this regime. With $k = 8$ genes and per-gene mass $0.004$:</p>
+  <table class="simple">
+    <tr><th>fold change</th><th>depth $D$</th><th>$\bar\lambda$ per gene</th><th>$\Phi(d'/2)$</th><th>exact</th><th>exact $-$ Gaussian</th></tr>
+    <tr><td>1.5</td><td>20</td><td>0.08</td><td>0.5636</td><td>0.5677</td><td>+0.004</td></tr>
+    <tr><td>1.5</td><td>320</td><td>1.28</td><td>0.7389</td><td>0.7393</td><td>+0.000</td></tr>
+    <tr><td>3.0</td><td>20</td><td>0.08</td><td>0.6554</td><td>0.6716</td><td>+0.016</td></tr>
+    <tr><td>3.0</td><td>160</td><td>0.64</td><td>0.8711</td><td>0.8818</td><td>+0.011</td></tr>
+    <tr><td>5.0</td><td>20</td><td>0.08</td><td>0.7031</td><td>0.7319</td><td><strong>+0.029</strong></td></tr>
+    <tr><td>5.0</td><td>160</td><td>0.64</td><td>0.9343</td><td>0.9485</td><td>+0.014</td></tr>
+  </table>
+  <p>The direction has a clean explanation, and it is Week 4's: at low rates the decision is
+  effectively "did I see <em>any</em> molecule at all?", and both Poissons place a large discrete lump
+  of probability on exactly zero. A continuous bell curve cannot represent a lump, so it cannot
+  exploit it, and it therefore <em>undersells</em> the achievable accuracy. The magnitude grows with
+  fold change because that is when the two lumps at zero differ most.</p>
+  <p class="muted">Notice what this means for how you report the project. The one place your headline
+  formula is provably wrong, it is wrong in the conservative direction: real classifiers do slightly
+  <em>better</em> than $\Phi(d'/2)$ at low depth. A prediction that errs towards under-promising is a
+  much more comfortable thing to defend than one that errs the other way, and it is worth one
+  sentence in the report saying so.</p>
+</div>
+
+<div class="box pitfall">
+  <span class="box-tag">The sentence you must never write</span>
+  <p>"At low depth the $\sqrt{\text{depth}}$ law breaks down." It does not, in this model, and a
+  reviewer who knows the material will stop listening at that point.</p>
+  <p>What breaks down is the <em>Gaussian approximation used to convert $d'$ into an accuracy</em>.
+  The correct sentence is: <em>"At low depth, $d'$ still grows as $\sqrt{D}$ exactly — it is built
+  from Poisson means and variances, which are exact at every rate — but the mapping accuracy
+  $=\Phi(d'/2)$ becomes inaccurate, by up to three points at large fold change, because the Poisson
+  is no longer close to a Gaussian. We measured that error against the exact Bayes accuracy, and it
+  is positive: the closed form is pessimistic."</em></p>
+  <p>Say it in exactly that order — what survives, what fails, how much, in which direction, measured
+  how — and you have turned a weakness in the theory into a demonstration that you understand it.</p>
+</div>
+
+<h2>5 &nbsp;More than two cell types</h2>
+
+<p>Everything so far has been a two-way decision, because that is where the theory is clean. Real annotation is a choice among many types, so it is worth knowing what changes.</p>
+
+<p>Two provided functions do the work. <code>multi_type_profiles(n_types, n_genes, fold_change, marker_mass, rng)</code> builds $T$ profiles in which type $t$ over-expresses its own disjoint block of $n_{\text{genes}}/T$ markers and sits at baseline on everyone else's blocks, renormalised so that each type spends exactly <code>marker_mass</code> on markers. <code>posterior_log_odds(X, rates, priors)</code> then returns, for each cell, the normalised log posterior over all $T$ types:</p>
+
+$$\log P(t \mid x) \;\propto\; \sum_g x_g\log\lambda_{tg} \;-\; \sum_g \lambda_{tg} \;+\; \log\pi_t,$$
+
+<p>and you classify by taking the arg max over $t$. That expression is the same Poisson log-likelihood you derived in Week 5, simply not yet turned into a ratio — with two types, subtracting row 2 from row 1 gives back <code>log_likelihood_ratio</code> exactly.</p>
+
+<div class="box definition">
+  <span class="box-tag">What changes, and what does not</span>
+  <p><strong>Changes:</strong></p>
+  <ul>
+    <li><strong>Chance is $1/T$, not $1/2$.</strong> With five types, a coin-flipping classifier gets
+    20%, so "80% accuracy" means something quite different from what it means with two types. Always
+    state the chance level on the axis or in the caption.</li>
+    <li><strong>There are $\binom{T}{2}$ separation indices, not one.</strong> Every pair of types has
+    its own $d'_{tu}$, and they are generally very different: in a PBMC panel, T cells and monocytes
+    are far apart while CD4 and CD8 T cells are close.</li>
+    <li><strong>The hardest pair dominates.</strong> Total error is roughly the union of the pairwise
+    errors, so it is bounded below by the worst pair's error and above by the sum:
+    $\max_{t\ne u}\varepsilon_{tu} \le \varepsilon \le \sum_{t \lt u}\varepsilon_{tu}$ (the upper bound is
+    a union bound). When one pair is much harder than the rest — which is the usual case — both
+    bounds are dominated by that pair, and the multi-class problem is really a two-class problem
+    wearing a hat.</li>
+  </ul>
+  <p><strong>Does not change:</strong></p>
+  <ul>
+    <li><strong>The $\sqrt{\text{depth}}$ law.</strong> Every pairwise $d'_{tu}$ scales as $\sqrt{D}$
+    for exactly the reason it did with two types, so the whole error curve moves with depth in the
+    same way.</li>
+    <li><strong>Dropout equals reduced depth.</strong> The thinning theorem is a statement about a
+    single Poisson variable; it never knew how many hypotheses you were entertaining.</li>
+    <li><strong>The rule is still linear in the counts.</strong> Each type's log posterior is linear
+    in $x$, so the decision regions are intersections of half-spaces.</li>
+  </ul>
+</div>
+
+<p><code>test_simulate_dataset_handles_more_than_two_types</code> checks that the simulator produces five labelled types; extending the accuracy measurement to them is exercise 9.6, and it is optional for the milestone. Do it if the two-type work is finished and solid, not instead of it.</p>
+
+<h2>6 &nbsp;The M3 gate</h2>
+
+<p>Milestone 3 is not a presentation. It is a <strong>decision</strong>, and the whole point of writing the decision rule down in advance is that you do not get to negotiate with it afterwards.</p>
+
+<div class="box verify">
+  <span class="box-tag">M3 · the decision rule, stated before you look at the numbers</span>
+  <p>Run <code>python experiments/week09_dropout.py</code> at SEED 109 and open
+  <code>progress/week09_table.md</code>. It has one row per (dropout, depth) pair, with the measured
+  accuracy, the theory value at the effective depth, and their difference.</p>
+  <p><strong>PASS</strong> if <em>every</em> row satisfies
+  $|\text{measured} - \text{theory at } D_{\text{eff}}| \le 0.02$, and the typical row is well inside
+  that. At 6,000 cells per type the sampling standard error of each accuracy is about
+  $\sqrt{0.25/12000} \approx 0.005$, so a tolerance of 0.02 is roughly four standard errors: tight
+  enough to catch a real disagreement, loose enough not to fire on noise. You should in fact find
+  the worst row lands somewhere near 0.005–0.010.</p>
+  <p><strong>If it passes:</strong> commit the table and the two figures, tag the repository
+  <code>simulator-validated</code>, and go to Week 10 and real data.</p>
+  <p><strong>If it fails — do NOT proceed to Week 10.</strong> Spend Week 10 finding out why. A
+  simulator that disagrees with the theory it implements is either a broken simulator or a broken
+  theory, and taking either one to real data means you will never be able to attribute a
+  disagreement to anything. In order, check: the label convention (<code>1 - y</code>); the effective
+  rates in the classifier (Section 3's pitfall); the keep/loss inversion in <code>apply_dropout</code>;
+  whether the failing rows are all at the lowest depths, in which case you have rediscovered
+  Section 4 and the fix is to compare against the exact accuracy rather than the Gaussian one.
+  Consult your mentor and invoke the fallback ladder in <code>plans/</code> (F1–F4), which specifies
+  in advance how the project's scope contracts if a milestone slips, so that the decision is not
+  made under time pressure in Week 13.</p>
+</div>
+
+<p>Notice the structure of that rule: a stated tolerance, a stated sample size that justifies the tolerance, a pass action, a fail action, and a named place where the fail action is written down. That is what a milestone is for. A milestone you can talk your way past is not a milestone.</p>
+
+<h2>7 &nbsp;Your Python laboratory</h2>
+
+<div class="box python">
+  <span class="box-tag">This week in the celldetect project</span>
+  <p>One function, and it is one line:</p>
+  <ul>
+    <li><code>apply_dropout(X, dropout, rng)</code> in <code>python/celldetect/simulate.py</code> —
+    call <code>downsample_counts(X, 1 - dropout, rng)</code>. Note the inversion:
+    <code>dropout</code> is the probability of <em>loss</em>, <code>keep_prob</code> the probability
+    of <em>survival</em>.</li>
+    <li>Check also that <code>simulate_cells(profile, depth, n_cells, rng, dropout=...)</code>
+    routes its <code>dropout</code> argument through the same path — step 4 of its scaffold — so
+    that <code>simulate_dataset(..., dropout=q)</code> works end to end.</li>
+  </ul>
+  <p>That is the whole of the week's new code, which should tell you where the week's difficulty
+  actually lives: in the argument, not the implementation.</p>
+  <p>Then:</p>
+  <p><code>pytest tests/test_simulate.py -k dropout</code></p>
+  <p>which selects the two tests that matter here.
+  <code>test_dropout_equals_reduced_depth</code> is the theorem as an assertion: it simulates 30,000
+  cells at depth 3,000 with $q = 0.4$ and 30,000 more at depth 1,800 with no dropout, and demands the
+  means agree within 0.05 and the variances within 0.15. <em>Both</em> moments, deliberately —
+  matching the mean alone would be satisfied by a naive rescaling, and it is the variance that
+  distinguishes genuine thinning from multiplying the counts by $1-q$.
+  <code>test_apply_dropout_never_increases_counts</code> checks the elementwise inequality and that
+  the surviving fraction is $1-q$ rather than $q$.</p>
+  <p>Then, because this is a milestone:</p>
+  <p><code>pytest tests/</code></p>
+  <p>The whole suite, everything from Week 1 to Week 9, green in one run. Not "green last week".</p>
+  <p>Then the figures and the table:</p>
+  <p><code>python experiments/week09_dropout.py</code></p>
+  <p>with <strong>SEED 109</strong>, 6,000 cells per type, $k = 8$ genes at fold change 1.5. It
+  writes <code>figures/week09_dropout.png</code> (the collapse, as two panels: accuracy against
+  nominal depth, then against effective depth),
+  <code>figures/week09_breakdown.png</code> (the low-depth regime, measured against $\Phi(d'/2)$,
+  with the signed residual on its own axis and a $\pm0.01$ band), and
+  <code>progress/week09_table.md</code> — the collapse table as markdown, ready to paste into your
+  progress log. <strong>Commit that table.</strong> It is the evidence for M3, and the script also
+  prints <code>worst collapse error</code>, which is the single number the gate in Section 6 is
+  written against.</p>
+</div>
+
+<h2>8 &nbsp;Exercises</h2>
+<p class="muted">Stars mark difficulty: ★ routine · ★★ requires an idea · ★★★ challenge. Write full sentences; every claim needs a reason. Solutions are provided — attempt first, then compare.</p>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 9.1</span><span class="stars">★</span></div>
+  <div class="ex-body">An experiment is run at depth $D = 5000$ with a capture efficiency of 20% (i.e. dropout $q = 0.8$). (a) What is the effective depth? (b) By what factor does $d'$ fall? (c) If the no-dropout accuracy would have been $\Phi(1.6) = 94.5\%$, what is it with dropout? (d) What nominal depth would you have to buy to get back to 94.5%?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) $D_{\text{eff}} = 5000 \times 0.2 = 1000$.</p>
+      <p>(b) $d' \propto \sqrt{D}$, so it falls by $\sqrt{0.2} = 0.447$ — a factor of about 2.2, not
+      a factor of 5.</p>
+      <p>(c) The original $d'$ was $2\times1.6 = 3.2$; after dropout it is
+      $3.2\times0.447 = 1.43$, so the accuracy is $\Phi(0.716) = 76.3\%$. Eighteen points lost.</p>
+      <p>(d) To restore $d' = 3.2$ at 20% efficiency you need $D_{\text{eff}} = 5000$, i.e. a nominal
+      depth of $5000/0.2 = 25{,}000$ — five times the original, which is exactly the reciprocal of
+      the efficiency and not a square-root relationship at all.</p>
+      <p class="muted">Part (d) is worth pausing on, because the two square roots cancel. Recovering
+      a given $d'$ costs a factor $1/(1-q)$ in depth, flat. The square root appears in what dropout
+      <em>costs you</em>, and disappears in what it costs to <em>undo</em>. Being able to switch
+      between those two framings without confusing yourself is most of what "understanding a scaling
+      law" means in practice.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 9.2</span><span class="stars">★</span></div>
+  <div class="ex-body">A library is sequenced at half depth, and then 30% of the surviving molecules are lost to dropout. (a) What single thinning is that equivalent to? (b) Show in general that thinning by $s_1$ then by $s_2$ is thinning by $s_1 s_2$. (c) Explain why this means the order of the two operations does not matter.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) Survival probabilities multiply: $0.5\times0.7 = 0.35$, so it is a single thinning with
+      $s = 0.35$, i.e. an effective depth of $0.35D$ and a dropout-equivalent of $q = 0.65$.</p>
+      <p>(b) Apply the thinning theorem twice. Start with $\mathrm{Poisson}(\lambda)$; after the first
+      thinning the survivors are $\mathrm{Poisson}(s_1\lambda)$ <em>exactly</em>, and this is a
+      genuine Poisson variable, not an approximation, so the theorem's hypotheses are met a second
+      time. Thinning it by $s_2$ gives $\mathrm{Poisson}(s_2 s_1 \lambda)$. The key point is that
+      thinning maps the Poisson family into itself, which is what makes it composable at all.</p>
+      <p>(c) $s_1 s_2 = s_2 s_1$: multiplication of the survival probabilities is commutative, and
+      the resulting distribution depends only on the product. So "downsample then drop out" and
+      "drop out then downsample" produce identically distributed data — which is why Week 10's
+      protocol of downsampling real data that has <em>already</em> been through dropout is
+      legitimate.</p>
+      <p class="muted">Part (c) is not a technicality; it is the licence for the entire real-data
+      arm of the project. The PBMC counts you download in Week 10 have already been thinned once, by
+      the capture process, by an unknown amount. Composability says that downsampling them further
+      just moves you along the same curve, so you can measure the <em>shape</em> of the depth
+      dependence without ever knowing where on the axis you started.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 9.3</span><span class="stars">★★</span></div>
+  <div class="ex-body">Prove the dropout-equals-reduced-depth theorem from scratch: state it precisely, prove it (you may quote the thinning theorem if you also state its assumptions), and then write the one-paragraph version you would say out loud to a biologist who has just told you that dropout is "a completely different problem from shallow sequencing".</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>The statement and proof are Section 2. The essential content: counts are
+      $\mathrm{Poisson}(Dp_g)$; each captured molecule independently survives dropout with
+      probability $1-q$; thinning a Poisson gives a Poisson with the rate multiplied by the survival
+      probability; therefore the observed counts are $\mathrm{Poisson}(D(1-q)p_g)$, which is the
+      distribution of a clean experiment at depth $D(1-q)$. Assumptions: Poisson counts, independent
+      per-molecule loss, and a loss probability that does not depend on the gene, the expression
+      level or the cell.</p>
+      <p><strong>Out loud:</strong> "Suppose you sequence a cell and capture 3,000 molecules, and
+      then 40% of them are lost. What you are holding is 1,800 molecules drawn at random from that
+      cell — and that is exactly what you would have been holding if the sequencer had captured 1,800
+      in the first place. The molecules do not know why they were left out. So dropout is not an
+      extra source of noise on top of sampling noise; it <em>is</em> sampling noise, relabelled. The
+      only way dropout becomes a genuinely different problem is if it is <em>selective</em> —
+      if some genes or some cells lose molecules at higher rates than others — and that is a
+      different claim, one we can test, and one that shows up as overdispersion rather than as a
+      shift along the depth axis."</p>
+      <p class="muted">Practise that paragraph. It is the single most surprising claim in the project
+      to a biologist audience, it takes forty seconds, and delivering it well is worth more in a
+      poster session than any figure.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 9.4</span><span class="stars">★★</span></div>
+  <div class="ex-body">Take $k = 8$ identical genes with per-gene rates $\lambda_1 = 0.096$ and $\lambda_2 = 0.064$ (that is, $D = 20$ at fold change 1.5 with per-gene mass 0.004). (a) Compute $d'_{\text{total}}$ and $\Phi(d'/2)$. (b) Using the sufficiency theorem of Section 4, write down the exact problem this reduces to. (c) Compute the exact accuracy by summing over $s = 0,1,2,3,4$ and argue why truncating there is safe. (d) Which is bigger, and why?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) Per gene, $\bar\lambda = 0.08$ and $|\Delta\lambda| = 0.032$, so
+      $d'_g = 0.032/\sqrt{0.08} = 0.1131$. Over 8 genes,
+      $d'_{\text{total}} = \sqrt8 \times 0.1131 = 0.320$, and $\Phi(0.160) = 0.5636$.</p>
+      <p>(b) $S = \sum_g x_g$ is $\mathrm{Poisson}(8\times0.096) = \mathrm{Poisson}(0.768)$ under type
+      1 and $\mathrm{Poisson}(0.512)$ under type 2. So the whole 8-gene problem is a single-count
+      problem at rates $0.768$ and $0.512$. (Sanity check: $d'$ of that single problem is
+      $0.256/\sqrt{0.64} = 0.320$ — the same number, as it must be.)</p>
+      <p>(c) With $P_\lambda(s) = e^{-\lambda}\lambda^s/s!$:</p>
+      <table class="simple">
+        <tr><th>$s$</th><th>$P_{0.768}(s)$</th><th>$P_{0.512}(s)$</th><th>min</th></tr>
+        <tr><td>0</td><td>0.4639</td><td>0.5993</td><td>0.4639</td></tr>
+        <tr><td>1</td><td>0.3563</td><td>0.3068</td><td>0.3068</td></tr>
+        <tr><td>2</td><td>0.1368</td><td>0.0785</td><td>0.0785</td></tr>
+        <tr><td>3</td><td>0.0350</td><td>0.0134</td><td>0.0134</td></tr>
+        <tr><td>4</td><td>0.0067</td><td>0.0017</td><td>0.0017</td></tr>
+      </table>
+      <p>The minimums sum to $0.8643$, so $\varepsilon^\star = \tfrac12(0.8643) = 0.4322$ and the
+      exact accuracy is $0.5678$. Truncating at $s=4$ is safe because the remaining mass under the
+      larger rate is $1 - 0.9987 = 0.0013$, and the minimum of the two pmfs is smaller still, so the
+      neglected contribution to the error is under $0.0007$ — below the fourth decimal place of the
+      answer.</p>
+      <p>(d) The exact answer, $0.5678$, is larger than $\Phi(d'/2) = 0.5636$, by $0.0042$. The
+      reason is visible in the table: 46% and 60% of the two distributions sit on the single value
+      $s = 0$, and the optimal rule gets to use that discrete lump. A Gaussian has no lumps, so the
+      approximation cannot see the structure that the real classifier is exploiting, and it
+      undersells the achievable accuracy.</p>
+      <p class="muted">This exercise is the milestone question in miniature. If you can produce this
+      table by hand and then say the sentence in (d), you can answer the Week 15 question about where
+      the theory bends, with numbers, in under a minute. Note also that the simulated value in
+      Section 4's table is $0.5677$ against your exact $0.5678$ — that agreement is what tells you
+      the <em>code</em> is right, independently of whether the <em>formula</em> is.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 9.5</span><span class="stars">★★</span></div>
+  <div class="ex-body">Suppose dropout is not constant: each <em>cell</em> has its own loss probability $q_i$, drawn from some distribution with mean $\bar q$ and variance $\tau^2 > 0$. (a) Is the count for a gene still Poisson? (b) Compute the mean and variance of the count, averaging over $q$. (c) What happens to the Fano factor? (d) Which of the two failures of Section 4 does this correspond to — and which week does it belong to?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) No. Conditional on $q_i$ the count is $\mathrm{Poisson}(D(1-q_i)p)$, but a
+      <em>mixture</em> of Poissons with different rates is not a Poisson. It is a compound
+      distribution, and mixing always adds variance.</p>
+      <p>(b) Write $\mu_i = D(1-q_i)p$ and let $m = Dp$. By the law of total expectation,
+      $E[X] = E[\mu_i] = m(1-\bar q)$. By the law of total variance,
+      $$\mathrm{Var}(X) = E[\mathrm{Var}(X\mid q)] + \mathrm{Var}(E[X\mid q])
+      = E[\mu_i] + \mathrm{Var}(\mu_i) = m(1-\bar q) + m^2\tau^2,$$
+      since $\mathrm{Var}(\mu_i) = m^2\mathrm{Var}(1-q_i) = m^2\tau^2$.</p>
+      <p>(c) $F = \dfrac{\mathrm{Var}(X)}{E[X]} = 1 + \dfrac{m\,\tau^2}{1-\bar q} > 1$. The data is
+      <strong>overdispersed</strong>, and — note this carefully — the excess grows <em>linearly with
+      the mean count</em>. Deeper sequencing makes the overdispersion worse, not better.</p>
+      <p>(d) Neither of Section 4's two failures. Section 4 was about the accuracy formula
+      $\Phi(d'/2)$ being the wrong function of $d'$; this is about $d'$ itself being computed from
+      the wrong variance, which breaks Claim A — the scaling law. The variance is now $m + \phi m^2$
+      in the notation of Week 11, so $d' = |\Delta m|/\sqrt{\bar m + \phi\bar m^2}$ saturates at
+      large depth instead of growing as $\sqrt D$. This is the negative binomial, it is the depth
+      ceiling, and it is Week 11's entire subject.</p>
+      <p class="muted">You have just derived the central result of Week 11 as a side effect of taking
+      one of this week's assumptions seriously. That is the argument for writing assumptions down: the
+      list is not bookkeeping, it is a list of experiments waiting to be done. Put this derivation in
+      your notebook now and re-read it in two weeks.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 9.6</span><span class="stars">★★★</span></div>
+  <div class="ex-body">Extend the measurement to five cell types. Use <code>multi_type_profiles(5, 50, fold_change=3.0)</code> and <code>posterior_log_odds</code> to classify by arg max, and measure accuracy against depth. (a) What is chance? (b) Compute all ten pairwise $d'$ values at some depth — what do you notice about them, given how <code>multi_type_profiles</code> is built? (c) Predict the accuracy curve using only the pairwise $d'$s, via the union bound, and compare with the measurement. (d) State one reason the union bound is loose here.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) Chance is $1/5 = 20\%$.</p>
+      <p>(b) By construction every type over-expresses its own disjoint block by the same fold change
+      and sits at baseline elsewhere, so <em>all ten pairs are equivalent by symmetry</em> and share a
+      single value of $d'$. Each pair differs on exactly two blocks (mine, where I am high and you are
+      low, and yours, where the reverse holds), so
+      $d'_{tu}{}^2 = 2\times(\text{block size})\times d'_{\text{gene}}{}^2$. This makes the five-type
+      problem an unusually clean test case and an unusually unrealistic one — the whole difficulty of
+      real annotation is that the pairs are <em>not</em> equivalent.</p>
+      <p>(c) The union bound gives $\varepsilon \le \sum_{u\ne t}\varepsilon_{tu}$ for a fixed true
+      type $t$: with symmetry, $\varepsilon \le 4\,\Phi(-d'/2)$, so the predicted accuracy is
+      $\ge 1 - 4\Phi(-d'/2)$. At $d' = 3$, $\Phi(-1.5) = 0.0668$, so the bound predicts accuracy at
+      least $1 - 0.267 = 73.3\%$, while the two-class accuracy at the same $d'$ would be $93.3\%$. The
+      measurement should land <em>above</em> the bound — comfortably so — and below the two-class
+      value.</p>
+      <p>(d) The bound double-counts: it adds the probability of losing to type $u$ and the
+      probability of losing to type $v$ as though those were disjoint events, when in fact a cell with
+      an unluckily low total count tends to look wrong against several types at once. The errors are
+      positively correlated, so the true error is smaller than the sum. (A second, smaller reason: the
+      pairwise error $\Phi(-d'/2)$ is itself the two-class optimal rule's error, and the multi-class
+      arg-max rule is not the same rule restricted to a pair.)</p>
+      <p class="muted">Optional for M3 — do it only if the two-type work is complete. Its real value
+      is Week 10: PBMC 3k has several types, most pairs of them easy and one or two hard, and part
+      (b)'s symmetry is exactly the thing real data does not have. Knowing what the clean case looks
+      like is what lets you see how messy the real one is.</p>
+    </div>
+  </details>
+</div>
+
+<h2>9 &nbsp;Research notebook</h2>
+
+<p>A milestone week, so the notebook is also the rehearsal:</p>
+
+<ul>
+  <li>The dropout-equals-reduced-depth theorem and proof, written from memory, ending with the three
+  assumptions listed explicitly and a mark against the third one saying "attacked in Week 11".</li>
+  <li>The out-loud paragraph from exercise 9.3, in your own words, rewritten until it takes under a
+  minute to deliver.</li>
+  <li>The two-column comparison of Section 4 — Claim A versus Claim B — copied out, plus the
+  forbidden sentence and the correct replacement for it. This page becomes a Week 15 slide.</li>
+  <li>Exercise 9.4's hand-computed table, and next to it the corresponding row from your own run of
+  <code>week09_dropout.py</code>.</li>
+  <li>Exercise 9.5 in full. Label the conclusion <span class="claim conjectured">conjectured</span>
+  until Week 11 measures it on real data, at which point it becomes
+  <span class="claim observed">observed</span>.</li>
+  <li>Your updated <strong>"assumptions I am making"</strong> list, with the new entry
+  <em>dropout is independent across molecules and does not depend on the gene, the expression level
+  or the cell</em>, and the week that tests it.</li>
+</ul>
+
+<p>Scan to <code>notebook/week09/</code>, fill in <code>progress/week09.md</code>, commit
+<code>progress/week09_table.md</code> and both figures, and then — only if the gate in Section 6
+passed — tag:</p>
+
+<p><code>git tag -a simulator-validated -m "M3: dropout collapses onto effective depth; simulation matches Phi(d'/2) within 0.02"</code><br>
+<code>git push origin simulator-validated</code></p>
+
+<p>If the gate did not pass, tag nothing and write the reason in <code>progress/week09.md</code> in one paragraph, with the worst row of the table quoted. An untagged, honestly documented failure is a better research record than a tag that means "I decided it was close enough".</p>
+
+<div class="box verify">
+  <span class="box-tag">MILESTONE M3 · verification (with mentor)</span>
+  <ul>
+    <li><strong>At the whiteboard, without notes:</strong> derive dropout $=$ reduced depth from the
+    thinning theorem, and state all three assumptions. Then say which one you distrust and what it
+    would look like in the data if it were false.</li>
+    <li><strong>State precisely which of the two failures the low-depth residual is.</strong> Given
+    <code>figures/week09_breakdown.png</code>, say in one sentence that the $\sqrt{\text{depth}}$
+    law is intact and the Gaussian mapping is not, give the sign of the residual, and explain the
+    sign using the lump of probability at zero.</li>
+    <li><strong>The collapse table is committed.</strong> <code>progress/week09_table.md</code> is in
+    the repository, generated at SEED 109, and you can read the worst row off it and compare it with
+    the 0.02 gate out loud.</li>
+    <li><strong>Show <code>figures/week09_dropout.png</code></strong> and explain what the right-hand
+    panel proves that the left-hand panel does not, and why nothing was fitted to make it work.</li>
+    <li><strong><code>pytest tests/</code> fully green</strong> — every test from Week 1 through
+    Week 9, in one run, on your machine, in front of your mentor.</li>
+    <li><strong>The tag <code>simulator-validated</code> exists and is pushed</strong> — or it does
+    not, and you can state the decision rule you applied and what Week 10 will now be spent on
+    instead.</li>
+  </ul>
+  <p class="muted">Aim 2's simulation arm closes here. From Week 10 on, every disagreement between
+  measurement and theory is attributable to the <em>data</em>, because this milestone is what rules
+  out the alternative.</p>
+</div>
+
+<h2>10 &nbsp;Going deeper</h2>
+<ul>
+  <li>Svensson et al. (2017), <em>Power analysis of single-cell RNA-sequencing experiments</em>, Nature Methods 14. <span class="muted">Where the capture-efficiency numbers in Section 1 come from: spike-in based measurements of molecular sensitivity across protocols. Read the figures and the methods paragraph on sensitivity estimation, and notice how much the estimates move between protocols. <span class="claim cited">cited</span></span></li>
+  <li>Zheng et al. (2017), <em>Massively parallel digital transcriptional profiling of single cells</em>, Nature Communications 8. <span class="muted">The 10x Chromium platform paper, and the source of the PBMC 3k dataset you meet next week. Skim for the reported conversion efficiency and for how the authors define it — the definition is doing a lot of work.</span></li>
+  <li>Svensson (2020), <em>Droplet scRNA-seq is not zero-inflated</em>, Nature Biotechnology 38. <span class="muted">Two pages, and directly on this chapter's argument: the excess zeros people attribute to a special "dropout" mechanism are largely what plain Poisson sampling at low rate already predicts. <span class="claim cited">cited</span></span></li>
+  <li>Kingman, <em>Poisson Processes</em> (1993), chapter 5. <span class="muted">Thinning and superposition in their natural setting. You proved the special case in Week 2; this is what it is a special case of. Read three pages and stop.</span></li>
+  <li>Course extras: <a href="../extras/big-picture.html">the big picture</a> · <a href="../extras/notation.html">notation card</a> · <a href="../extras/glossary.html">glossary</a> · <a href="../extras/problem-bank.html">problem bank</a></li>
+</ul>
+
+</div>
+
+<footer class="site">How Much Data Does It Take to Tell Two Cell Types Apart? · Week 9 · <a href="../index.html">Course home</a></footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  /* ---------------- Lab 1: the dropout collapse -------------------------- */
+  (function () {
+    const DEPTHS = [125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+    const K = 8, FOLD = 1.5, MASS = 0.004 * 8, NPER = 700;
+    let q = 0.6, effAxis = false;
+
+    const pr = CD.markerProfiles(K, FOLD, MASS);
+
+    function measure(D, drop) {                    // optimal-rule accuracy at effective rates
+      const r = CD.rng(9100 + Math.round(D) + Math.round(1000 * drop));
+      const eff = D * (1 - drop);
+      const l1 = pr[0].map(p => eff * p), l2 = pr[1].map(p => eff * p);
+      let ok = 0;
+      for (let i = 0; i < NPER; i++) {
+        if (CD.nbLogRatio(CD.sampleCell(pr[0], D, r, drop), l1, l2) > 0) ok++;
+        if (CD.nbLogRatio(CD.sampleCell(pr[1], D, r, drop), l1, l2) <= 0) ok++;
+      }
+      return ok / (2 * NPER);
+    }
+    function theory(D) {
+      const ds = pr[0].map((p, g) => CD.dPrime(D * p, D * pr[1][g]));
+      return CD.accuracyFromDPrime(CD.combineDPrime(ds));
+    }
+
+    function run() {
+      const plain = DEPTHS.map(D => [Math.log10(D), measure(D, 0)]);
+      const drop = DEPTHS.map(D => [Math.log10(effAxis ? D * (1 - q) : D), measure(D, q)]);
+      const P = CD.plot("w9lab1", { xmin: 1.6, xmax: 4.3, ymin: 0.5, ymax: 1.02,
+                                    xlabel: effAxis ? "effective depth D(1-q)  [log scale]"
+                                                    : "nominal depth D  [log scale]",
+                                    ylabel: "accuracy of the optimal rule",
+                                    xfmt: t => Math.round(Math.pow(10, t)) });
+      P.clear(); P.axes();
+      P.funcPlot(t => theory(Math.pow(10, t)), { color: CD.C.orange, width: 2.5 });
+      P.line(plain, { color: CD.C.gray, width: 2 });
+      P.scatter(plain, { color: CD.C.gray, r: 3.5 });
+      P.line(drop, { color: CD.C.blue, width: 2 });
+      P.scatter(drop, { color: CD.C.blue, r: 4.5 });
+      P.label(1.68, 0.99, "orange: Φ(d'/2)   grey: no dropout   blue: dropout q", { color: CD.C.navy });
+
+      const rows = DEPTHS.map((D, i) => {
+        const eff = D * (1 - q), t = theory(eff);
+        return [D, Math.round(eff), drop[i][1].toFixed(3), t.toFixed(3),
+                (drop[i][1] - t >= 0 ? "+" : "") + (drop[i][1] - t).toFixed(3)];
+      });
+      CD.table("w9lab1out", ["nominal D", "effective D", "measured", "theory at D_eff", "diff"], rows);
+    }
+
+    CD.slider("w9lab1ctl", { label: "dropout q", min: 0, max: 0.85, step: 0.05, value: q,
+                             fmt: v => (100 * v).toFixed(0) + "%" }, v => { q = v; run(); });
+    CD.toggle("w9lab1ctl", "x axis = effective depth D(1-q)", false, v => { effAxis = v; run(); });
+  })();
+
+  /* ---------------- Lab 2: the low-depth breakdown ----------------------- */
+  (function () {
+    const DEPTHS = [10, 20, 40, 80, 160, 320, 640, 1280];
+    const FOLDS = [1.5, 2, 3, 5];
+    const K = 8, PER_GENE = 0.004, NPER = 4000;
+    let fi = 2;
+
+    /* Exact optimal accuracy. All k genes are identical, so the optimal rule
+       depends only on the total S, which is Poisson(k*lambda). Section 4. */
+    function exactAcc(l1, l2) {
+      const big = Math.max(l1, l2);
+      const top = Math.ceil(big + 10 * Math.sqrt(big) + 20);
+      let p1 = Math.exp(-l1), p2 = Math.exp(-l2), err = 0;
+      for (let s = 0; s <= top; s++) {
+        err += Math.min(p1, p2);
+        p1 *= l1 / (s + 1); p2 *= l2 / (s + 1);
+      }
+      return 1 - 0.5 * err;
+    }
+
+    function run() {
+      const fold = FOLDS[fi];
+      const pr = CD.markerProfiles(K, fold, PER_GENE * K);
+      const meas = [], gauss = [], exact = [], resid = [], rows = [];
+      DEPTHS.forEach(D => {
+        const l1 = pr[0].map(p => D * p), l2 = pr[1].map(p => D * p);
+        const r = CD.rng(9200 + D + 7 * fi);
+        let ok = 0;
+        for (let i = 0; i < NPER; i++) {
+          if (CD.nbLogRatio(CD.sampleCell(pr[0], D, r), l1, l2) > 0) ok++;
+          if (CD.nbLogRatio(CD.sampleCell(pr[1], D, r), l1, l2) <= 0) ok++;
+        }
+        const m = ok / (2 * NPER);
+        const g = CD.accuracyFromDPrime(CD.combineDPrime(l1.map((v, j) => CD.dPrime(v, l2[j]))));
+        const e = exactAcc(K * l1[0], K * l2[0]);
+        const x = Math.log10(D);
+        meas.push([x, m]); gauss.push([x, g]); exact.push([x, e]); resid.push([x, m - g]);
+        rows.push([D, (D * PER_GENE).toFixed(3), m.toFixed(4), e.toFixed(4), g.toFixed(4),
+                   (e - g >= 0 ? "+" : "") + (e - g).toFixed(4)]);
+      });
+
+      const P = CD.plot("w9lab2", { xmin: 0.9, xmax: 3.2, ymin: 0.34, ymax: 1.04,
+                                    xlabel: "depth D  [log scale]",
+                                    ylabel: "accuracy  (residual strip below, magnified 3x)",
+                                    xfmt: t => Math.round(Math.pow(10, t)) });
+      P.clear(); P.axes();
+      P.line(gauss, { color: CD.C.orange, width: 2.5, dash: [7, 5] });
+      P.line(exact, { color: CD.C.green, width: 2 });
+      P.line(meas, { color: CD.C.blue, width: 1.5 });
+      P.scatter(meas, { color: CD.C.blue, r: 4 });
+      /* residual strip in the bottom band: zero at 0.42, magnified 3x, +-0.01 guides */
+      const rY = v => 0.42 + 3 * v;
+      P.line([[0.9, rY(0)], [3.2, rY(0)]], { color: CD.C.orange, width: 1.5 });
+      [-0.01, 0.01].forEach(g => P.line([[0.9, rY(g)], [3.2, rY(g)]],
+                                        { color: CD.C.gray, width: 1, dash: [4, 4] }));
+      P.line(resid.map(p => [p[0], rY(p[1])]), { color: CD.C.purple, width: 2 });
+      P.scatter(resid.map(p => [p[0], rY(p[1])]), { color: CD.C.purple, r: 3 });
+      P.label(0.95, 1.01, "orange dashed: Φ(d'/2)   green: exact Bayes   blue: measured", { color: CD.C.navy });
+      P.label(0.95, 0.365, "purple: measured − Φ(d'/2); zero line orange, dashed guides at ±0.01",
+              { color: CD.C.purple });
+
+      CD.table("w9lab2out",
+        ["depth", "λ̄ per gene", "measured", "exact", "Φ(d'/2)", "exact − Φ"], rows);
+    }
+
+    CD.slider("w9lab2ctl", { label: "fold change between the types", min: 0, max: FOLDS.length - 1,
+                             step: 1, value: fi, fmt: i => FOLDS[i] }, i => { fi = i; run(); });
+  })();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glossary — How Much Data Does It Take to Tell Two Cell Types Apart?</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="notation.html">Notation card</a><a href="problem-bank.html">Problem bank</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Reference · every technical term in the project</span>
+    </div>
+    <h1 class="chapter-title">Glossary</h1>
+    <div class="chapter-sub">Statistics, biology, machine learning, and the project's own vocabulary — with the week each term appears and the Python name where there is one</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<p>Every entry gives a definition at the level the project actually uses, the week where the term is introduced or first matters, and the <code>celldetect</code> function or Python name where one exists. Terms are linkable: each row has an anchor, so other pages can point at a single definition — for example <a href="#g-dprime"><code>glossary.html#g-dprime</code></a>.</p>
+
+<p>The <a href="#confused">commonly confused pairs</a> at the end are the six distinctions that cause the most trouble. If you read nothing else on this page, read those.</p>
+
+<div class="toolbar-links">
+  <a href="#symbols">Symbols</a>
+  <a href="#A">A–C</a>
+  <a href="#D">D–F</a>
+  <a href="#G">G–L</a>
+  <a href="#M">M–P</a>
+  <a href="#Q">Q–S</a>
+  <a href="#T">T–W</a>
+  <a href="#confused">Confused pairs</a>
+</div>
+
+<h2 id="symbols">Symbols and numerals</h2>
+
+<table class="simple">
+  <tr><th>Symbol</th><th>Meaning</th><th>Week</th><th>Code</th></tr>
+  <tr id="g-10x"><td><strong>10x Genomics</strong></td>
+      <td>The company whose droplet-based platform produced the PBMC 3k dataset used in this project. A cell is co-encapsulated in an oil droplet with a bead carrying a cell <a href="#g-barcode">barcode</a>; captured mRNA molecules get that barcode plus a <a href="#g-umi">UMI</a>, and the result is a matrix of counts per gene per cell. Used here as the source of real data, not as a subject of study.</td>
+      <td>1 · 10</td><td><code>realdata.load_pbmc</code></td></tr>
+  <tr id="g-D"><td><strong>$D$</strong></td>
+      <td>The sequencing <a href="#g-depth">depth</a>: the number of molecules captured from one cell. The independent variable of Aim 1 and Aim 2.</td>
+      <td>1</td><td><code>depth=</code> in <code>simulate.simulate_cells</code></td></tr>
+  <tr id="g-dprime"><td><strong>$d'$</strong> ("d-prime")</td>
+      <td>The <strong>separation index</strong>: the gap between two distributions' means divided by their (pooled) standard deviation. For Poisson counts $d' = |\lambda_1 - \lambda_2| / \sqrt{\bar\lambda}$. The central quantity of the project, because it is dimensionless, it grows as $\sqrt{\text{data}}$, and accuracy is a known function of it. Borrowed from 1950s detection theory, where it means exactly the same thing.</td>
+      <td>3</td><td><code>detection.d_prime</code>, <code>detection.d_prime_total</code>, <code>beads.bead_d_prime</code>, <code>realdata.d_prime_overdispersed</code></td></tr>
+  <tr id="g-k"><td><strong>$k$</strong></td>
+      <td>The number of informative <a href="#g-marker">marker genes</a> combined. The second independent variable of Aim 1: $d' \propto \sqrt{k}$ under independence. (Also used as a count of successes in interval formulas; context disambiguates.)</td>
+      <td>5</td><td><code>n_genes</code> in <code>simulate.marker_profiles</code></td></tr>
+  <tr id="g-lambda"><td><strong>$\lambda$</strong></td>
+      <td>A Poisson rate — here, the expected count of a gene in a cell, $\lambda = D p$. Not a probability; it can be any positive number.</td>
+      <td>1</td><td><code>lam</code> throughout</td></tr>
+  <tr id="g-n"><td><strong>$n$</strong></td>
+      <td>In the bead experiment, the number of beads drawn in one trial — the analogue of depth. Elsewhere, a sample size.</td>
+      <td>6</td><td><code>n</code> in <code>beads.*</code></td></tr>
+  <tr id="g-q"><td><strong>$q$</strong></td>
+      <td>The <a href="#g-dropout">dropout</a> (discard) probability. The <em>keep</em> probability is $1-q$. Getting these the wrong way round is the single most common sign error in the project.</td>
+      <td>9</td><td><code>dropout=</code> in <code>simulate.apply_dropout</code></td></tr>
+  <tr id="g-Phi"><td><strong>$\Phi$</strong> (capital Phi)</td>
+      <td>The standard normal <strong>cumulative distribution function</strong>: $\Phi(z) = P(Z \le z)$ for $Z\sim\mathcal N(0,1)$. Increasing from 0 to 1, with $\Phi(0)=\tfrac12$. Appears in the project's headline result, accuracy $=\Phi(d'/2)$.</td>
+      <td>4</td><td><code>detection.normal_cdf</code>, <code>CD.Phi</code></td></tr>
+  <tr id="g-varphi"><td><strong>$\varphi$</strong> (lower-case phi)</td>
+      <td>The negative-binomial <a href="#g-dispersion">dispersion</a> parameter, defined by $\mathrm{Var} = m + \varphi m^{2}$. A completely different object from $\Phi$; see the <a href="#pair-phi">confused pairs</a>.</td>
+      <td>11</td><td><code>phi</code> in <code>realdata.d_prime_overdispersed</code></td></tr>
+</table>
+
+<h2 id="A">A</h2>
+
+<table class="simple">
+  <tr><th>Term</th><th>Definition</th><th>Week</th><th>Code</th></tr>
+  <tr id="g-accuracy"><td><strong>accuracy</strong></td>
+      <td>The fraction of cells (or trials) classified correctly. With two equally likely classes, chance is $0.5$ and the theoretical best is $\Phi(d'/2)$. Saturates at 1, which is why the project converts it back to $d'$ before fitting anything.</td>
+      <td>4</td><td><code>classify.accuracy</code>, <code>detection.accuracy_from_d_prime</code></td></tr>
+  <tr id="g-aim"><td><strong>aim</strong></td>
+      <td>One of the project's three strands: Aim 1 (theory, Weeks 1–5), Aim 2 (simulation and real data, Weeks 7–11), Aim 3 (the physical bead analog, Weeks 6–12). Each aim can fail independently, which is the point of having three.</td>
+      <td>1</td><td>—</td></tr>
+  <tr id="g-ambient"><td><strong>ambient RNA</strong></td>
+      <td>Free-floating mRNA in the cell suspension that gets captured into a droplet along with (or instead of) a cell's own molecules, adding a background that belongs to no particular cell. One of the real-data complications the bead experiment deliberately does not model.</td>
+      <td>6 · 10</td><td>—</td></tr>
+  <tr id="g-auc"><td><strong>AUC</strong> (area under the ROC curve)</td>
+      <td>The probability that a randomly chosen cell of type 2 receives a higher score than a randomly chosen cell of type 1. Threshold-free, so it measures the data's separability rather than a particular decision rule. Under the Gaussian model $\mathrm{AUC} = \Phi(d'/\sqrt2)$.</td>
+      <td>4</td><td><code>detection.roc_auc</code>, <code>detection.d_prime_from_auc</code></td></tr>
+</table>
+
+<h2>B</h2>
+
+<table class="simple">
+  <tr><th>Term</th><th>Definition</th><th>Week</th><th>Code</th></tr>
+  <tr id="g-barcode"><td><strong>barcode</strong></td>
+      <td>A short synthetic DNA sequence attached to every molecule captured from one droplet, so that after everything is pooled and sequenced you can tell which cell each read came from. Cell barcodes identify cells; <a href="#g-umi">UMIs</a> identify molecules.</td>
+      <td>10</td><td>—</td></tr>
+  <tr id="g-bayeserror"><td><strong>Bayes error</strong></td>
+      <td>The lowest error rate achievable by <em>any</em> classifier given the true distributions. It is a property of the data, not of an algorithm. $\Phi(d'/2)$ is a Gaussian approximation to $1 - $ Bayes error; for Poisson counts the exact value can be computed by summation.</td>
+      <td>4</td><td><code>detection.bayes_error_exact</code></td></tr>
+  <tr id="g-bernoulli"><td><strong>Bernoulli trial</strong></td>
+      <td>A single yes/no experiment with success probability $p$. The atom from which the binomial is built: $n$ independent Bernoulli trials summed give a binomial.</td>
+      <td>2</td><td>—</td></tr>
+  <tr id="g-binomial"><td><strong>binomial distribution</strong></td>
+      <td>The number of successes in $n$ independent trials each with probability $p$. Mean $np$, variance $np(1-p)$. Describes the beads exactly; describes gene counts too, but is indistinguishable from Poisson when $p$ is tiny and $n$ is large.</td>
+      <td>2</td><td><code>CD.binomial</code> (labs)</td></tr>
+  <tr id="g-blinding"><td><strong>blinding</strong></td>
+      <td>Withholding the true answer from the person making the guess, so that their guess cannot be influenced by it. In Aim 3 the guesser must not see which jar, must get no feedback within a block, and must not read the helper's reactions.</td>
+      <td>6</td><td><a href="bead-protocol.html">bead protocol §4</a></td></tr>
+  <tr id="g-bootstrap"><td><strong>bootstrap</strong></td>
+      <td>Estimating the uncertainty of a statistic by resampling your own data with replacement, recomputing the statistic each time, and looking at the spread. Used here to put an interval on a fitted exponent, where no closed-form standard error is available.</td>
+      <td>13</td><td><code>stats.bootstrap_ci</code></td></tr>
+</table>
+
+<h2>C</h2>
+
+<table class="simple">
+  <tr><th>Term</th><th>Definition</th><th>Week</th><th>Code</th></tr>
+  <tr id="g-celltype"><td><strong>cell type</strong></td>
+      <td>Biologically, a category of cell defined by what it does and expresses. <em>For this project</em>, a probability distribution over which gene the next transcript belongs to — a vector $p^{(t)}$ summing to 1. Reducing a cell type to a fixed vector is a simplification, and it is the one that breaks in Week 11.</td>
+      <td>1</td><td><code>simulate.marker_profiles</code></td></tr>
+  <tr id="g-clt"><td><strong>central limit theorem</strong></td>
+      <td>Sums (and averages) of many independent contributions tend toward a normal distribution, regardless of what the individual contributions look like. It is what licenses treating Poisson counts as Gaussian, and therefore what puts the $\Phi$ into $\Phi(d'/2)$.</td>
+      <td>4</td><td>—</td></tr>
+  <tr id="g-chance"><td><strong>chance level</strong></td>
+      <td>The accuracy of guessing without using the data: $0.5$ for two equally likely classes. Any accuracy claim must be read against it, and any measured accuracy at or below it converts to $d' \le 0$ and cannot go on a log plot.</td>
+      <td>1</td><td>—</td></tr>
+  <tr id="g-ledger"><td><strong>claim ledger</strong></td>
+      <td>The project's running table in which every claim appears with its measured value, its predicted value, its interval, and its status label. Built in Week 13 and carried into the report. Its purpose is to make "the data agrees with the theory" and "I want the data to agree with the theory" impossible to blur.</td>
+      <td>13</td><td><code>progress/week13_claims.md</code></td></tr>
+  <tr id="g-claimstatus"><td><strong>claim status labels</strong></td>
+      <td>The four tags every claim carries. <span class="claim proved">proved</span> you can derive it at a whiteboard, on demand, without notes. <span class="claim cited">cited</span> someone else established it and you give a checkable reference. <span class="claim observed">observed</span> measured here, with a seed and an interval, but not derived. <span class="claim conjectured">conjectured</span> believed, and stated plainly as a belief. An unlabelled claim is not admissible.</td>
+      <td>1 · 13</td><td><code>.claim</code> CSS classes</td></tr>
+  <tr id="g-classifier"><td><strong>classifier</strong></td>
+      <td>Any rule that takes a cell's counts and returns a predicted type. In this project the classifier is deliberately <em>not</em> the interesting part: all reasonable classifiers converge to the same ceiling, so the project studies the ceiling.</td>
+      <td>8</td><td><code>celldetect.classify</code></td></tr>
+  <tr id="g-ci"><td><strong>confidence interval</strong></td>
+      <td>A range of values consistent with your data at a stated confidence level. "95%" refers to the procedure's long-run coverage, not to a probability that this particular interval contains the truth. Every proportion in this project gets one.</td>
+      <td>13</td><td><code>stats.wilson_interval</code></td></tr>
+  <tr id="g-cv"><td><strong>cross-validation</strong></td>
+      <td>Splitting the data into $n$ folds, training on $n-1$ and testing on the remaining one, rotating through all folds, and averaging. Uses every cell for both training and testing without ever testing on a cell that was trained on. Any feature selection must happen <em>inside</em> each fold.</td>
+      <td>8</td><td><code>classify.cross_validated_accuracy</code></td></tr>
+</table>
+
+<h2 id="D">D</h2>
+
+<table class="simple">
+  <tr><th>Term</th><th>Definition</th><th>Week</th><th>Code</th></tr>
+  <tr id="g-boundary"><td><strong>decision boundary</strong></td>
+      <td>The surface in feature space separating the region where a classifier says "type 1" from where it says "type 2". For the Poisson log-likelihood ratio it is a plane (the rule is linear in the counts), which is why logistic regression can match naive Bayes exactly in principle.</td>
+      <td>8</td><td>—</td></tr>
+  <tr id="g-depth"><td><strong>depth</strong></td>
+      <td>The number of mRNA molecules captured and counted from one cell — the project's measure of "how much data per cell". Distinct from reads and from the observed library size; see the <a href="#pair-depth">confused pairs</a>.</td>
+      <td>1</td><td><code>depth=</code> in <code>simulate.*</code></td></tr>
+  <tr id="g-ceiling"><td><strong>depth ceiling</strong> (the knee)</td>
+      <td>Under overdispersion, $d'$ stops growing with depth and saturates at $|\Delta p| / (\bar p \sqrt{\varphi})$. The <strong>knee</strong> is where the transition happens, at a mean count of $\bar m = 1/\varphi$. Past it, deeper sequencing buys essentially nothing. Week 11's headline result.</td>
+      <td>11</td><td><code>realdata.d_prime_overdispersed</code></td></tr>
+  <tr id="g-dispersion"><td><strong>dispersion</strong> ($\varphi$)</td>
+      <td>The parameter measuring how much a gene's variance exceeds the Poisson floor: $\mathrm{Var} = m + \varphi m^{2}$. Unlike the Fano factor it does <em>not</em> change with sequencing depth, which is why it is the quantity to report.</td>
+      <td>11</td><td><code>realdata.negative_binomial_dispersion</code></td></tr>
+  <tr id="g-downsampling"><td><strong>downsampling</strong></td>
+      <td>Discarding a random fraction of a dataset's molecules to imitate a shallower experiment. Legitimate because of the <a href="#g-thinning">thinning theorem</a>: the result has exactly the distribution a genuinely shallower run would have had, under the Poisson model.</td>
+      <td>2 · 10</td><td><code>counting.downsample_counts</code>, <code>realdata.downsample_matrix</code></td></tr>
+  <tr id="g-dropout"><td><strong>dropout</strong></td>
+      <td>The loss of captured molecules before they are counted, modelled as each molecule being discarded independently with probability $q$. If the loss does not depend on which gene a molecule belongs to, dropout is <em>exactly</em> equivalent to sequencing at depth $D(1-q)$ — nothing more.</td>
+      <td>9</td><td><code>simulate.apply_dropout</code></td></tr>
+</table>
+
+<h2>E</h2>
+
+<table class="simple">
+  <tr><th>Term</th><th>Definition</th><th>Week</th><th>Code</th></tr>
+  <tr id="g-effdepth"><td><strong>effective depth</strong></td>
+      <td>$D_{\text{eff}} = D(1-q)$: the depth that a dropout-affected measurement is statistically equivalent to. Plotting a dropout arm against effective depth rather than nominal depth should make it fall on top of the no-dropout curve, and that collapse is the testable prediction.</td>
+      <td>9 · 12</td><td><code>dropout=</code> in <code>beads.bead_d_prime</code></td></tr>
+  <tr id="g-expectation"><td><strong>expectation</strong> ($E[X]$)</td>
+      <td>The probability-weighted average of a random variable — its long-run mean. Adds across sums whether or not the variables are independent, which is the asymmetry with variance that the whole $\sqrt k$ law turns on.</td>
+      <td>2</td><td><code>counting.empirical_moments</code></td></tr>
+  <tr id="g-expression"><td><strong>expression</strong></td>
+      <td>How much of a gene's mRNA a cell contains. In this project always as a <em>fraction</em> $p_g$ of the transcriptome, so that a count is $\mathrm{Poisson}(Dp_g)$ and depth is separated from biology.</td>
+      <td>1</td><td><code>realdata.estimate_rates</code></td></tr>
+</table>
+
+<h2>F</h2>
+
+<table class="simple">
+  <tr><th>Term</th><th>Definition</th><th>Week</th><th>Code</th></tr>
+  <tr id="g-fallback"><td><strong>fallback ladder</strong></td>
+      <td>The plan's pre-specified sequence of scope reductions, F1–F4, describing in advance how the project contracts if a milestone slips. Written before the pressure arrives so that the decision is not made under it.</td>
+      <td>plans/ · 9</td><td>—</td></tr>
+  <tr id="g-fano"><td><strong>Fano factor</strong></td>
+      <td>Variance divided by mean. Exactly 1 for Poisson data; greater than 1 means <a href="#g-overdispersion">overdispersed</a>. Depends on depth, so a Fano factor quoted without the mean it was measured at is not a reportable number.</td>
+      <td>1</td><td><code>counting.fano_factor</code>, <code>realdata.gene_fano</code></td></tr>
+  <tr id="g-feature"><td><strong>feature</strong></td>
+      <td>An input variable to a classifier. Here, one gene's count in one cell. A cell is then a point in $k$-dimensional feature space.</td>
+      <td>8</td><td>columns of <code>X</code></td></tr>
+  <tr id="g-foldchange"><td><strong>fold change</strong></td>
+      <td>The ratio of a gene's expression between two cell types. Widely used to pick markers and <strong>not the same as $d'$</strong>: a 3-fold change on a count of 2 is far less useful than a 1.5-fold change on a count of 25, because fold change ignores noise.</td>
+      <td>7 · 10</td><td><code>fold_change=</code> in <code>simulate.marker_profiles</code></td></tr>
+</table>
+
+<h2 id="G">G</h2>
+
+<table class="simple">
+  <tr><th>Term</th><th>Definition</th><th>Week</th><th>Code</th></tr>
+  <tr id="g-gene"><td><strong>gene</strong></td>
+      <td>A stretch of DNA transcribed into mRNA. For this project, simply an index: one of the ~20,000 categories a captured molecule can fall into.</td>
+      <td>1</td><td>columns of <code>X</code></td></tr>
+  <tr id="g-generative"><td><strong>generative model</strong></td>
+      <td>A model that says how the data was produced, and can therefore be run forward to make new data. "Type $t$ has rate vector $p^{(t)}$; draw $D$ molecules" is a generative model. Contrast a discriminative model, which only learns a boundary and cannot generate anything.</td>
+      <td>7</td><td><code>celldetect.simulate</code></td></tr>
+  <tr id="g-gradient"><td><strong>gradient descent</strong></td>
+      <td>Fitting parameters by repeatedly stepping downhill on a loss function. Used here to fit logistic regression by hand, so that the classifier is not a black box.</td>
+      <td>8</td><td><code>classify.LogisticRegression</code></td></tr>
+</table>
+
+<h2>H · I</h2>
+
+<table class="simple">
+  <tr><th>Term</th><th>Definition</th><th>Week</th><th>Code</th></tr>
+  <tr id="g-hypergeometric"><td><strong>hypergeometric distribution</strong></td>
+      <td>The count of successes when drawing <em>without</em> replacement from a finite pool. Its variance is smaller than the binomial's by the finite-population factor $(N-n)/(N-1)$. Relevant because a bead scoop is technically hypergeometric, which the protocol keeps negligible by using small scoops.</td>
+      <td>6</td><td><a href="bead-protocol.html">bead protocol §5</a></td></tr>
+  <tr id="g-independence"><td><strong>independence</strong></td>
+      <td>Two random variables are independent if knowing one tells you nothing about the other. Required for variances to add, and therefore required for the $\sqrt k$ law. Genes are assumed independent throughout and are not; the violation makes the prediction optimistic.</td>
+      <td>1 · 5</td><td>—</td></tr>
+  <tr id="g-indicator"><td><strong>indicator variable</strong></td>
+      <td>A variable that is 1 when an event happens and 0 otherwise. Its expectation is the event's probability, which is the trick that makes the binomial's mean and variance a two-line derivation.</td>
+      <td>2</td><td>—</td></tr>
+</table>
+
+<h2>K · L</h2>
+
+<table class="simple">
+  <tr><th>Term</th><th>Definition</th><th>Week</th><th>Code</th></tr>
+  <tr id="g-keepprob"><td><strong>keep probability</strong></td>
+      <td>The probability a molecule survives thinning: $c = 1 - q$. The functions in this project are split between the two conventions on purpose, and the docstrings say which — read them.</td>
+      <td>2</td><td><code>keep_prob=</code> in <code>counting.downsample_counts</code>; <code>CD.thin(count, keep, r)</code></td></tr>
+  <tr id="g-knn"><td><strong>k-nearest neighbours</strong> (kNN)</td>
+      <td>Classify a cell by the majority label among its $k$ closest training cells. Makes no assumption about the count distribution, which is what makes it a useful check: if kNN beats naive Bayes, your generative model is wrong.</td>
+      <td>8</td><td><code>classify.knn_predict</code></td></tr>
+  <tr id="g-leakage"><td><strong>leakage</strong></td>
+      <td>Any route by which information about the test set reaches the model before evaluation. The classic case here is selecting marker genes using all the cells' labels and only then splitting into train and test — which inflates accuracy and looks like success.</td>
+      <td>10</td><td><code>realdata.select_markers</code> (call inside the training fold)</td></tr>
+  <tr id="g-librarysize"><td><strong>library size</strong></td>
+      <td>The total number of counted molecules in one cell — the row sum of the count matrix. The <em>observed</em> quantity corresponding to the modelled depth $D$; the two differ, and Week 10 is where that starts to matter.</td>
+      <td>1 · 10</td><td><code>counting.total_counts</code></td></tr>
+  <tr id="g-likelihood"><td><strong>likelihood</strong></td>
+      <td>The probability of the data you observed, viewed as a function of the parameters rather than of the data. Not a probability distribution over parameters — that would be a <a href="#g-posterior">posterior</a>.</td>
+      <td>4 · 5</td><td><code>counting.poisson_logpmf</code></td></tr>
+  <tr id="g-llr"><td><strong>log-likelihood ratio</strong> (LLR)</td>
+      <td>$\log\big(P(\text{data}\mid\text{type 2}) / P(\text{data}\mid\text{type 1})\big)$. The optimal statistic for a two-class decision: threshold it at 0 (with equal priors) and you have the Bayes-optimal rule. For Poisson counts it is <em>linear</em> in the counts, which is the fact that makes the entire theory tractable.</td>
+      <td>5</td><td><code>detection.log_likelihood_ratio</code></td></tr>
+  <tr id="g-logistic"><td><strong>logistic regression</strong></td>
+      <td>A classifier that fits a linear score and squashes it through the logistic function to get a probability. Since the optimal rule here is already linear, logistic regression can in principle match it exactly; any gap is a finite-sample effect and is a result, not a bug.</td>
+      <td>8</td><td><code>classify.LogisticRegression</code></td></tr>
+</table>
+
+<h2 id="M">M</h2>
+
+<table class="simple">
+  <tr><th>Term</th><th>Definition</th><th>Week</th><th>Code</th></tr>
+  <tr id="g-marker"><td><strong>marker gene</strong></td>
+      <td>A gene whose expression differs between the two cell types enough to be useful for telling them apart. "Enough" should be measured by $d'$, not by fold change.</td>
+      <td>1 · 10</td><td><code>realdata.select_markers</code>, <code>simulate.marker_profiles</code></td></tr>
+  <tr id="g-mom"><td><strong>method of moments</strong></td>
+      <td>Estimating parameters by setting sample moments equal to theoretical ones and solving. Used here for dispersion: $\hat\varphi = (s^{2} - \bar m)/\bar m^{2}$. Simple, transparent, and noisy — and it can return a negative value, which must be clamped and reported rather than hidden.</td>
+      <td>11</td><td><code>realdata.negative_binomial_dispersion</code></td></tr>
+  <tr id="g-milestone"><td><strong>milestone</strong></td>
+      <td>A scheduled verification event, M1–M8, at which specific things must be demonstrable to the mentor. Milestones are checked against what you can <em>explain</em>, not against what runs.</td>
+      <td>1</td><td>git tags: <code>theory-complete</code>, <code>simulator-validated</code>, <code>evidence-complete</code>, <code>report-draft</code>, <code>v1.0</code></td></tr>
+  <tr id="g-mrna"><td><strong>mRNA</strong> (messenger RNA)</td>
+      <td>The transcribed copy of a gene that carries its instructions to be translated into protein. A human cell holds a few hundred thousand mRNA molecules; a single-cell experiment counts a few thousand of them.</td>
+      <td>1</td><td>—</td></tr>
+</table>
+
+<h2>N · O</h2>
+
+<table class="simple">
+  <tr><th>Term</th><th>Definition</th><th>Week</th><th>Code</th></tr>
+  <tr id="g-naivebayes"><td><strong>naive Bayes</strong></td>
+      <td>A classifier that assumes the features are conditionally independent given the class, so the log-likelihood ratio is a sum of per-gene terms. "Naive" refers to that independence assumption. With the true Poisson rates it <em>is</em> the Bayes-optimal rule, which is why it is the project's baseline.</td>
+      <td>5</td><td><code>classify.naive_bayes_predict</code>, <code>detection.posterior_log_odds</code></td></tr>
+  <tr id="g-nb"><td><strong>negative binomial</strong></td>
+      <td>A count distribution with an extra parameter beyond the mean, arising naturally as a Poisson whose rate is itself gamma-distributed (a gamma–Poisson mixture). Variance $m + \varphi m^{2}$. The RNA-seq field's standard model, because real replicate counts are consistently more variable than Poisson.</td>
+      <td>11</td><td><code>realdata.d_prime_overdispersed</code>, <code>CD.nbLogRatio</code></td></tr>
+  <tr id="g-normalization"><td><strong>normalization</strong></td>
+      <td>Rescaling each cell's counts to remove differences in library size, so that cells are comparable. Necessary in practice and slightly dangerous in theory, because it removes a shared factor whose presence is part of what overdispersion measures.</td>
+      <td>10</td><td>—</td></tr>
+  <tr id="g-null"><td><strong>null hypothesis</strong></td>
+      <td>The default claim a test tries to reject — typically "there is no effect". Rejecting it is evidence for something; failing to reject it is <em>not</em> evidence that it is true, especially with the sample sizes in this project.</td>
+      <td>13</td><td><code>stats.permutation_test</code></td></tr>
+  <tr id="g-overdispersion"><td><strong>overdispersion</strong></td>
+      <td>Variance exceeding what the counting model predicts (Fano factor above 1). In scRNA-seq the cause is largely biological: cells of the "same type" are not identical, so the rate itself varies from cell to cell. Week 11's central finding, and the reason the $\sqrt{D}$ law has a ceiling.</td>
+      <td>11</td><td><code>realdata.gene_fano</code></td></tr>
+  <tr id="g-overfitting"><td><strong>overfitting</strong></td>
+      <td>Learning features of the training sample that do not generalize. Diagnosed by a gap between training and test accuracy; 1-NN is the extreme case, scoring 100% on its own training data by construction.</td>
+      <td>8</td><td><code>classify.train_test_split</code></td></tr>
+</table>
+
+<h2>P</h2>
+
+<table class="simple">
+  <tr><th>Term</th><th>Definition</th><th>Week</th><th>Code</th></tr>
+  <tr id="g-pbmc"><td><strong>PBMC</strong> (peripheral blood mononuclear cell)</td>
+      <td>The round-nucleus white blood cells — T cells, B cells, monocytes, NK cells. Easy to obtain from a blood sample and easy to dissociate, which is why "PBMC 3k" is single-cell genomics' equivalent of a standard test image.</td>
+      <td>10</td><td><code>realdata.load_pbmc</code></td></tr>
+  <tr id="g-permutation"><td><strong>permutation test</strong></td>
+      <td>Shuffle the labels many times, recompute your statistic each time, and see where the real value sits in that distribution. Assumption-light, and doubles as a bug detector: a pipeline that scores above chance on shuffled labels has leakage.</td>
+      <td>13</td><td><code>stats.permutation_test</code></td></tr>
+  <tr id="g-poisson"><td><strong>Poisson distribution</strong></td>
+      <td>The count of rare independent events at rate $\lambda$: $P(X=k) = \lambda^{k}e^{-\lambda}/k!$. Mean $\lambda$ and — the coincidence the whole project rests on — variance $\lambda$ too, so the relative noise is $1/\sqrt\lambda$.</td>
+      <td>1</td><td><code>counting.sample_counts</code>, <code>counting.poisson_pmf</code>, <code>CD.poisson</code></td></tr>
+  <tr id="g-posterior"><td><strong>posterior</strong></td>
+      <td>The probability of each class <em>after</em> seeing the data: prior times likelihood, normalized. What a classifier should ideally report instead of a bare label.</td>
+      <td>5 · 9</td><td><code>detection.posterior_log_odds</code></td></tr>
+  <tr id="g-power"><td><strong>power</strong> (statistical)</td>
+      <td>The probability that an experiment detects a real effect of a given size. Computed <em>before</em> running, from the effect size and the sample size. A design without adequate power is not an experiment; it is a way of spending a month.</td>
+      <td>6</td><td><code>beads.trials_needed</code></td></tr>
+  <tr id="g-prior"><td><strong>prior</strong></td>
+      <td>The probability of each class before seeing any data. Taken as $\tfrac12$ each throughout, which is what makes the optimal threshold sit exactly halfway and produces the factor of 2 in $\Phi(d'/2)$.</td>
+      <td>4</td><td><code>priors=</code> in <code>detection.posterior_log_odds</code></td></tr>
+  <tr id="g-progresslog"><td><strong>progress log</strong></td>
+      <td>The weekly file in <code>progress/</code> recording what was derived (with status labels), what was built and with which seed, the bead trials completed, where you are stuck, and the <a href="ai-policy.html">Tools used</a> line. Filled in from <code>progress/TEMPLATE.md</code>.</td>
+      <td>1</td><td><code>progress/weekNN.md</code></td></tr>
+  <tr id="g-pvalue"><td><strong>p-value</strong></td>
+      <td>The probability of seeing a result at least as extreme as yours, <em>if the null hypothesis were true</em>. Not the probability that the null is true, and not a measure of how important an effect is.</td>
+      <td>13</td><td><code>stats.permutation_test</code></td></tr>
+</table>
+
+<h2 id="Q">Q · R</h2>
+
+<table class="simple">
+  <tr><th>Term</th><th>Definition</th><th>Week</th><th>Code</th></tr>
+  <tr id="g-quadrature"><td><strong>quadrature</strong> (adding in)</td>
+      <td>Combining quantities as $\sqrt{a^{2}+b^{2}+\cdots}$ rather than $a+b+\cdots$. Independent evidence combines this way because means add while <em>variances</em> add, so the ratio grows as the square root of the count.</td>
+      <td>5</td><td><code>detection.combine_d_prime</code>, <code>CD.combineDPrime</code></td></tr>
+  <tr id="g-read"><td><strong>read</strong></td>
+      <td>One sequence output by the sequencing machine. Several reads can come from the same original molecule after PCR amplification, which is why reads are deduplicated by <a href="#g-umi">UMI</a> before counting. Reads are what you buy; molecules are what you get.</td>
+      <td>10</td><td>—</td></tr>
+  <tr id="g-regularization"><td><strong>regularization</strong></td>
+      <td>Penalizing large parameter values during fitting, to trade a little bias for less variance. Relevant here mainly as a reason logistic regression can behave differently from naive Bayes on small training sets.</td>
+      <td>8</td><td><code>classify.LogisticRegression</code></td></tr>
+  <tr id="g-replacement"><td><strong>replacement</strong> (drawing with)</td>
+      <td>Returning each drawn item before the next draw, so successive draws are independent and identically distributed. Required for the bead counts to be binomial; without it they are <a href="#g-hypergeometric">hypergeometric</a> and every formula shifts.</td>
+      <td>6</td><td><a href="bead-protocol.html">bead protocol §5</a></td></tr>
+  <tr id="g-roc"><td><strong>ROC curve</strong></td>
+      <td>The trace of (false-positive rate, true-positive rate) as a decision threshold sweeps from one extreme to the other. Describes a detector's behaviour at every operating point at once, independent of where you choose to put the threshold.</td>
+      <td>4</td><td><code>detection.roc_curve</code>, <code>CD.roc</code></td></tr>
+</table>
+
+<h2>S</h2>
+
+<table class="simple">
+  <tr><th>Term</th><th>Definition</th><th>Week</th><th>Code</th></tr>
+  <tr id="g-sample"><td><strong>sample</strong></td>
+      <td>A subset drawn from a larger whole. The project's opening claim is that a sequencing count is a sample from a cell's transcriptome, not a measurement of it — and everything follows from taking that literally.</td>
+      <td>1</td><td>—</td></tr>
+  <tr id="g-scrnaseq"><td><strong>scRNA-seq</strong> (single-cell RNA sequencing)</td>
+      <td>Measuring gene expression separately in each of many individual cells, rather than averaged over a tissue. The averaging is what it removes; the counting noise is what it adds.</td>
+      <td>1</td><td>—</td></tr>
+  <tr id="g-seed"><td><strong>seed</strong></td>
+      <td>The integer that initializes a pseudorandom generator, so that a run can be reproduced exactly. Every experiment script in this project has one and prints it; an irreproducible figure is not a result.</td>
+      <td>1</td><td><code>SEED</code> in <code>experiments/*.py</code>; <code>CD.rng(seed)</code></td></tr>
+  <tr id="g-sensitivity"><td><strong>sensitivity</strong></td>
+      <td>The fraction of true positives correctly identified — the true-positive rate, the $y$ axis of an ROC curve. Also called recall.</td>
+      <td>4 · 14</td><td><code>detection.roc_curve</code></td></tr>
+  <tr id="g-srs"><td><strong>simple random sample</strong></td>
+      <td>Every item equally likely to be chosen, independently of the others. The idealization behind treating capture as unbiased; real capture efficiency varies by gene, which is one of the project's stated assumptions.</td>
+      <td>1</td><td>—</td></tr>
+  <tr id="g-specificity"><td><strong>specificity</strong></td>
+      <td>The fraction of true negatives correctly identified, i.e. $1 - $ false-positive rate. The complement of the ROC curve's $x$ axis.</td>
+      <td>4 · 15</td><td><code>detection.roc_curve</code></td></tr>
+  <tr id="g-se"><td><strong>standard error</strong></td>
+      <td>The standard deviation of an <em>estimate</em>, as opposed to of the underlying data. For a proportion, $\sqrt{p(1-p)/n}$. Shrinks as $1/\sqrt n$ — the same square root as everything else here.</td>
+      <td>6 · 13</td><td><code>stats.standard_error_of_proportion</code></td></tr>
+  <tr id="g-standardization"><td><strong>standardization</strong></td>
+      <td>Rescaling each feature to zero mean and unit variance before fitting. Necessary for gradient descent to converge at a sensible rate when features have wildly different scales, and it changes the fitted coefficients' units, not the classifier's decisions.</td>
+      <td>8</td><td><code>standardize=</code> in <code>classify.LogisticRegression</code></td></tr>
+  <tr id="g-standin"><td><strong>stand-in data</strong></td>
+      <td>Simulated data used in place of real data so that a pipeline can be built and tested before the real thing arrives. Every figure made from it is stamped, and a stamped figure never enters the report — <code>week14_report_figures.py</code> enforces this.</td>
+      <td>10 · 12</td><td><code>USED_STAND_IN</code> flag in the experiment scripts</td></tr>
+  <tr id="g-sufficient"><td><strong>sufficient statistic</strong></td>
+      <td>A summary of the data that loses nothing relevant to the parameter: once you know it, the raw data tells you no more. For $n$ Bernoulli draws the count of successes is sufficient for $p$, which is why the bead guesser can throw away the <em>order</em> of the beads and lose nothing.</td>
+      <td>5 (implicit)</td><td>—</td></tr>
+  <tr id="g-surrogate"><td><strong>surrogate data</strong></td>
+      <td>A clearly-labelled synthetic substitute for PBMC 3k, so that the test suite runs on a laptop with no network and no download. Distinct from stand-in data only in intent: surrogate data exists permanently for testing, stand-in data is temporary scaffolding.</td>
+      <td>10</td><td><code>realdata.surrogate_pbmc</code></td></tr>
+</table>
+
+<h2 id="T">T</h2>
+
+<table class="simple">
+  <tr><th>Term</th><th>Definition</th><th>Week</th><th>Code</th></tr>
+  <tr id="g-tally"><td><strong>tally sheet</strong></td>
+      <td>The printed, pre-randomized sheet used to run a bead session: one row per trial, with <code>true_jar</code> filled in advance and covered up, and <code>guess</code> and <code>correct</code> written in by hand. The paper sheet is the primary record; the CSV is a transcription of it.</td>
+      <td>6</td><td><code>beads.write_tally_template</code>, <code>beads.load_tally</code>, <code>beads.validate_tally</code></td></tr>
+  <tr id="g-testset"><td><strong>test set</strong></td>
+      <td>Data held out from training and used exactly once, to estimate how the classifier performs on cells it has never seen. Touched more than once, it stops being a test set.</td>
+      <td>8</td><td><code>classify.train_test_split</code></td></tr>
+  <tr id="g-thinning"><td><strong>thinning</strong></td>
+      <td>Keeping each element of a Poisson count independently with probability $c$. <strong>The thinning theorem:</strong> the result is $\mathrm{Poisson}(c\lambda)$ — still Poisson, at the reduced rate. This one theorem justifies downsampling, explains dropout, and predicts the bead dropout arm's collapse.</td>
+      <td>2</td><td><code>counting.downsample_counts</code>, <code>CD.thin</code></td></tr>
+  <tr id="g-trainingset"><td><strong>training set</strong></td>
+      <td>The data a classifier is allowed to learn from, including any marker selection or preprocessing that uses labels.</td>
+      <td>8</td><td><code>classify.train_test_split</code></td></tr>
+  <tr id="g-transcriptome"><td><strong>transcriptome</strong></td>
+      <td>The full set of mRNA molecules present in a cell at one moment — a few hundred thousand molecules spread over ~20,000 genes. What the sequencer samples from.</td>
+      <td>1</td><td>—</td></tr>
+  <tr id="g-type1"><td><strong>type I error</strong></td>
+      <td>A false positive: rejecting a null hypothesis that is true. Its rate is the significance level $\alpha$ you chose.</td>
+      <td>13</td><td><code>stats.bonferroni</code></td></tr>
+  <tr id="g-type2"><td><strong>type II error</strong></td>
+      <td>A false negative: failing to reject a null hypothesis that is false. Its rate is $1 - $ power, and it is the error an underpowered bead design makes.</td>
+      <td>13</td><td><code>beads.trials_needed</code></td></tr>
+</table>
+
+<h2>U · V · W</h2>
+
+<table class="simple">
+  <tr><th>Term</th><th>Definition</th><th>Week</th><th>Code</th></tr>
+  <tr id="g-umi"><td><strong>UMI</strong> (unique molecular identifier)</td>
+      <td>A random tag attached to each captured molecule before amplification, so that many reads from one molecule can be collapsed back to a count of one. UMI counts, not read counts, are what "molecules captured" means in this project.</td>
+      <td>10</td><td>—</td></tr>
+  <tr id="g-unbiased"><td><strong>unbiased estimator</strong></td>
+      <td>An estimator whose expectation equals the quantity it estimates. The sample variance is unbiased only when it divides by $n-1$, which is why <code>fano_factor</code> uses <code>ddof=1</code> — dividing by $n$ biases the Fano factor low by $(n-1)/n$.</td>
+      <td>1</td><td><code>ddof=1</code> in <code>counting.fano_factor</code></td></tr>
+  <tr id="g-variance"><td><strong>variance</strong></td>
+      <td>$E[(X - E[X])^{2}]$ — the mean squared deviation from the mean. Adds across sums only when the variables are independent, which is the asymmetry with expectation that the whole project turns on.</td>
+      <td>2</td><td><code>counting.empirical_moments</code></td></tr>
+  <tr id="g-wilson"><td><strong>Wilson interval</strong></td>
+      <td>A confidence interval for a proportion obtained by asking which values of $p$ are consistent with the observation, rather than by estimating the standard error at $\hat p$. Never collapses to zero width at $k = 0$ or $k = n$, and has far better coverage than the textbook (Wald) interval at small $n$. The project's default everywhere.</td>
+      <td>12 · 13</td><td><code>stats.wilson_interval</code>, <code>CD.wilson</code></td></tr>
+</table>
+
+<h2 id="confused">Commonly confused pairs</h2>
+
+<p>Six distinctions that account for most of the confusion in this project. Each one has cost somebody a week.</p>
+
+<div class="box pitfall" id="pair-phi">
+  <span class="box-tag">1 &nbsp;$\Phi$ versus $\varphi$</span>
+  <p><strong>$\Phi$</strong> (capital) is the standard normal <em>cumulative distribution function</em>. It is a function, it takes a $z$-score, it returns a probability between 0 and 1, and it appears in accuracy $= \Phi(d'/2)$. <code>detection.normal_cdf</code>.</p>
+  <p><strong>$\varphi$</strong> (lower-case) is the negative-binomial <em>dispersion parameter</em>. It is a number, it is a property of a gene, it is typically between 0 and a few, and it appears in $\mathrm{Var} = m + \varphi m^{2}$. <code>realdata.negative_binomial_dispersion</code>.</p>
+  <p>They have nothing to do with each other and the collision is purely notational. Be aware also that in many statistics texts lower-case $\phi$ means the normal <em>density</em> (the derivative of $\Phi$) — a third meaning. When you write for a reader outside this project, define the symbol.</p>
+</div>
+
+<div class="box pitfall" id="pair-depth">
+  <span class="box-tag">2 &nbsp;Depth versus library size versus read count</span>
+  <p><strong>Depth $D$</strong> is the model parameter: the number of molecules captured from a cell. It is what you set in the simulator and what the theory's $\sqrt D$ refers to.</p>
+  <p><strong>Library size</strong> is the observed row sum of the count matrix for a cell — the number of UMIs actually recorded. It is the empirical stand-in for $D$, and it varies enormously between cells, which is itself a source of overdispersion.</p>
+  <p><strong>Read count</strong> is what you buy from the sequencing facility. Several reads collapse to one UMI after deduplication, so reads exceed molecules, by a factor that depends on how deeply the library was sequenced. Vendor depth recommendations are quoted in <em>reads per cell</em>, which is <strong>not</strong> your $D$.</p>
+  <p>Practical consequence: "we sequenced at 50,000 reads per cell" and "each cell contributes 3,000 molecules" can both be true of the same experiment. When you plot against depth, say which one you mean, in the axis label.</p>
+</div>
+
+<div class="box pitfall" id="pair-accuracy">
+  <span class="box-tag">3 &nbsp;Accuracy versus $d'$</span>
+  <p><strong>Accuracy</strong> is bounded: it lives in $[0.5, 1]$ for a two-class problem and it <em>saturates</em>. Equal changes in the underlying separability produce wildly unequal changes in accuracy depending on where you are — from 0.55 to 0.60 is a small change in $d'$, from 0.98 to 0.99 is a large one.</p>
+  <p><strong>$d'$</strong> is unbounded and scales cleanly: it doubles when the data quadruples, always, everywhere on the range.</p>
+  <p>Consequence, and it is the methodological hinge of Week 12: <strong>fit exponents in $d'$ space, never in accuracy space.</strong> Fitting a power law to accuracy returns a number ($0.104$ for the 30/35 jars) that is not an estimate of anything and that changes when you change the beads. Convert first: $d' = 2\Phi^{-1}(\text{accuracy})$.</p>
+  <p>Second consequence: only $d'$ is comparable across experiments with different units of data. Accuracy of 0.7 on beads and accuracy of 0.7 on cells are not the same statement about anything.</p>
+</div>
+
+<div class="box pitfall" id="pair-dropout">
+  <span class="box-tag">4 &nbsp;Dropout $q$ versus keep probability $c$</span>
+  <p>$c = 1 - q$. Trivially. And yet this is the most frequent sign error in the codebase, because the two conventions coexist on purpose:</p>
+  <table class="simple">
+    <tr><th>Function</th><th>Argument</th><th>Meaning of a value of 0.3</th></tr>
+    <tr><td><code>counting.downsample_counts(counts, keep_prob, rng)</code></td><td><code>keep_prob</code></td><td>keep 30%, <strong>lose 70%</strong></td></tr>
+    <tr><td><code>realdata.downsample_matrix(X, keep_prob, rng)</code></td><td><code>keep_prob</code></td><td>keep 30%</td></tr>
+    <tr><td><code>simulate.apply_dropout(X, dropout, rng)</code></td><td><code>dropout</code></td><td><strong>lose 30%</strong>, keep 70%</td></tr>
+    <tr><td><code>beads.bead_d_prime(n, p_a, p_b, dropout)</code></td><td><code>dropout</code></td><td>lose 30%</td></tr>
+    <tr><td><code>CD.thin(count, keep, r)</code></td><td><code>keep</code></td><td>keep 30%</td></tr>
+  </table>
+  <p>The signature of getting it backwards: your dropout curve is <em>above</em> the no-dropout curve. Dropout can only ever cost you data, so if losing molecules improved your accuracy, you inverted a probability. Check this before checking anything else.</p>
+</div>
+
+<div class="box pitfall" id="pair-fano">
+  <span class="box-tag">5 &nbsp;Fano factor versus dispersion</span>
+  <p><strong>Fano factor</strong> $F = \mathrm{Var}/\mathrm{mean}$. Equals 1 for Poisson. <strong>It depends on depth:</strong> for a gamma–Poisson gene, $F = 1 + \varphi m$, so a gene measured at half the depth reports a smaller $F$ on identical biology. Quoting "$F = 3.4$" without saying at what mean count is not a reportable number.</p>
+  <p><strong>Dispersion</strong> $\varphi$, from $\mathrm{Var} = m + \varphi m^{2}$. Equals 0 for Poisson. <strong>It does not depend on depth</strong> — thinning a gamma–Poisson leaves $\varphi$ unchanged while shrinking $F$ (problem B.4 in the <a href="problem-bank.html">problem bank</a> proves it).</p>
+  <p>So: use $F$ as a <em>diagnostic</em> — "is this gene Poisson?" — and quote $\varphi$ as a <em>result</em>. And notice that only $\varphi$ can tell you where the depth ceiling is, because the knee sits at $m = 1/\varphi$.</p>
+</div>
+
+<div class="box pitfall" id="pair-variance">
+  <span class="box-tag">6 &nbsp;Variance versus standard error</span>
+  <p><strong>Variance</strong> (and its square root, the standard deviation) describes how spread out the <em>data</em> is. It does not shrink when you collect more data — a deeper sample of a wide distribution is still wide.</p>
+  <p><strong>Standard error</strong> describes how uncertain an <em>estimate</em> is. It shrinks as $1/\sqrt n$, because an average of $n$ things is less variable than one thing.</p>
+  <p>The test: ask what would happen if you had a million cells. The variance of gene expression across cells would be unchanged. The standard error on your estimate of the mean would be tiny. Two different questions, two different quantities, and an error bar on a figure should say which one it is.</p>
+  <p>A third relative to keep separate: the <strong>standard deviation of a statistic</strong>, such as the spread of Fano factors you would report from repeated 50-cell samples (Week 1's Lab 2). That is a standard error too — of the Fano factor — even though it is computed from variances.</p>
+</div>
+
+<p class="muted">Missing a term? It probably belongs here — tell your mentor and add it. Related pages: <a href="notation.html">notation card</a> for the symbols in one page · <a href="problem-bank.html">problem bank</a> for problems using these definitions · <a href="bead-protocol.html">bead protocol</a> · <a href="resources.html">resource library</a> · <a href="biology-background.html">biology background</a> for the biological entries in more depth.</p>
+
+</div>
+
+<footer class="site">How Much Data Does It Take to Tell Two Cell Types Apart? · Glossary · <a href="../index.html">Course home</a></footer>
+</body>
+</html>

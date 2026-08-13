@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 5 — Many Genes: Naive Bayes and the √k Law</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="week04.html">← Week 4</a><a href="week06.html">Week 6 →</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Week 5</span>
+      <span class="badge mile">MILESTONE M2</span>
+      <span class="badge aim1">Aim 1 · Theory</span>
+      <span class="badge win">AIM 1 CLOSES · git tag <code>theory-complete</code></span>
+    </div>
+    <h1 class="chapter-title">Many Genes: Naive Bayes and the $\sqrt{k}$ Law</h1>
+    <div class="chapter-sub">The log-likelihood ratio is linear · evidence adds in quadrature · $d' \propto \sqrt{\text{depth}\times k}$ · and the closed-form prediction that Aim 1 exists to produce</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<h2>Objectives</h2>
+<ul class="objectives">
+  <li>Write the probability of a whole cell's count vector under each hypothesis as a product of Poisson pmfs, and state the independence assumption out loud.</li>
+  <li>Derive $\mathrm{LLR}(x) = \sum_g\left[x_g\log(\lambda_{1g}/\lambda_{2g}) - (\lambda_{1g}-\lambda_{2g})\right]$, showing where the $\log(x_g!)$ terms go and why the rule is therefore <em>linear</em> in the counts.</li>
+  <li>Compute the mean and variance of the log-likelihood ratio under each hypothesis, and derive $(d'_{\text{total}})^2 = \sum_g (d'_g)^2$ — evidence adds in quadrature.</li>
+  <li>Conclude $d' \propto \sqrt{k}$ for $k$ equally informative genes, and $d' \propto \sqrt{\text{depth}\times k}$ overall.</li>
+  <li>Explain, with algebra and in words, why splitting a fixed amount of marker signal over more genes gains you exactly nothing.</li>
+  <li>State the Aim 1 deliverable — accuracy $= \Phi(d'/2)$ with $d' = \sqrt{\sum_g (\lambda_{1g}-\lambda_{2g})^2/\bar\lambda_g}$ — together with the five assumptions it rests on.</li>
+  <li>Implement <code>combine_d_prime</code>, <code>d_prime_total</code> and <code>log_likelihood_ratio</code>, get <code>tests/test_detection.py</code> fully green, and tag the repository <code>theory-complete</code>.</li>
+</ul>
+
+<h2>1 &nbsp;One gene was never the plan</h2>
+
+<p>Everything so far has been about a single gene. That was a deliberate simplification and it has been getting in the way for two weeks. No real analysis classifies a cell from one number; the standard marker panels people actually use have anywhere from ten to a few hundred genes in them, and a full transcriptome has twenty thousand columns waiting to be used.</p>
+
+<p>So: you have $k$ genes. Each one gives a count. Each count is noisy, and most of them individually are nearly useless — a single marker gene at 41% relative noise is not going to decide anything. The question of the week is how to <strong>pool weak evidence</strong>, and how much pooling weak evidence is worth.</p>
+
+<p>The answer, stated now so you know where you are being taken:</p>
+
+$$(d'_{\text{total}})^2 = \sum_{g=1}^{k} (d'_g)^2 \qquad\Longrightarrow\qquad d'_{\text{total}} = \sqrt{k}\,d'_{\text{single}} \ \text{ for } k \text{ equally good genes.}$$
+
+<p>Evidence does not add. Evidence <em>adds in squares</em>, which means it adds like the sides of a right triangle. Four mediocre genes are worth two good ones, not four. And combined with Week 3's depth law this closes Aim 1:</p>
+
+$$d' \;\propto\; \sqrt{\text{depth} \times k}, \qquad \text{accuracy} = \Phi\!\left(\frac{d'}{2}\right).$$
+
+<p>By the end of this chapter every symbol in those two formulas will have been derived from the statement "sequencing draws a random sample of molecules". That is what a milestone is: not a new topic, but a closed loop.</p>
+
+<h2>2 &nbsp;The probability of a whole cell</h2>
+
+<p>A cell is now a vector of counts, $x = (x_1, x_2, \dots, x_k)$, one per gene. Under type 1 the gene $g$ count is $\mathrm{Poisson}(\lambda_{1g})$, where $\lambda_{1g} = D\,p_{1g}$ is the depth times that type's expression fraction; under type 2 it is $\mathrm{Poisson}(\lambda_{2g})$. To use the decision theory of Week 4 you need one number per hypothesis: the probability of the <em>whole vector</em>.</p>
+
+<div class="box definition">
+  <span class="box-tag">The naive Bayes likelihood</span>
+  <p>Assuming the genes are independent given the cell type,
+  $$P(x \mid \text{type } c) = \prod_{g=1}^{k} \frac{e^{-\lambda_{cg}}\lambda_{cg}^{x_g}}{x_g!}.$$
+  The word "naive" in <em>naive Bayes</em> refers to exactly this product — to the assumption that once you know the cell type, knowing one gene's count tells you nothing about another's.</p>
+</div>
+
+<div class="box warning">
+  <span class="box-tag">The assumption that will cost you, named now so you can measure it later</span>
+  <p><strong>Genes are not independent.</strong> They are famously not independent. Genes sit in regulatory modules and are switched on together; a cell caught mid-cycle raises hundreds of them at once; a cell that happened to be captured with more mRNA raises <em>all</em> of them, because the library size varies from cell to cell. Every one of those effects puts positive correlation between columns of $x$, and every one of them makes the product above wrong.</p>
+  <p>Why use it anyway? Three reasons, in increasing order of honesty. (i) It is the only assumption under which the answer is closed-form, and a closed-form answer that can be falsified beats a black box that cannot. (ii) Naive Bayes classifiers are famously good at <em>deciding</em> even when their probabilities are badly calibrated — Domingos and Pazzani (1997) is the standard reference. (iii) It is testable, and this project tests it: correlated genes carry redundant evidence, so the true $d'$ is smaller than the quadrature formula says, and the direction of the error is predictable. Exercise 5.6 quantifies it exactly.</p>
+  <p>Put "genes are conditionally independent" at the top of your <strong>assumptions</strong> list in the notebook, underlined. It is the headline entry of the Week 14 limitations section.</p>
+</div>
+
+<h2>3 &nbsp;Take logs, subtract, and watch the factorials leave</h2>
+
+<p>Week 4 proved that the optimal rule compares the two likelihoods. Comparing products of $k$ small numbers is numerically horrible and algebraically opaque, so do what one always does with products: take logarithms and subtract them.</p>
+
+<div class="box theorem">
+  <span class="box-tag">Theorem · the optimal rule is linear in the counts <span class="claim proved">proved</span></span>
+  <p>With equal priors and conditionally independent Poisson genes, the error-minimising rule is: <strong>call type 1 if $\mathrm{LLR}(x) \gt 0$</strong>, where</p>
+  $$\mathrm{LLR}(x) \;=\; \log\frac{P(x\mid 1)}{P(x \mid 2)} \;=\; \sum_{g=1}^{k}\left[x_g\log\frac{\lambda_{1g}}{\lambda_{2g}} - (\lambda_{1g}-\lambda_{2g})\right].$$
+  <p>This is $w \cdot x + b$ with fixed weights $w_g = \log(\lambda_{1g}/\lambda_{2g})$ and a fixed offset $b = -\sum_g(\lambda_{1g}-\lambda_{2g})$. The decision boundary is a flat hyperplane in count space.</p>
+</div>
+
+<div class="box proof">
+  <span class="box-tag">Proof</span>
+  <p>Take the log of the product, which turns it into a sum:</p>
+  $$\log P(x \mid c) = \sum_{g=1}^{k}\Big[-\lambda_{cg} + x_g\log\lambda_{cg} - \log(x_g!)\Big].$$
+  <p>Now subtract the two hypotheses term by term:</p>
+  $$\mathrm{LLR}(x) = \sum_{g=1}^{k}\Big[\big(-\lambda_{1g} + x_g\log\lambda_{1g} - \log(x_g!)\big) - \big(-\lambda_{2g} + x_g\log\lambda_{2g} - \log(x_g!)\big)\Big].$$
+  <p>Look at the two $\log(x_g!)$ terms. They are <em>the same term</em>. The factorial depends only on the count you observed, not on which hypothesis you are entertaining about it, so it appears identically in both likelihoods and disappears in the difference:</p>
+  $$\mathrm{LLR}(x) = \sum_{g=1}^{k}\left[x_g\big(\log\lambda_{1g} - \log\lambda_{2g}\big) - (\lambda_{1g} - \lambda_{2g})\right]
+   = \sum_{g=1}^{k}\left[x_g\log\frac{\lambda_{1g}}{\lambda_{2g}} - (\lambda_{1g}-\lambda_{2g})\right].$$
+  <p>Every $x_g$ now appears to the first power, multiplied by a constant that does not depend on the data. That is the definition of a linear function of $x$. By Week 4's theorem the optimal rule keeps the larger likelihood, i.e. calls type 1 when the log ratio is positive. <span class="qed">∎</span></p>
+  <p class="muted"><strong>Assumptions used:</strong> conditional independence (to get the product), Poisson pmfs (to get this particular linear form), equal priors (to put the threshold at $\mathrm{LLR} = 0$ rather than at $\log(\pi_2/\pi_1)$), and known rates. No Gaussian approximation anywhere — this rule is exact.</p>
+</div>
+
+<p>Three things to take away from that cancellation, because it is doing more work than it looks.</p>
+
+<p><strong>First, it is why the rule is computable.</strong> $x_g!$ for a count of 40 is a number with 48 digits. Any implementation that computed the two likelihoods separately and divided would overflow or lose all its precision; the cancellation means you never form them at all. That is exactly why <code>log_likelihood_ratio</code> is written as a single matrix product <code>X @ np.log(a / b) - np.sum(a - b)</code>.</p>
+
+<p><strong>Second, the offset is a constant.</strong> $b = -\sum_g(\lambda_{1g}-\lambda_{2g})$ contains no $x$ at all. It shifts every cell's score by the same amount — it moves the threshold, not the ranking. So the ROC curve and the AUC of Week 4 do not depend on $b$ in the slightest, while the accuracy does. Convince yourself of that; it is exercise 5.3.</p>
+
+<p><strong>Third — and this is the one that matters for the rest of the project — linearity is a bridge to Week 8.</strong></p>
+
+<div class="box biology">
+  <span class="box-tag">Why "linear" is the most important word in this chapter</span>
+  <p>In Week 8 you will write a logistic regression from scratch and turn it loose on simulated cells. Logistic regression searches over rules of the form "call type 1 if $w\cdot x + b \gt 0$" and picks the $w, b$ that fit the training data best. It searches over <em>linear</em> rules.</p>
+  <p>You have just proved that the <strong>optimal</strong> rule for this problem is linear. So the family logistic regression searches contains the perfect answer. It follows that, if the Poisson model is true and the rates are known, logistic regression can at best <em>match</em> naive Bayes and can never beat it — and any gap you measure in Week 8 is estimation error from having finite training data, not a deficiency of the classifier.</p>
+  <p>This is why the project's headline claim is about <em>data</em>, not about <em>methods</em>. There is no clever algorithm waiting to rescue you from a low $d'$. The ceiling is set by the counting noise, and Week 8 exists to demonstrate exactly that. It is also why the honest answer to "did you try a neural network?" in the Week 15 Q&amp;A is: "the optimal rule for this generative model is provably linear, so a network can only match it."</p>
+</div>
+
+<h2>4 &nbsp;How much does the combined evidence separate? Quadrature</h2>
+
+<p>You have a rule. Now you need its $d'$, because $d'$ is what converts into an accuracy.</p>
+
+<p>The statistic being thresholded is no longer a count — it is $S = \mathrm{LLR}(x) = \sum_g w_g x_g + b$, a weighted sum of counts. So compute its mean and variance under each hypothesis, exactly as Week 3 did for a single count.</p>
+
+<div class="box example">
+  <span class="box-tag">Step 1 · the moments of a weighted sum of Poissons</span>
+  <p>Under type $c$, each $x_g$ is $\mathrm{Poisson}(\lambda_{cg})$, so $E[x_g] = \mathrm{Var}(x_g) = \lambda_{cg}$. Expectation is linear whatever the dependence structure, so</p>
+  $$E_c[S] = \sum_g w_g \lambda_{cg} + b.$$
+  <p>Variance needs independence, and here is where the naive Bayes assumption earns its keep. For independent variables variances add, and a constant multiplier comes out squared:</p>
+  $$\mathrm{Var}_c(S) = \sum_g w_g^2\,\mathrm{Var}(x_g) = \sum_g w_g^2 \lambda_{cg}.$$
+  <p>Write $\delta_g = \lambda_{1g}-\lambda_{2g}$ for the signal on gene $g$ and $\bar\lambda_g = (\lambda_{1g}+\lambda_{2g})/2$ for its pooled rate. Then the separation of the statistic is the difference of the means over the pooled standard deviation — Week 3's definition, applied to $S$ instead of to a raw count:</p>
+  $$d'(w) = \frac{E_1[S]-E_2[S]}{\sqrt{\sum_g w_g^2\bar\lambda_g}} = \frac{\sum_g w_g \delta_g}{\sqrt{\sum_g w_g^2 \bar\lambda_g}}.$$
+  <p>Note that $b$ has vanished: it appears in both means and cancels in the difference. The offset cannot change how separable the two clouds are.</p>
+</div>
+
+<p>Now, which weights are best? You could just plug in the LLR's weights $w_g = \log(\lambda_{1g}/\lambda_{2g})$ and grind. It is more illuminating — and, as it happens, more rigorous — to ask which weights maximise $d'(w)$ over <em>all</em> possible linear rules, and then check that the LLR's weights are the winners.</p>
+
+<div class="box theorem">
+  <span class="box-tag">Theorem · evidence adds in quadrature <span class="claim proved">proved</span></span>
+  <p>Over all linear statistics $S = \sum_g w_g x_g$, the separation $d'(w)$ is maximised by taking $w_g \propto \delta_g/\bar\lambda_g$, and its maximum value is</p>
+  $$d'_{\text{total}} = \sqrt{\sum_{g=1}^{k}\frac{\delta_g^2}{\bar\lambda_g}} = \sqrt{\sum_{g=1}^{k} (d'_g)^2}, \qquad d'_g = \frac{|\delta_g|}{\sqrt{\bar\lambda_g}}.$$
+</div>
+
+<div class="box proof">
+  <span class="box-tag">Proof (two dot products and one inequality)</span>
+  <p>Define two vectors with $k$ components each:</p>
+  $$u_g = w_g\sqrt{\bar\lambda_g}, \qquad v_g = \frac{\delta_g}{\sqrt{\bar\lambda_g}}.$$
+  <p>These are built so that the messy expression becomes tidy. Check the pieces: $u \cdot v = \sum_g w_g\sqrt{\bar\lambda_g}\cdot\delta_g/\sqrt{\bar\lambda_g} = \sum_g w_g\delta_g$, which is the numerator. And $|u|^2 = \sum_g w_g^2\bar\lambda_g$, which is the square of the denominator. So</p>
+  $$d'(w) = \frac{u\cdot v}{|u|}.$$
+  <p>Now use the geometric meaning of the dot product, $u\cdot v = |u|\,|v|\cos\theta$ where $\theta$ is the angle between the two vectors:</p>
+  $$d'(w) = |v|\cos\theta \;\le\; |v|,$$
+  <p>with equality exactly when $\cos\theta = 1$, i.e. when $u$ points the same way as $v$. (This is the Cauchy–Schwarz inequality; in this form it is just "a cosine is at most 1".) Translating $u \parallel v$ back through the definitions: $w_g\sqrt{\bar\lambda_g} \propto \delta_g/\sqrt{\bar\lambda_g}$, that is, $w_g \propto \delta_g/\bar\lambda_g$. And the maximum value is</p>
+  $$|v| = \sqrt{\sum_g \frac{\delta_g^2}{\bar\lambda_g}} = \sqrt{\sum_g (d'_g)^2}. \qquad\blacksquare$$
+  <p class="muted"><strong>Assumptions used:</strong> independence (for the variances to add) and the pooled-variance convention of Week 3. <em>No</em> Gaussian approximation and <em>no</em> small-difference approximation: this statement about $d'$ is exact. The approximations enter in the next two paragraphs.</p>
+</div>
+
+<p>Two loose ends, and being honest about both is the difference between a derivation and a slogan.</p>
+
+<p><strong>Loose end 1: does the LLR actually use the winning weights?</strong> Not exactly — it uses $w_g = \log(\lambda_{1g}/\lambda_{2g})$, not $\delta_g/\bar\lambda_g$. But write $\lambda_{1g} = \bar\lambda_g + \delta_g/2$ and $\lambda_{2g} = \bar\lambda_g - \delta_g/2$ and expand with $\epsilon = \delta_g/(2\bar\lambda_g)$:</p>
+
+$$\log\frac{\lambda_{1g}}{\lambda_{2g}} = \log\frac{1+\epsilon}{1-\epsilon} = 2\left(\epsilon + \frac{\epsilon^3}{3}+\cdots\right) = \frac{\delta_g}{\bar\lambda_g}\left(1 + \frac{1}{12}\left(\frac{\delta_g}{\bar\lambda_g}\right)^{2} + \cdots\right).$$
+
+<p>So the LLR's weights <em>are</em> the optimal ones, to a relative error of $\tfrac{1}{12}(\delta/\bar\lambda)^2$. For a 40% fold change, $\delta/\bar\lambda = 1/3$ and that error is 0.9%. For a 3-fold change it is 2.1%. And because $d'(w)$ sits at a smooth maximum — it is $|v|\cos\theta$, and $\cos$ is flat at its peak — a 1% error in the weights costs far less than 1% of the separation. This is the same "flat at the optimum" phenomenon you saw with the threshold in Week 4's Lab 1, and it is why naive Bayes is so forgiving.</p>
+
+<p><strong>Loose end 2: turning $d'_{\text{total}}$ into an accuracy still needs the Gaussian approximation.</strong> The quadrature formula is a statement about a mean and a variance, nothing more. To say accuracy $= \Phi(d'_{\text{total}}/2)$ you must claim that $S$ is approximately normal — and here the claim is on <em>much</em> firmer ground than it was in Week 4, because $S$ is now a sum of $k$ independent contributions and the central limit theorem applies to the sum directly. <span class="claim cited">cited</span> Combining many weak genes does not merely add signal; it also makes the Gaussian approximation better. Low-depth single-gene detection is the worst case for the theory, and it is the case Week 9 goes after.</p>
+
+<div class="box definition">
+  <span class="box-tag">Quadrature is Pythagoras</span>
+  <p>The proof above says $d'_{\text{total}} = |v|$, the <em>length</em> of the vector whose components are the per-gene $d'_g$. So the picture is exactly the one from geometry: three genes with $d'_g = 2, 3, 6$ combine to
+  $$d'_{\text{total}} = \sqrt{4+9+36} = 7,$$
+  the diagonal of a box with sides 2, 3 and 6. Independent evidence lies along perpendicular axes, and perpendicular things combine by Pythagoras.</p>
+  <p>This immediately explains the two facts that surprise people. <em>Weak genes barely matter:</em> adding a fourth gene with $d'_4 = 1$ to the box above takes the total from 7.00 to $\sqrt{50} = 7.07$. <em>The strongest gene dominates:</em> a panel's total is always at least its best member and at most $\sqrt{k}$ times it.</p>
+</div>
+
+<h2>5 &nbsp;Lab: build the evidence up one gene at a time</h2>
+
+<div class="lab">
+  <div class="lab-title">Lab 1 · Adding genes, in quadrature</div>
+  <div class="lab-desc">A seeded panel of 40 marker genes with realistically unequal quality: a few good ones, a long tail of nearly useless ones, sorted best-first as any real marker-selection procedure would. Bars are the per-gene $d'_g$; the orange line is the running total $\sqrt{\sum_{g\le j} (d'_g)^2}$. Slide $k$ and watch the total climb steeply at first and then flatten. Press the button to swap in an idealised panel of $k$ <em>equally</em> informative genes chosen so that all 40 together give the same total — same destination, very different route.</div>
+  <canvas id="lab1" height="340"></canvas>
+  <div class="controls" id="lab1ctl"></div>
+  <div class="readout" id="lab1out"></div>
+</div>
+
+<p>Things to notice, and to write in the notebook:</p>
+
+<ul>
+  <li>With the realistic panel, the first five genes buy most of the separation there is to buy. This is why marker panels are small, and it is a preview of Week 10, where choosing those five genes <em>using the same data you then test on</em> turns out to be a serious methodological trap.</li>
+  <li>The row labelled "if you had added the $d'$ values instead" is enormous and wrong. That is not a straw man: adding instead of adding-in-squares is the single most common error in this week, and the docstring of <code>combine_d_prime</code> warns about it specifically (<code>[3, 4]</code> must give 5, not 7).</li>
+  <li>With the equal panel, check the total against $\sqrt{k}\,d'_1$ at several $k$. It should agree to the last printed digit — that identity <em>is</em> the $\sqrt{k}$ law, and <code>test_combine_d_prime_scales_as_sqrt_k</code> asserts it in code.</li>
+</ul>
+
+<h2>6 &nbsp;The $\sqrt{k}$ law, and the full scaling law</h2>
+
+<p>Specialise the theorem to $k$ genes that are equally informative — same $d'_g = d'_1$ for every $g$. Then</p>
+
+$$d'_{\text{total}} = \sqrt{\sum_{g=1}^{k} (d'_1)^2} = \sqrt{k\,(d'_1)^2} = \sqrt{k}\;d'_1.$$
+
+<p>That is the whole derivation. Now put it beside Week 3's result. Writing $\lambda_{cg} = D\,p_{cg}$ with $D$ the depth,</p>
+
+$$d'_g = \frac{|\lambda_{1g}-\lambda_{2g}|}{\sqrt{\bar\lambda_g}} = \frac{D|p_{1g}-p_{2g}|}{\sqrt{D\bar p_g}} = \sqrt{D}\;\frac{|p_{1g}-p_{2g}|}{\sqrt{\bar p_g}},$$
+
+<p>and therefore, for $k$ equally informative markers,</p>
+
+<div class="box theorem">
+  <span class="box-tag">The scaling law of Aim 1 <span class="claim proved">proved</span></span>
+  $$d'_{\text{total}} = \sqrt{D\,k}\;\cdot\;\frac{|p_1 - p_2|}{\sqrt{\bar p}}, \qquad\text{so}\qquad d' \propto \sqrt{\text{depth}\times k}.$$
+  <p>Depth and gene count enter <em>symmetrically</em> and with the same exponent, even though they arrived from completely different arguments: depth from the Poisson variance-equals-mean coincidence, gene count from variances adding over independent terms. Doubling the depth and doubling the number of markers buy you exactly the same thing.</p>
+</div>
+
+<p>Sit with that symmetry for a moment, because it is the most useful practical statement the project produces. Sequencing twice as deep is expensive. Adding twice as many marker genes to your panel is free — you already sequenced them. The theory says they are worth the same. That is a real design recommendation, and it is falsifiable: Week 10 will check it on PBMC data, where it holds until the extra "markers" stop being independent.</p>
+
+<div class="box example">
+  <span class="box-tag">Worked example · what the law predicts for a plausible experiment</span>
+  <p>Two cell types, 20 marker genes, each expressed at $p_1 = 0.0030$ and $p_2 = 0.0020$ (a 1.5-fold difference — a modest marker, not a spectacular one), sequenced at $D = 3000$ molecules per cell.</p>
+  <p>Per gene: $\lambda_1 = 9$, $\lambda_2 = 6$, $\bar\lambda = 7.5$, $\delta = 3$, so $d'_g = 3/\sqrt{7.5} = 1.095$ and one gene alone would give $\Phi(0.548) = 71\%$.</p>
+  <p>All twenty: $d'_{\text{total}} = \sqrt{20}\times 1.095 = 4.90$, so accuracy $= \Phi(2.45) = 99.3\%$.</p>
+  <p>Now sequence ten times shallower, $D = 300$: $d'$ falls by $\sqrt{10}$ to $1.55$, and the accuracy falls to $\Phi(0.775) = 78\%$.</p>
+  <p class="muted">Two lessons. First, twenty ordinary markers at ordinary depth already give 99% — which is why published cell-type classification looks easy, and why <em>high accuracy is not the success criterion of this project</em>. Second, the interesting physics is at the shallow end, where the curve is steep. Every experiment from Week 7 on deliberately works at depths where the answer is not already 1, because that is where a prediction can be tested.</p>
+</div>
+
+<h2>7 &nbsp;The subtlety: new signal, or the same signal cut into more pieces?</h2>
+
+<p>Here is the trap, and it catches professionals. The $\sqrt{k}$ law says more genes give more separation. Does that mean you should always add more genes?</p>
+
+<p>Read the derivation again and notice the hidden clause: "$k$ <em>equally informative</em> genes", each with its own $d'_g$ that <strong>does not change</strong> as $k$ grows. That is an assumption about biology, not a theorem. It says each new gene brings signal that was not already there. Whether that is true depends entirely on what you hold fixed as you enlarge the panel.</p>
+
+<div class="box example">
+  <span class="box-tag">Derivation · fixed total marker mass gives no gain at all <span class="claim proved">proved</span></span>
+  <p>Suppose the two cell types differ in a fixed <em>total</em> amount: together the marker genes account for a fraction $m$ of the transcriptome (on average across the two types), and you split that mass equally among $k$ genes, each pair differing by a fold change $f$. This is exactly the convention of <code>simulate.marker_profiles</code>. Then per gene the average rate is $\text{base} = m/k$, and solving $a/b = f$ with $(a+b)/2 = \text{base}$ gives</p>
+  $$a = \frac{2\,\text{base}\,f}{1+f}, \qquad b = \frac{2\,\text{base}}{1+f}, \qquad
+    \delta = a - b = 2\,\text{base}\,\frac{f-1}{f+1}.$$
+  <p>At depth $D$ the expected counts are $\lambda_{1g} = Da$, $\lambda_{2g} = Db$, with pooled mean $\bar\lambda_g = D\,\text{base} = Dm/k$. So</p>
+  $$d'_g = \frac{D\delta}{\sqrt{Dm/k}} = \frac{2D\,(m/k)\frac{f-1}{f+1}}{\sqrt{Dm/k}} = \sqrt{\frac{Dm}{k}}\cdot\frac{2(f-1)}{f+1} \;\propto\; \frac{1}{\sqrt{k}}.$$
+  <p>Each gene is $\sqrt{k}$ times weaker than it would have been alone. Now combine in quadrature:</p>
+  $$d'_{\text{total}} = \sqrt{k}\,d'_g = \sqrt{k}\cdot\sqrt{\frac{Dm}{k}}\cdot\frac{2(f-1)}{f+1} = \sqrt{Dm}\cdot\frac{2(f-1)}{f+1}.$$
+  <p>The $k$ has cancelled <em>exactly</em>. Splitting a fixed amount of marker signal into more genes changes nothing whatsoever about how well you can classify. <span class="qed">∎</span></p>
+  <p class="muted">The two $\sqrt{k}$'s that cancel here are the same two square roots, pulling in opposite directions: dilution weakens each gene by $\sqrt{k}$, quadrature recovers exactly $\sqrt{k}$. This is asserted in code by <code>test_d_prime_total_combines_the_sqrt_laws</code>, which checks that <code>total(1000, 40) == total(1000, 10)</code> to nine digits. If your implementation gets that wrong, it is not a rounding problem.</p>
+</div>
+
+<div class="box biology">
+  <span class="box-tag">What this means about actual cells</span>
+  <p>Suppose you have a 199-gene panel and you find a 200th gene that "also distinguishes the types". Whether it helps depends on a question the mathematics cannot answer for you: <strong>is it new evidence, or is it a copy?</strong></p>
+  <p>If the 200th gene is an independent module — a different pathway, regulated separately, adding transcripts that were not being counted before — it adds its own $(d')^2$ and the panel improves, a little. If it is a weak echo of the first 199 (a downstream target of the same transcription factor, a paralogue, a gene that goes up simply because the whole module goes up), then it carries no information you did not already have, and quadrature will <em>tell you it helped</em> when it did not. The formula cannot tell the difference; only the covariance between genes can, and naive Bayes has assumed that away.</p>
+  <p>This is the honest version of the marketing claim "our panel has 500 genes". Five hundred correlated genes can be worth fewer than twenty independent ones. Exercise 5.6 puts a number on it.</p>
+</div>
+
+<h2>8 &nbsp;Lab: the two conventions, side by side</h2>
+
+<div class="lab">
+  <div class="lab-title">Lab 2 · Where the $\sqrt{k}$ comes from, and where it does not</div>
+  <div class="lab-desc">Both curves use the exact same code path — <code>CD.markerProfiles</code>, then a per-gene $d'$, then quadrature. The only difference is what is held fixed as $k$ grows. <span style="color:#2563eb"><strong>Blue:</strong></span> each gene keeps its own marker mass, so the panel genuinely gets more signal. <span style="color:#0d9488"><strong>Teal:</strong></span> the total marker mass is fixed and split $k$ ways. Axes are $\log_{10}$, so a power law is a straight line and the exponent is the slope; the fitted slopes are printed below. There is no randomness in this lab at all — it is the theory computing itself.</div>
+  <canvas id="lab2" height="340"></canvas>
+  <div class="controls" id="lab2ctl"></div>
+  <div class="readout" id="lab2out"></div>
+</div>
+
+<p>Move the depth slider and watch both lines shift vertically without changing slope — that is $d' \propto \sqrt{D}$ appearing as an intercept shift of $\tfrac12\log_{10} D$, exactly as Week 3's lab showed. The whole of Aim 1 is visible on this one pair of axes: a slope of $0.5$ in $k$ when the signal is real, a slope of $0$ when it is not, and a vertical shift with depth.</p>
+
+<div class="box pitfall">
+  <span class="box-tag">The mistake this lab exists to prevent</span>
+  <p>A student who has read only the headline runs a simulation, doubles $k$, sees no improvement, and concludes that the $\sqrt{k}$ law is wrong. What actually happened is that their simulator held the total marker mass fixed — as <code>marker_profiles</code> does by default, deliberately — so they measured the teal line and compared it against the blue one.</p>
+  <p>The lesson generalises far beyond this chapter: <strong>a scaling law is only meaningful together with a statement of what is held fixed.</strong> When you write $d' \propto \sqrt{k}$ in your report, the sentence immediately after it must say "at fixed per-gene marker mass", or the claim is not falsifiable. Week 12 makes the same demand of the bead experiment.</p>
+</div>
+
+<h2>9 &nbsp;The Aim 1 deliverable</h2>
+
+<p>Aim 1 is now closed. Here is everything it produced, on one card. If you can reconstruct this box from a blank page, you have the theory.</p>
+
+<div class="box win">
+  <span class="box-tag">Aim 1 · a closed-form accuracy prediction with no free parameters</span>
+  <p>For two cell types with expression profiles $p_1, p_2$, sequenced at depth $D$, using $k$ genes:</p>
+  $$\lambda_{cg} = D\,p_{cg}, \qquad
+    \bar\lambda_g = \frac{\lambda_{1g}+\lambda_{2g}}{2}, \qquad
+    d' = \sqrt{\sum_{g=1}^{k}\frac{(\lambda_{1g}-\lambda_{2g})^2}{\bar\lambda_g}},$$
+  $$\boxed{\ \text{accuracy} = \Phi\!\left(\frac{d'}{2}\right)\ }$$
+  <p>and, for $k$ equally informative markers, $d' \propto \sqrt{D\,k}$.</p>
+  <p><strong>Nothing here is fitted.</strong> There is no constant tuned to make a curve pass through data, no hyperparameter, no training set. Given the rates and the depth, the accuracy is determined. That is what makes the next seven weeks a test rather than a demonstration.</p>
+  <p><strong>What it assumes, in full:</strong></p>
+  <ol>
+    <li><strong>Poisson counts.</strong> Cells of one type are identical, and capture is a simple random sample, so variance equals mean. <span class="muted">Fails on real data — Week 11.</span></li>
+    <li><strong>Independent genes.</strong> Conditional independence given the type. <span class="muted">Fails in reality; direction of the error known — exercise 5.6, Week 14.</span></li>
+    <li><strong>Equal priors and equal error costs.</strong> The two types are equally common and confusing them is equally bad either way. <span class="muted">Fixable: unequal priors move the threshold to $\log(\pi_2/\pi_1)$ — exercise 5.4.</span></li>
+    <li><strong>Known rates.</strong> $\lambda_{1g}$ and $\lambda_{2g}$ are given, not estimated. <span class="muted">Fails on real data, where estimating them from the same cells you test on leaks — Week 10.</span></li>
+    <li><strong>The Gaussian approximation.</strong> Needed only to turn $d'$ into a probability, and helped rather than hurt by having many genes. <span class="muted">Measured in Week 4; breaks at low rate with large fold change; Week 9 revisits it under dropout.</span></li>
+  </ol>
+  <p class="muted">Five assumptions, three of which this project goes on to break on purpose. A theory whose failure modes you have enumerated in advance is worth more than one that has never been tested.</p>
+</div>
+
+<h2>10 &nbsp;Your Python laboratory</h2>
+
+<div class="box python">
+  <span class="box-tag">This week in the celldetect project</span>
+  <p>Three functions in <code>python/celldetect/detection.py</code> finish the module:</p>
+  <ul>
+    <li><code>combine_d_prime(dprimes)</code> — $\sqrt{\sum_g (d'_g)^2}$. Two lines. The docstring's check is the whole week in miniature: <code>[3, 4]</code> must give exactly <code>5.0</code>.</li>
+    <li><code>d_prime_total(lam1, lam2)</code> — one line, composing <code>combine_d_prime</code> with the vectorised <code>d_prime</code> from Week 3. Note that this only works because <code>d_prime</code> was written to accept arrays and to return 0 rather than NaN for a gene that is silent in both types.</li>
+    <li><code>log_likelihood_ratio(X, lam1, lam2)</code> — the linear rule, as a matrix product: <code>X @ np.log(a / b) - np.sum(a - b)</code>, with both rate vectors floored at <code>1e-12</code> so a zero rate cannot produce an infinite weight. Convince yourself the second term is a single scalar shared by every cell.</li>
+  </ul>
+  <p>Then the whole file should pass:</p>
+  <p><code>pytest tests/test_detection.py</code></p>
+  <p>Every test, not a subset — this is the milestone. The ones that are new this week are <code>test_combine_d_prime_quadrature</code>, <code>test_combine_d_prime_scales_as_sqrt_k</code>, <code>test_d_prime_total_combines_the_sqrt_laws</code>, <code>test_log_likelihood_ratio_is_linear_in_counts</code>, <code>test_log_likelihood_ratio_sign_favours_the_true_type</code>, <code>test_log_likelihood_ratio_shape</code>, and above all <code>test_measured_accuracy_matches_the_prediction</code>, which simulates 20,000 cells of each type over 8 genes, classifies them with the optimal rule, and demands that the measured accuracy sit within 0.02 of $\Phi(d'/2)$. That single test is the project's hypothesis in miniature, and the first time you watch it pass is the point of the semester so far.</p>
+  <p>Then the figures:</p>
+  <p><code>python experiments/week05_sqrt_k.py</code></p>
+  <p>with <strong>SEED 105</strong>, writing <code>figures/week05_sqrt_k.png</code> (the two conventions of Section 7, with the fitted slope printed in the legend — it should read 0.500) and <code>figures/week05_prediction.png</code> (the Aim 1 deliverable: measured accuracy against predicted, over a grid of five depths and four gene counts, with the residuals on a second axis). Record the printed <code>max |measured - predicted|</code> in <code>progress/week05.md</code>; it is the number your milestone rests on.</p>
+  <div class="box warning">
+    <span class="box-tag">A dependency to know about before you run it</span>
+    <p><code>week05_sqrt_k.py</code> imports <code>marker_profiles</code> and <code>simulate_dataset</code> from <code>celldetect/simulate.py</code>, which are formally Week 7's assignment. That is deliberate: this week's figure needs simulated cells. Both are short and their docstrings are complete, and the algebra behind <code>marker_profiles</code> is precisely the derivation you did in Section 7, so implement them now — you will be a week ahead. If you would rather leave Week 7 untouched, <code>python run_solution_check.py</code> exercises the reference implementations so you can at least see the figure the script is meant to produce.</p>
+  </div>
+</div>
+
+<div class="box pitfall">
+  <span class="box-tag">The three that catch everyone in Week 5</span>
+  <ul>
+    <li><strong>Adding $d'$ instead of $(d')^2$.</strong> Ten genes at $d' = 0.4$ give $\sqrt{10}\times 0.4 = 1.26$, not $4.0$. The accuracies these imply are 74% and 98% — you will not be able to tell which is right by looking at a plot, only by getting the algebra right.</li>
+    <li><strong>Summing over the wrong axis.</strong> <code>X @ np.log(a/b)</code> must contract over <em>genes</em> and leave one number per <em>cell</em>. If <code>log_likelihood_ratio</code> returns something of length <code>n_genes</code>, you have transposed something; <code>test_log_likelihood_ratio_shape</code> exists for exactly this.</li>
+    <li><strong>Comparing $d'$ values computed with different conventions.</strong> If your theory curve uses per-gene mass and your simulation uses fixed total mass, the two will disagree by a factor of $\sqrt{k}$ and you will spend a day hunting a bug that is really a definition. Print the rate vectors and look at them.</li>
+  </ul>
+</div>
+
+<h2>11 &nbsp;Exercises</h2>
+<p class="muted">Stars mark difficulty: ★ routine · ★★ requires an idea · ★★★ challenge. Write full sentences; every claim needs a reason. Solutions are provided — attempt first, then compare.</p>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 5.1</span><span class="stars">★</span></div>
+  <div class="ex-body">(a) Combine $d'$ values of 3 and 4. (b) Combine 100 genes each with $d'_g = 0.37$, and give the predicted accuracy. (c) A panel has one excellent gene at $d' = 3$ and thirty poor ones at $d' = 0.2$. What is the total, and what fraction of it came from the thirty?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) $\sqrt{9+16} = 5$. (Not 7. The docstring of <code>combine_d_prime</code> says so in bold, because everyone tries 7 once.)</p>
+      <p>(b) $\sqrt{100 \times 0.37^2} = 10\times 0.37 = 3.7$, so accuracy $= \Phi(1.85) = 0.968$.</p>
+      <p>(c) $\sqrt{9 + 30(0.04)} = \sqrt{10.2} = 3.194$. The excellent gene alone gives 3.000, so thirty extra genes bought $0.194$ — about 6% more separation, which raises the accuracy from $\Phi(1.5) = 93.3\%$ to $\Phi(1.597) = 94.5\%$.</p>
+      <p class="muted">Part (c) is the practical content of quadrature. Effort spent finding one more <em>good</em> marker dominates effort spent adding thirty mediocre ones — and this is exactly why Week 10 spends a whole chapter on how markers are chosen, and on the leakage that makes badly chosen markers look good.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 5.2</span><span class="stars">★</span></div>
+  <div class="ex-body">You have 20 genes, each with $d'_g = 0.3$ at your current depth, giving some accuracy $A$. You want 95% accuracy. (a) What is $A$? (b) What total $d'$ do you need? (c) How many such genes would that take, at fixed depth? (d) Or, keeping 20 genes, by what factor must you increase the depth?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) $d' = \sqrt{20}\times 0.3 = 1.342$, so $A = \Phi(0.671) = 0.749$.</p>
+      <p>(b) $\Phi(z) = 0.95$ at $z = 1.645$, so you need $d' = 3.29$.</p>
+      <p>(c) $d' \propto \sqrt{k}$, so $k$ must grow by $(3.29/1.342)^2 = 6.01$: about <strong>120 genes</strong>.</p>
+      <p>(d) $d' \propto \sqrt{D}$, the identical algebra: about <strong>6 times the depth</strong>.</p>
+      <p class="muted">Note that (c) and (d) give the same factor. They must: the two variables enter the law with the same exponent. This is the calculation an experimenter actually wants from you, and it is worth practising until you can do it in your head — go from accuracy to $z$ via the $\Phi$ table, square the ratio, done.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 5.3</span><span class="stars">★★</span></div>
+  <div class="ex-body">(a) Reproduce the cancellation of the $\log(x_g!)$ terms from scratch, and state the property of the factorial that makes it happen. (b) Write the rule in the form $w\cdot x + b \gt 0$ and give $w$ and $b$ explicitly. (c) Show that changing $b$ alone cannot change the AUC, but can change the accuracy. (d) A friend proposes classifying on the <em>total</em> count $\sum_g x_g$ instead. Under what condition on the rates is that the optimal rule?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) See Section 3. The property is that $x_g!$ depends only on the <em>observation</em> and not on the <em>hypothesis</em>: it is a function of the data alone, so it contributes the same additive constant to both log-likelihoods and vanishes on subtraction. Any factor of the likelihood with that property cancels — which is a general and useful fact, not a Poisson coincidence.</p>
+      <p>(b) $w_g = \log(\lambda_{1g}/\lambda_{2g})$ and $b = -\sum_g(\lambda_{1g}-\lambda_{2g})$.</p>
+      <p>(c) Changing $b$ adds the same constant to every cell's score, so the <em>ranking</em> of cells by score is unchanged. AUC depends only on the ranking (Week 4), so it is unchanged. Accuracy, on the other hand, is measured against the fixed threshold 0, and shifting all the scores relative to that threshold is precisely a change of threshold — which does change the error rate, and does so optimally only at the correct $b$.</p>
+      <p>(d) The rule uses only $\sum_g x_g$ when all the weights are equal: $\log(\lambda_{1g}/\lambda_{2g}) = c$ for every $g$, i.e. every gene has the <em>same fold change</em> between the two types. Then $w\cdot x = c\sum_g x_g$ and thresholding the weighted sum is the same as thresholding the total. If the fold changes differ between genes, using the plain total throws away the information carried by which genes are high, and the resulting $d'$ is strictly smaller — by the Cauchy–Schwarz argument of Section 4, since equal weights are then not parallel to $v$.</p>
+      <p class="muted">Part (d) is a real and slightly alarming observation about single-cell analysis: the total count per cell (the "library size") is the first thing every pipeline normalises away, on the grounds that it reflects capture efficiency rather than biology. That is usually right — but it also means that if two cell types genuinely differ in total mRNA content, the standard pipeline deletes that evidence before you ever see it.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 5.4</span><span class="stars">★★</span></div>
+  <div class="ex-body">(a) Compute $E_1[\mathrm{LLR}]$ and $E_2[\mathrm{LLR}]$ explicitly. (b) Prove $E_1[\mathrm{LLR}] \ge 0 \ge E_2[\mathrm{LLR}]$, with equality only if the two rate vectors are identical — so the LLR points the right way on average, whatever the rates. (c) If the priors are $\pi_1 \ne \pi_2$ rather than equal, where does the decision threshold move to, and in which direction?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) With $E_c[x_g] = \lambda_{cg}$ and $w_g = \log(\lambda_{1g}/\lambda_{2g})$,
+      $$E_1[\mathrm{LLR}] = \sum_g\left[\lambda_{1g}\log\frac{\lambda_{1g}}{\lambda_{2g}} - (\lambda_{1g}-\lambda_{2g})\right], \qquad
+        E_2[\mathrm{LLR}] = \sum_g\left[\lambda_{2g}\log\frac{\lambda_{1g}}{\lambda_{2g}} - (\lambda_{1g}-\lambda_{2g})\right].$$
+      </p>
+      <p>(b) Take one gene and write $t = \lambda_{1g}/\lambda_{2g} \gt 0$. The first expression is $\lambda_{2g}\left(t\log t - t + 1\right)$. The function $h(t) = t\log t - t + 1$ has $h(1) = 0$, $h'(t) = \log t$, so $h$ decreases on $(0,1)$ and increases on $(1,\infty)$, with its minimum value $h(1) = 0$. Hence $h(t)\ge 0$ with equality only at $t = 1$. Summing over genes, $E_1[\mathrm{LLR}]\ge 0$, with equality only if every $\lambda_{1g} = \lambda_{2g}$.</p>
+      <p>For the second, write $E_2[\mathrm{LLR}] = \sum_g \lambda_{2g}(\log t - t + 1) = -\sum_g\lambda_{2g}\,(t - 1 - \log t)$, and the function $t - 1 - \log t$ is non-negative by the same argument (value 0 and minimum at $t=1$). So $E_2[\mathrm{LLR}] \le 0$. <span class="qed">∎</span></p>
+      <p>(c) With unequal priors the optimal rule maximises the posterior, $\pi_1 P(x\mid 1)$ against $\pi_2 P(x \mid 2)$, so the rule becomes $\mathrm{LLR}(x) \gt \log(\pi_2/\pi_1)$. If type 1 is rarer ($\pi_1 \lt \pi_2$) the right-hand side is positive: you demand <em>more</em> evidence before calling the rare type. That is the correct and slightly counterintuitive behaviour — a rare type needs a higher bar, which is why a test with excellent $d'$ can still produce mostly false positives when it screens for something rare.</p>
+      <p class="muted">Part (b) is worth recognising: $E_1[\mathrm{LLR}]$ is the Kullback–Leibler divergence from $P_2$ to $P_1$, and you have just proved the special case of "KL divergence is non-negative, and zero only for identical distributions" for Poissons. <span class="claim cited">cited</span> It is also exactly what <code>test_log_likelihood_ratio_sign_favours_the_true_type</code> checks empirically, so you now know that test cannot fail by chance — only by a bug.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 5.5</span><span class="stars">★★</span></div>
+  <div class="ex-body">Derive <code>marker_profiles</code>'s algebra yourself: solve $a/b = f$ and $(a+b)/2 = \text{base}$ for $a$ and $b$. Then (a) show that under the fixed-total-mass convention $d'_{\text{total}}$ does not depend on $k$; (b) show that under the fixed-per-gene-mass convention it is proportional to $\sqrt{k}$; (c) explain in one sentence what physical difference between the two experiments the mathematics is expressing.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>From $a = fb$ and $a + b = 2\,\text{base}$: $b(f+1) = 2\,\text{base}$, so
+      $$b = \frac{2\,\text{base}}{1+f}, \qquad a = \frac{2\,\text{base}\,f}{1+f},$$
+      which is exactly what the scaffold's step 3 tells you to write, and what <code>CD.markerProfiles</code> computes in JavaScript.</p>
+      <p>(a) With $\text{base} = m/k$, Section 7 gives $d'_g = \sqrt{Dm/k}\cdot\frac{2(f-1)}{f+1}$ and $d'_{\text{total}} = \sqrt{k}\,d'_g = \sqrt{Dm}\cdot\frac{2(f-1)}{f+1}$. No $k$.</p>
+      <p>(b) With $\text{base} = m$ fixed per gene (i.e. total mass $mk$), $d'_g = \sqrt{Dm}\cdot\frac{2(f-1)}{f+1}$ is itself independent of $k$, so $d'_{\text{total}} = \sqrt{k}\,d'_g \propto \sqrt{k}$.</p>
+      <p>(c) In (a) you are re-describing the <em>same</em> biological difference between the two cell types using more genes; in (b) you are claiming the two cell types differ in more places. Only the second is more evidence.</p>
+      <p class="muted">Both conventions appear in the Week 5 experiment, deliberately, as the two curves of <code>figures/week05_sqrt_k.png</code>. When you present this figure, lead with the question "what is being held fixed?" — it is the single most effective way to show an audience that you understand your own result rather than having produced it.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 5.6</span><span class="stars">★★★</span></div>
+  <div class="ex-body">Drop independence. Suppose $k$ genes each have the same per-gene separation $d'_1$, and that the standardised noise on any two distinct genes has correlation $\rho \ge 0$ (all pairs the same). (a) Find the true $d'$ of the equally weighted sum. (b) Check the cases $\rho = 0$ and $\rho = 1$. (c) With $k = 100$, $d'_1 = 0.3$ and a mild $\rho = 0.05$, compare the true $d'$ and accuracy with what the quadrature formula would have claimed. (d) What is the largest $d'$ you can ever reach as $k\to\infty$ at fixed $\rho \gt 0$?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) Let $z_g$ be the standardised count of gene $g$, so each has unit variance and mean difference $d'_1$ between the two types. Consider $S = \sum_g z_g$. The mean difference is $k\,d'_1$. For the variance, use the general formula from Week 1's exercise 1.4 — variances add plus twice every covariance:
+      $$\mathrm{Var}(S) = \sum_g \mathrm{Var}(z_g) + \sum_{g\ne h}\mathrm{Cov}(z_g, z_h) = k + k(k-1)\rho.$$
+      Therefore
+      $$d'_{\text{true}} = \frac{k\,d'_1}{\sqrt{k\big(1 + (k-1)\rho\big)}} = d'_1\sqrt{\frac{k}{1+(k-1)\rho}}.$$
+      (By the symmetry of the setup, equal weights are optimal here, so this is the best any linear rule can do, not merely the value for one particular choice.)</p>
+      <p>(b) At $\rho = 0$ this is $d'_1\sqrt{k}$ — quadrature, recovered. At $\rho = 1$ the genes are perfect copies of one another and the expression collapses to $d'_1\sqrt{k/k} = d'_1$: one gene's worth of evidence, no matter how many copies of it you collect. Both limits are what common sense demands, which is a good sign that the algebra is right.</p>
+      <p>(c) Quadrature would claim $d' = 0.3\sqrt{100} = 3.0$ and accuracy $\Phi(1.5) = 93.3\%$. The truth is
+      $$d' = 0.3\sqrt{\frac{100}{1 + 99(0.05)}} = 0.3\sqrt{\frac{100}{5.95}} = 0.3 \times 4.100 = 1.23,$$
+      and accuracy $\Phi(0.615) = 73.1\%$. A correlation of five percent — which nobody would even report — has turned a claimed 7% error rate into a real 27% error rate.</p>
+      <p>(d) As $k\to\infty$ the expression tends to $d'_1/\sqrt{\rho}$. There is a hard ceiling: with $\rho = 0.05$ you can never exceed $0.3/\sqrt{0.05} = 1.34$, however many genes you add. Adding genes past a few hundred buys essentially nothing.</p>
+      <p class="muted">Keep this result; it is one of the most valuable things in the chapter. It says the naive Bayes prediction is an <em>upper bound</em> on achievable performance, and that the bound is loose in a way you can estimate if you can estimate $\rho$. It is also the exact structural twin of Week 11's overdispersion ceiling, where correlation <em>within</em> a gene across cells (rather than between genes) puts a similar hard cap on what depth can buy. When two independent failure modes have the same algebraic shape, that is worth a paragraph in the report.</p>
+    </div>
+  </details>
+</div>
+
+<h2>12 &nbsp;Research notebook</h2>
+
+<p>This is a milestone week, so the notebook entries are also the rehearsal for the check-in:</p>
+
+<ul>
+  <li>The $\log(x_g!)$ cancellation, written out in full from memory, ending with the sentence "therefore the optimal rule is linear in the counts, and therefore logistic regression can at best match it."</li>
+  <li>The quadrature proof — the two vectors $u$ and $v$, the cosine, the equality condition — again from memory. Then, underneath, the one-line version you would say out loud: <em>independent evidence is perpendicular, so it combines by Pythagoras.</em></li>
+  <li>The Section 7 algebra for fixed total mass, with the two $\sqrt{k}$'s cancelling, and a two-sentence biological gloss in your own words.</li>
+  <li>The Aim 1 deliverable box copied out, including all five assumptions and which later week attacks each. This page will be photographed and become a slide in Week 15.</li>
+  <li>Exercise 5.6 in full, with the numbers from part (c) boxed.</li>
+  <li>Your updated <strong>"assumptions I am making"</strong> list. It should now have at least six entries, each with a note of where in the project it gets tested.</li>
+</ul>
+
+<p>Scan to <code>notebook/week05/</code>, fill in <code>progress/week05.md</code>, and then tag the repository:</p>
+
+<p><code>git tag -a theory-complete -m "Aim 1 closed: accuracy = Phi(d'/2), d' ~ sqrt(depth * k)"</code><br>
+<code>git push origin theory-complete</code></p>
+
+<p>A tag is a promise about a commit: it says <em>everything the theory claims is derived and tested as of here</em>. Do not move it afterwards. If Week 9 forces a change to the theory — and it might — that becomes a new commit and, if it deserves one, a new tag. The history of what you believed and when is part of the research record.</p>
+
+<div class="box verify">
+  <span class="box-tag">MILESTONE M2 · verification (with mentor)</span>
+  <ul>
+    <li><strong>At the whiteboard, without notes:</strong> write the two Poisson likelihoods, take logs, subtract, and show the $\log(x!)$ terms cancelling. Say why the cancellation happens and what it implies about the shape of the decision boundary.</li>
+    <li><strong>Also at the whiteboard:</strong> derive $(d'_{\text{total}})^2 = \sum_g (d'_g)^2$, and state explicitly which step used independence and which step used the Gaussian approximation.</li>
+    <li><strong>Explain the fixed-total-mass subtlety</strong> before showing the figure: predict out loud that one curve will have slope $0.5$ and the other slope $0$, and say which is which and why.</li>
+    <li><strong>Show <code>figures/week05_prediction.png</code></strong> and point out that the scatter sits on the diagonal; quote the printed <code>max |measured - predicted|</code> and say whether that is small compared with the sampling error of the measurement itself (hint: each point is 8000 cells of each type, so $n = 16{,}000$ and $\sqrt{p(1-p)/n} \le 0.004$; Week 13 replaces this back-of-envelope with a Wilson interval).</li>
+    <li><strong><code>pytest tests/test_detection.py</code> fully green</strong>, on your machine, in front of your mentor, and you can say in one sentence what each of the seven new tests is protecting against.</li>
+    <li><strong>State the Aim 1 deliverable from memory</strong> — formula plus all five assumptions — and name the week that breaks each of the three breakable ones.</li>
+    <li><strong>The tag <code>theory-complete</code> exists and is pushed.</strong></li>
+  </ul>
+  <p class="muted">If any item fails, that is what Week 6 is for: it is a buffer week with no new mandatory material, and its first job is a closed-book rerun of exactly this list.</p>
+</div>
+
+<h2>13 &nbsp;Going deeper</h2>
+<ul>
+  <li>Duda, Hart &amp; Stork, <em>Pattern Classification</em> (2nd ed.), chapter 2, sections 2.1–2.6. <span class="muted">Bayes decision theory and discriminant functions, done properly. Section 2.6 derives the linear discriminant for the Gaussian case; you have just done the Poisson analogue by hand, and reading theirs afterwards is the fastest way to see what is general and what is Poisson-specific.</span></li>
+  <li>Domingos &amp; Pazzani (1997), <em>On the optimality of the simple Bayesian classifier under zero-one loss</em>, <em>Machine Learning</em> 29. <span class="muted">The paper that explains why naive Bayes classifies well even when its independence assumption is badly violated — that the <em>decisions</em> survive even though the <em>probabilities</em> do not. Directly relevant to your Week 14 limitations section.</span></li>
+  <li>Kay, <em>Fundamentals of Statistical Signal Processing, Vol. II: Detection Theory</em> (1998), chapter 4. <span class="muted">The engineering treatment of exactly this problem, where the linear statistic is called a matched filter and quadrature combination is the "deflection coefficient". Heavier going, but it shows you that the result you derived this week is a standard tool in a field that has been using it since radar.</span></li>
+  <li>Bishop, <em>Pattern Recognition and Machine Learning</em> (2006), §4.2. <span class="muted">The relationship between generative models with linear log-ratios and logistic regression — the exact bridge described in Section 3, stated in the language Week 8 will use.</span></li>
+  <li>Course extras: <a href="../extras/notation.html">notation card</a> · <a href="../extras/glossary.html">glossary</a> · <a href="../extras/big-picture.html">the big picture</a> (re-read it now that Aim 1 is closed) · <a href="../extras/problem-bank.html">problem bank</a></li>
+</ul>
+
+</div>
+
+<footer class="site">How Much Data Does It Take to Tell Two Cell Types Apart? · Week 5 · <a href="../index.html">Course home</a></footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  /* ---------------- Lab 1: quadrature, gene by gene ---------------------- */
+  (function () {
+    const KMAX = 40;
+    let k = 8, equal = false;
+
+    /* A seeded "marker panel": most genes weakly expressed and weakly
+       differential, a few good ones. Sorted best-first, as any real
+       marker-selection step would leave them. */
+    const panel = (function () {
+      const r = CD.rng(1050), out = [];
+      for (let g = 0; g < KMAX; g++) {
+        const u = r(), v = r();
+        const lbar = 0.5 + 10 * u * u;            // pooled expected count
+        const fold = 1.05 + 0.65 * v * v;         // fold change between types
+        const l1 = 2 * lbar * fold / (1 + fold), l2 = 2 * lbar / (1 + fold);
+        out.push(CD.dPrime(l1, l2));
+      }
+      return out.sort((a, b) => b - a);
+    })();
+    const rms = Math.sqrt(panel.reduce((s, d) => s + d * d, 0) / KMAX);
+
+    function run() {
+      const ds = [];
+      for (let g = 0; g < k; g++) ds.push(equal ? rms : panel[g]);
+      const running = [];
+      let acc = 0;
+      ds.forEach((d, i) => { acc += d * d; running.push([i + 1, Math.sqrt(acc)]); });
+      const total = CD.combineDPrime(ds);
+      const naive = ds.reduce((s, d) => s + d, 0);
+      const ymax = Math.max(1.15 * total, 1.0);
+
+      const P = CD.plot("lab1", { xmin: 0.5, xmax: k + 0.5, ymin: 0, ymax: ymax,
+                                  xlabel: "gene, best first", ylabel: "d'" });
+      P.clear(); P.axes();
+      const w = (P.X(2) - P.X(1)) * 0.7;
+      ds.forEach((d, i) => {
+        const x = P.X(i + 1), y = P.Y(d);
+        P.ctx.fillStyle = "rgba(37,99,235,0.55)";
+        P.ctx.fillRect(x - w / 2, y, Math.max(1, w), P.Y(0) - y);
+      });
+      P.line(running, { color: CD.C.orange, width: 2.5 });
+      P.scatter(running, { color: CD.C.orange, r: 3 });
+      P.label(0.55 * k, ymax * 0.30, "bars: per-gene d'", { color: CD.C.blue });
+      P.label(0.55 * k, ymax * 0.20, "line: running √Σd'²", { color: CD.C.orange });
+
+      CD.table("lab1out",
+        ["quantity", "value"],
+        [["panel", equal ? "k equal genes (d' = " + rms.toFixed(3) + " each)" : "realistic, unequal genes"],
+         ["genes used, k", "" + k],
+         ["best single gene", ds[0].toFixed(3)],
+         ["total d' (quadrature)", total.toFixed(3)],
+         ["predicted accuracy Φ(d'/2)", CD.accuracyFromDPrime(total).toFixed(4)],
+         ["√k × (first gene's d')", (Math.sqrt(k) * ds[0]).toFixed(3)],
+         ["if you had added the d' values instead", naive.toFixed(3) +
+            "  →  Φ = " + CD.accuracyFromDPrime(naive).toFixed(4) + "  (wrong)"]]);
+    }
+
+    CD.slider("lab1ctl", { label: "number of genes k", min: 1, max: KMAX, step: 1, value: k,
+                           fmt: v => v }, v => { k = v; run(); });
+    CD.button("lab1ctl", "Swap realistic / equal panel", () => { equal = !equal; run(); }, true);
+  })();
+
+  /* ---------------- Lab 2: the two conventions, log-log ------------------ */
+  (function () {
+    const DEPTHS = [500, 1000, 2000, 4000, 8000];
+    const FOLDS = [1.2, 1.5, 2.0, 3.0];
+    const KS = [1, 2, 4, 8, 16, 32, 64, 128];
+    const MASS = 0.02;
+    let di = 3, fi = 1;
+
+    function totalDp(k, mass, depth, fold) {
+      const pr = CD.markerProfiles(k, fold, mass);
+      const ds = [];
+      for (let g = 0; g < k; g++) ds.push(CD.dPrime(depth * pr[0][g], depth * pr[1][g]));
+      return CD.combineDPrime(ds);
+    }
+    function slope(pts) {                          // least squares on log-log points
+      const n = pts.length;
+      let sx = 0, sy = 0, sxy = 0, sxx = 0;
+      pts.forEach(p => { sx += p[0]; sy += p[1]; sxy += p[0] * p[1]; sxx += p[0] * p[0]; });
+      return (n * sxy - sx * sy) / (n * sxx - sx * sx);
+    }
+
+    function run() {
+      const depth = DEPTHS[di], fold = FOLDS[fi];
+      const perGene = [], fixedTotal = [];
+      KS.forEach(k => {
+        perGene.push([Math.log10(k), Math.log10(totalDp(k, MASS * k, depth, fold))]);
+        fixedTotal.push([Math.log10(k), Math.log10(totalDp(k, MASS, depth, fold))]);
+      });
+      const lo = Math.min(fixedTotal[0][1], perGene[0][1]) - 0.2;
+      const hi = perGene[perGene.length - 1][1] + 0.2;
+
+      const P = CD.plot("lab2", { xmin: -0.1, xmax: 2.25, ymin: lo, ymax: hi,
+                                  xlabel: "log₁₀ (number of marker genes k)",
+                                  ylabel: "log₁₀ d'" });
+      P.clear(); P.axes();
+      P.line(perGene, { color: CD.C.blue, width: 2.5 });
+      P.scatter(perGene, { color: CD.C.blue, r: 3.5 });
+      P.line(fixedTotal, { color: CD.C.teal, width: 2.5 });
+      P.scatter(fixedTotal, { color: CD.C.teal, r: 3.5 });
+      P.line([[0, perGene[0][1]], [2.107, perGene[0][1] + 0.5 * 2.107]],
+             { color: CD.C.orange, width: 2, dash: [6, 4] });
+      P.label(1.15, perGene[0][1] + 0.62, "slope ½ reference", { color: CD.C.orange });
+      P.label(1.30, fixedTotal[0][1] + 0.06, "fixed total mass", { color: CD.C.teal });
+
+      const sPer = slope(perGene), sTot = slope(fixedTotal);
+      CD.table("lab2out",
+        ["quantity", "value"],
+        [["depth D", "" + depth],
+         ["fold change f", fold.toFixed(1)],
+         ["fitted slope, each gene keeps its mass", sPer.toFixed(4) + "   (theory 0.5)"],
+         ["fitted slope, total mass split k ways", sTot.toFixed(4) + "   (theory 0)"],
+         ["d' at k = 1", Math.pow(10, perGene[0][1]).toFixed(3)],
+         ["d' at k = 128, per-gene mass", Math.pow(10, perGene[7][1]).toFixed(3) +
+            "  →  accuracy " + CD.accuracyFromDPrime(Math.pow(10, perGene[7][1])).toFixed(4)],
+         ["d' at k = 128, fixed total mass", Math.pow(10, fixedTotal[7][1]).toFixed(3) +
+            "  →  accuracy " + CD.accuracyFromDPrime(Math.pow(10, fixedTotal[7][1])).toFixed(4)]]);
+    }
+
+    CD.slider("lab2ctl", { label: "depth D", min: 0, max: DEPTHS.length - 1, step: 1,
+                           value: di, fmt: i => DEPTHS[i] }, i => { di = i; run(); });
+    CD.slider("lab2ctl", { label: "fold change", min: 0, max: FOLDS.length - 1, step: 1,
+                           value: fi, fmt: i => FOLDS[i].toFixed(1) }, i => { fi = i; run(); });
+  })();
+});
+</script>
+</body>
+</html>

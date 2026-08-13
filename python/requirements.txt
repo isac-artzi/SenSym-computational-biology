@@ -1,0 +1,8 @@
+# numpy: arrays, random generators, linear algebra — the only universal dependency
+numpy>=1.24
+# scipy: erf/erfinv (the Gaussian CDF) and gammaln (log-factorials, overflow-free)
+scipy>=1.10
+# matplotlib: figures for the weekly experiments (saved as PNG into figures/)
+matplotlib>=3.7
+# pytest: the test runner — the tests define "done" for every scaffold function
+pytest>=7.0

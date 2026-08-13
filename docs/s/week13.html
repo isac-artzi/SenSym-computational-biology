@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 13 — Error Bars and the Claim Ledger</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="week12.html">← Week 12</a><a href="week14.html">Week 14 →</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Week 13</span>
+      <span class="badge mile">MILESTONE M6</span>
+      <span class="badge buffer">buffer week</span>
+    </div>
+    <h1 class="chapter-title">Error Bars and the Claim Ledger</h1>
+    <div class="chapter-sub">The Wilson interval, derived · the bootstrap and the one thing it cannot do · permutation tests · eight depths and eight chances to be wrong · and a status for every claim in the project</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<h2>Objectives</h2>
+<ul class="objectives">
+  <li>Explain why a measured accuracy reported without an interval is not a measurement, and say what it <em>is</em> instead.</li>
+  <li>State the naive normal interval $\hat p \pm z\sqrt{\hat p(1-\hat p)/n}$ and demonstrate its two failures with actual numbers, not adjectives.</li>
+  <li>Derive the Wilson score interval by inverting the score test — solve the quadratic in $p_0$ and land exactly on the centre and half-width in <code>celldetect/stats.py</code>.</li>
+  <li>Say what "95% confidence" promises, in terms of coverage over repeated experiments, and measure the coverage of both intervals yourself.</li>
+  <li>Describe what a bootstrap over cells does and does <em>not</em> quantify, and write the one-sentence donor caveat that must appear in the report.</li>
+  <li>Run a permutation test, explain the add-one correction, and say why $p = 0$ is never reportable from a finite number of shuffles.</li>
+  <li>Compute the family-wise error rate of the eight-point depth sweep, and choose between correcting it and declaring the sweep exploratory.</li>
+  <li>Fill in the claim ledger by hand — every claim in the project labelled <span class="claim proved">proved</span>, <span class="claim cited">cited</span>, <span class="claim observed">observed</span> or <span class="claim conjectured">conjectured</span> — and defend it line by line.</li>
+</ul>
+
+<h2>1 &nbsp;A number without an interval is a rumour</h2>
+
+<p>Twelve weeks of work have produced a great many numbers. The simulator says accuracy is 0.9300 at depth 2000 with eight markers. The bead experiment says 34 of 40 draws were classified correctly. The PBMC downsampling curve has eight points on it. Week 12's fitted exponent came out near one half.</p>
+
+<p>Every one of those numbers came from a finite number of trials, and would have come out differently if you had run the same experiment again with a different seed, a different shuffle of the deck, a different afternoon of drawing beads. A number that does not say how much it would have wobbled is not yet a measurement. It is a rumour that happens to have decimal places.</p>
+
+<div class="box definition">
+  <span class="box-tag">This week's job, stated plainly</span>
+  Retro-fit an honest interval to every proportion the project has produced, decide which
+  differences between measurement and theory survive that treatment, and give every claim in
+  the project a status you are willing to defend out loud. Nothing new is derived about
+  biology this week. What changes is what you are entitled to say.
+</div>
+
+<p>This is a buffer week, and it is deliberately placed here: after all the evidence is in and before a single sentence of the report is written. Doing it in this order means the report is built from claims that already have their intervals attached. Doing it in the other order means writing a report and then discovering that its headline sentence was not supported — which happens, and which is much more painful in Week 14 than it is now.</p>
+
+<p>There is one further reason this week is not optional. In Week 12 you put three lines of evidence on one axis and compared their slopes. A comparison of slopes is a comparison of two numbers each of which has an uncertainty; without those uncertainties, "the bead exponent is 0.42 and the theory says 0.5" is not agreement <em>or</em> disagreement. It is nothing at all.</p>
+
+<h2>2 &nbsp;The naive interval, and its two failures</h2>
+
+<p>Start with the interval everyone is taught first. You observed $k$ successes in $n$ independent trials, each with unknown success probability $p$. The estimator is $\hat p = k/n$, and by the central limit theorem $\hat p$ is approximately normal with mean $p$ and variance $p(1-p)/n$. So with probability about 0.95,</p>
+
+$$\left|\hat p - p\right| \le z\sqrt{\frac{p(1-p)}{n}}, \qquad z = 1.96.$$
+
+<p>That inequality involves the unknown $p$ on both sides. The naive move — and it is a move, not a theorem — is to replace the $p$ inside the square root with $\hat p$ and rearrange:</p>
+
+<div class="box definition">
+  <span class="box-tag">Definition · the naive normal (Wald) interval</span>
+  $$\hat p \pm z\sqrt{\frac{\hat p(1-\hat p)}{n}}.$$
+  Substituting $\hat p$ for $p$ in the <em>standard deviation</em> is the only step that is not
+  justified above, and every problem this interval has traces back to it.
+</div>
+
+<p>The substitution is harmless when $n$ is large and $\hat p$ is far from 0 and 1. This project is full of situations where it is neither.</p>
+
+<h3>Failure 1: it leaves the interval $[0,1]$</h3>
+
+<p>Take a bead point. Week 12's protocol runs $n = 40$ trials at each draw size, and at $n_{\text{beads}} = 200$ you might record 38 correct. Then $\hat p = 0.95$ and</p>
+
+$$1.96\sqrt{\frac{0.95 \times 0.05}{40}} = 1.96\sqrt{0.0011875} = 1.96 \times 0.03446 = 0.0675,$$
+
+<p>giving the interval $[0.8825,\ 1.0175]$. The upper end is a probability of 1.02. There is no such thing. A referee who sees that on a poster concludes, correctly, that the author did not look at their own output.</p>
+
+<p>The same arithmetic with 18 of 20 gives $[0.7685,\ 1.0315]$, which is worse.</p>
+
+<h3>Failure 2: at the extremes it has zero width</h3>
+
+<p>This is the serious one. Suppose the bead classifier gets all 40 right at the largest draw size — which it will, because at $n_{\text{beads}} = 200$ the two jars are easy to tell apart. Then $\hat p = 1$, and</p>
+
+$$1.96\sqrt{\frac{1 \times 0}{40}} = 0.$$
+
+<p>The naive interval is $[1, 1]$: the claim that the true accuracy is exactly 100.000%, with certainty, on the evidence of forty draws. That is not a slightly-too-narrow interval. It is a statement no amount of data of this kind could ever license, produced by a formula that had no way of knowing it was in trouble.</p>
+
+<p>The mirror image is just as bad. Zero successes in twenty trials gives $[0,0]$ — "this never happens" — from an experiment that could easily miss a one-in-ten event twenty times running. (The chance of that is $0.9^{20} = 0.12$, so it is not even unusual.)</p>
+
+<div class="box pitfall">
+  <span class="box-tag">The mistake this actually causes in a research project</span>
+  <p>The zero-width failure is dangerous precisely because it is <em>silent</em>. Nothing crashes.
+  The plot is drawn. The error bar is simply not there, and a missing error bar reads to the eye
+  as a very precise measurement rather than as a broken one.</p>
+  <p>In this project the affected points are the ones at the top of every accuracy curve — high
+  depth, many markers, large bead draws. Those are exactly the points a reader looks at first,
+  and exactly the points where "measurement agrees with theory" is being claimed. Getting the
+  interval wrong there is getting it wrong where it matters most.</p>
+</div>
+
+<h2>3 &nbsp;The Wilson interval, derived</h2>
+
+<p>The fix is to undo the illegitimate step. Do not substitute $\hat p$ into the standard deviation. Keep the candidate value $p_0$ there, where it belongs, and ask a different question:</p>
+
+<div class="box definition">
+  <span class="box-tag">Definition · the score test, and confidence by inversion</span>
+  <p>Fix a candidate value $p_0$. Under the hypothesis $p = p_0$, the estimator $\hat p$ has mean
+  $p_0$ and standard deviation $\sqrt{p_0(1-p_0)/n}$ — both computed from $p_0$, because that is
+  what the hypothesis says. The <strong>score statistic</strong> is</p>
+  $$z(p_0) \;=\; \frac{\hat p - p_0}{\sqrt{p_0(1-p_0)/n}},$$
+  <p>and we reject $p_0$ at the 5% level when $|z(p_0)| > 1.96$. The <strong>confidence interval
+  by inversion</strong> is the set of candidate values that survive:</p>
+  $$\mathcal{C} = \left\{\, p_0 \in [0,1] \;:\; |z(p_0)| \le z \,\right\}.$$
+  <p>Read that definition twice. A confidence interval is not "where the truth probably is". It is
+  <em>the set of hypotheses this data does not refute</em>. Everything sensible about the Wilson
+  interval follows from taking that seriously.</p>
+</div>
+
+<p>Now do the algebra. It is a quadratic; Calculus AB is more than enough.</p>
+
+<div class="box example">
+  <span class="box-tag">Derivation · solving $|z(p_0)| \le z$ for $p_0$</span>
+  <p>Square both sides of $|\hat p - p_0| \le z\sqrt{p_0(1-p_0)/n}$ (both sides are non-negative, so squaring is reversible):</p>
+  $$(\hat p - p_0)^2 \;\le\; \frac{z^2}{n}\,p_0(1-p_0).$$
+  <p>Expand both sides:</p>
+  $$\hat p^2 - 2\hat p\,p_0 + p_0^2 \;\le\; \frac{z^2}{n}p_0 - \frac{z^2}{n}p_0^2 .$$
+  <p>Move everything to the left and collect powers of $p_0$:</p>
+  $$\left(1 + \frac{z^2}{n}\right)p_0^2 \;-\; \left(2\hat p + \frac{z^2}{n}\right)p_0 \;+\; \hat p^2 \;\le\; 0 .$$
+  <p>The left-hand side is an upward-opening parabola in $p_0$, so the solution set is the closed
+  interval between its two roots — which is already the reason a Wilson interval is an interval at
+  all. By the quadratic formula, with $A = 1 + z^2/n$, $B = 2\hat p + z^2/n$ and $C = \hat p^2$,</p>
+  $$p_0 = \frac{B \pm \sqrt{B^2 - 4AC}}{2A}.$$
+  <p>The centre is $B/(2A)$:</p>
+  $$\text{centre} \;=\; \frac{2\hat p + z^2/n}{2\left(1 + z^2/n\right)} \;=\; \frac{\hat p + \dfrac{z^2}{2n}}{1 + \dfrac{z^2}{n}}.$$
+  <p>For the half-width, expand the discriminant — the $\hat p^2$ terms cancel, which is the small miracle that makes the formula clean:</p>
+  $$B^2 - 4AC = 4\hat p^2 + \frac{4\hat p z^2}{n} + \frac{z^4}{n^2} - 4\hat p^2 - \frac{4\hat p^2 z^2}{n}
+   = \frac{4z^2\hat p(1-\hat p)}{n} + \frac{z^4}{n^2}.$$
+  <p>So $\sqrt{B^2-4AC} = 2z\sqrt{\hat p(1-\hat p)/n + z^2/(4n^2)}$, and dividing by $2A$:</p>
+  $$\text{half} \;=\; \frac{z\sqrt{\dfrac{\hat p(1-\hat p)}{n} + \dfrac{z^2}{4n^2}}}{1 + \dfrac{z^2}{n}}. \qquad \blacksquare$$
+  <p class="muted"><strong>Assumptions used:</strong> the $n$ trials are independent with a common
+  success probability, and $\hat p$ is approximately normal about $p_0$ with variance
+  $p_0(1-p_0)/n$. The second is still an approximation — Wilson is not exact — but it is an
+  approximation made at the right place, about the estimator's sampling distribution, rather than
+  a substitution made inside a standard deviation.</p>
+</div>
+
+<p>Those two lines are exactly what <code>wilson_interval</code> computes, and now you know where each symbol came from rather than having copied them.</p>
+
+<div class="box theorem">
+  <span class="box-tag">Why Wilson cannot misbehave</span>
+  <p><strong>It cannot leave $[0,1]$.</strong> The interval is the set of $p_0$ in $[0,1]$ satisfying
+  an inequality; values outside $[0,1]$ were never candidates. Concretely: at $p_0 = 0$ the
+  parabola takes the value $\hat p^2 \ge 0$ and at $p_0 = 1$ it takes $(1-\hat p)^2 \ge 0$, so
+  the roots are pinned inside.</p>
+  <p><strong>It cannot have zero width at the extremes.</strong> Put $\hat p = 1$: the half-width
+  becomes $z\sqrt{0 + z^2/4n^2}/(1+z^2/n) = (z^2/2n)/(1+z^2/n) > 0$. The $z^2/4n^2$ term inside
+  the square root is what saves it, and it is there because the variance was evaluated at $p_0$,
+  not at $\hat p$. At $n = 40$ that gives $[0.912,\ 1]$ instead of $[1,1]$.</p>
+</div>
+
+<div class="box example">
+  <span class="box-tag">The same four numbers, both ways</span>
+  <table class="simple">
+    <tr><th>data</th><th>$\hat p$</th><th>naive normal</th><th>Wilson</th><th>verdict on the naive one</th></tr>
+    <tr><td>18 / 20</td><td>0.900</td><td>[0.769, <strong>1.032</strong>]</td><td>[0.699, 0.972]</td><td>leaves $[0,1]$</td></tr>
+    <tr><td>0 / 20</td><td>0.000</td><td>[0.000, 0.000]</td><td>[0.000, 0.161]</td><td>zero width</td></tr>
+    <tr><td>38 / 40</td><td>0.950</td><td>[0.883, <strong>1.018</strong>]</td><td>[0.835, 0.986]</td><td>leaves $[0,1]$</td></tr>
+    <tr><td>40 / 40</td><td>1.000</td><td>[1.000, 1.000]</td><td>[0.912, 1.000]</td><td>certainty from 40 trials</td></tr>
+    <tr><td>20 / 40</td><td>0.500</td><td>[0.345, 0.655]</td><td>[0.352, 0.648]</td><td>fine — this is the easy case</td></tr>
+  </table>
+  <p class="muted">The last row is the honest part of the story: in the middle of the range the two
+  intervals barely differ, which is exactly why the naive one survives in so many textbooks. It
+  fails at the edges, and the edges are where a good classifier lives.</p>
+</div>
+
+<div class="box definition">
+  <span class="box-tag">A useful way to read the Wilson centre</span>
+  <p>Multiply numerator and denominator of the centre by $n$:</p>
+  $$\text{centre} = \frac{k + z^2/2}{n + z^2} \approx \frac{k + 1.92}{n + 3.84}.$$
+  <p>The Wilson point estimate is what you would get by <strong>adding about two successes and two
+  failures</strong> to your data before dividing. That is the Agresti–Coull "add two and two"
+  rule of thumb, and it is not a hack — it falls out of the algebra above. It is also a good
+  intuition for what the interval is doing: it refuses to believe an extreme proportion measured
+  from few trials, and it refuses more gently as $n$ grows.</p>
+</div>
+
+<div class="lab">
+  <div class="lab-title">Lab 1 · Wilson versus naive across the whole range of $p$</div>
+  <div class="lab-desc">The blue band is the Wilson interval, the dashed red curves are the naive normal one, and the grey regions are impossible — no probability lives there. Move the slider through the three sample sizes this project actually uses: $n = 20$ (a small bead cell), $n = 40$ (one bead point), $n = 200$ (a small simulation batch). Watch where the red curves cross into the grey, and watch what the red band does at each end.</div>
+  <canvas id="w13lab1" height="360"></canvas>
+  <div class="controls" id="w13lab1ctl"></div>
+  <div class="readout" id="w13lab1out"></div>
+</div>
+
+<p>Three things to take away from Lab 1. The naive interval crosses into impossible territory for every $\hat p$ above roughly $1 - 4/n$ or below $4/n$. The Wilson band is visibly asymmetric near the ends — the interval for 38/40 reaches further down than up, which is correct, because there is much more room below 0.95 than above it. And the naive band pinches to a point at both ends while the Wilson band does not.</p>
+
+<h2>4 &nbsp;What "95% confidence" actually promises</h2>
+
+<p>It is worth being precise, because the phrase is used loosely everywhere and the loose version is wrong.</p>
+
+<div class="box definition">
+  <span class="box-tag">Definition · coverage</span>
+  A procedure that turns data into an interval has <strong>coverage</strong> $c$ at a given true
+  value $p$ if, over many independent repetitions of the whole experiment, the interval it
+  produces contains $p$ a fraction $c$ of the time. A "95% interval" is a promise about the
+  <em>procedure</em>, not about any one interval it produced. Your particular interval either
+  contains $p$ or does not; you will never know which.
+</div>
+
+<p>Coverage is measurable. Pick a true $p$, pick $n$, simulate the experiment thousands of times, and count. That is the whole idea, and it is the lab that makes this week's point.</p>
+
+<div class="lab">
+  <div class="lab-title">Lab 2 · Do the intervals actually cover? (the lab that settles it)</div>
+  <div class="lab-desc">A true $p$ and a sample size $n$ are chosen; the lab then runs 4000 independent experiments, builds both intervals each time, and counts how often each one contains the true $p$. The curves show the running coverage estimate converging. The readout also gives the <em>exact</em> coverage, obtained by summing the binomial probability of every possible $k$ — no simulation error at all. <span class="muted">At $n = 400$ the library's binomial sampler switches to a normal approximation, so trust the exact column there.</span></div>
+  <canvas id="w13lab2" height="330"></canvas>
+  <div class="controls" id="w13lab2ctl"></div>
+  <div class="readout" id="w13lab2out"></div>
+</div>
+
+<div class="box example">
+  <span class="box-tag">What Lab 2 shows, in numbers you can check</span>
+  <table class="simple">
+    <tr><th>true $p$</th><th>$n$</th><th>Wilson coverage</th><th>naive coverage</th></tr>
+    <tr><td>0.50</td><td>20</td><td>95.9%</td><td>95.9%</td></tr>
+    <tr><td>0.90</td><td>20</td><td>95.7%</td><td><strong>87.6%</strong></td></tr>
+    <tr><td>0.90</td><td>40</td><td>94.3%</td><td>91.5%</td></tr>
+    <tr><td>0.95</td><td>40</td><td>95.2%</td><td><strong>86.8%</strong></td></tr>
+  </table>
+  <p>These are exact numbers, computed by summing over all $n+1$ outcomes, not estimates. Read the
+  third row of the second column as: <em>an interval advertised as 95% catches the truth 87.6% of
+  the time</em>. One error bar in eight is wrong instead of one in twenty. A figure with eight such
+  points is more likely than not to contain at least one bar that does not cover.</p>
+  <p class="muted">And notice the first row: in the middle of the range the naive interval is fine.
+  This is not a story about one formula being universally bad. It is a story about a formula whose
+  failure mode coincides exactly with the regime this project reports.</p>
+</div>
+
+<p>Two honest caveats, because you will be asked. First, Wilson coverage is not exactly 95% either — it wobbles above and below as $p$ moves, because $k$ is a discrete count and the interval endpoints jump when $k$ does. No interval for a binomial proportion has exactly 95% coverage everywhere; that is a theorem about discreteness, not a defect of Wilson. Second, Wilson's wobble is centred on 95%, while the naive interval's wobble sits mostly below it. Being unbiasedly imperfect is a different thing from being systematically overconfident.</p>
+
+<h2>5 &nbsp;The bootstrap, and the thing it cannot do</h2>
+
+<p>The Wilson interval works because "accuracy" is a proportion and proportions have a known sampling distribution. Most of the project's other numbers are not proportions: the median Fano factor across genes, the fitted exponent from a log-log regression, the RMSE between the measured curve and the Poisson prediction. There is no textbook formula for the standard error of a fitted exponent computed the way you computed it. The bootstrap is the tool for that case.</p>
+
+<div class="box definition">
+  <span class="box-tag">Definition · the percentile bootstrap</span>
+  <p>Given a sample $x_1,\dots,x_n$ and a statistic $T$ (any function of the sample at all):</p>
+  <ol>
+    <li>Draw $n$ values from the sample <strong>with replacement</strong>. Some originals appear
+    twice or more; some do not appear. That is the point.</li>
+    <li>Recompute $T$ on the resample. Call it $T^*_b$.</li>
+    <li>Repeat for $b = 1, \dots, B$ (this project uses $B = 2000$).</li>
+    <li>Report the 2.5th and 97.5th percentiles of $\{T^*_b\}$ as a 95% interval.</li>
+  </ol>
+  <p>Python twin: <code>bootstrap_ci(values, statistic, n_boot, rng, alpha=0.05)</code>.</p>
+</div>
+
+<p>The logic is a substitution, and it is worth stating so that you know what you are relying on. What you want is the spread of $T$ over fresh samples from the true population. What you have is one sample. The bootstrap replaces the true population with the sample itself and draws from that instead. When the sample is a decent picture of the population, the two spreads are close.</p>
+
+<div class="box warning">
+  <span class="box-tag">Two things the bootstrap cannot do, and one of them will be in your report</span>
+  <p><strong>It cannot fix bias.</strong> If your estimator is systematically 0.03 too high, every
+  resample is also about 0.03 too high, and the interval is a tight, confident band around the
+  wrong value. The bootstrap measures wobble, not correctness. A biased estimator with a narrow
+  bootstrap interval is the most convincing wrong answer in statistics.</p>
+  <p><strong>It cannot widen the population.</strong> The bootstrap tells you about resampling
+  <em>the population you actually sampled</em>. If that population is not the one your claim is
+  about, no amount of resampling repairs the mismatch — and the interval will not warn you,
+  because from the inside everything looks fine.</p>
+</div>
+
+<div class="box data">
+  <span class="box-tag">The donor problem, concretely — this must be in the report</span>
+  <p>PBMC 3k is <strong>one donor</strong>. One person, one blood draw, one 10x run.</p>
+  <p>When you bootstrap over the cells in that dataset, you are resampling cells from that one
+  donor. The resulting interval answers: <em>if I had captured a different random set of cells
+  from this same sample, how much would my number have moved?</em> It is a real question and the
+  interval is a real answer.</p>
+  <p>It is not the question anyone cares about. The claim the report wants to make is about
+  <em>T cells and monocytes</em>, not about the T cells in this vial. Between-donor variation —
+  age, genotype, infection status, time since the blood was drawn, which technician ran the
+  chip — is completely invisible to a bootstrap over cells, and it is typically <em>larger</em>
+  than the within-sample variation the bootstrap measures. With $n = 1$ donor, the between-donor
+  error bar cannot be estimated at all. Not "is estimated poorly": cannot be estimated.</p>
+  <p><strong>The sentence for the report</strong> (write it in the notebook now, use it verbatim in
+  Week 14): <em>"All intervals on real-data quantities are bootstrap intervals over cells within a
+  single donor (10x PBMC 3k). They quantify sampling of cells, not biological variation between
+  individuals; with one donor the latter cannot be estimated, and every real-data claim should be
+  read as applying to this sample rather than to the cell types in general."</em></p>
+  <p class="muted">This paragraph costs you nothing and buys you everything. A reviewer who spots
+  the one-donor problem before you mention it discounts the whole report. A reviewer who reads
+  your own statement of it concludes that you understand your data.</p>
+</div>
+
+<p>The same warning applies with different words to the bead experiment (one experimenter, one pair of jars, one afternoon — a bootstrap over trials says nothing about whether a different person counting beads in different light would get the same answer) and to the simulator (a bootstrap over simulated cells says nothing about whether the model generating them is right, which is exactly what Week 11 found it was not).</p>
+
+<h2>6 &nbsp;The permutation test</h2>
+
+<p>Sometimes the question is not "how precise is this number" but "is this difference real at all". Deep sequencing at depth 2400 gave a higher accuracy than depth 2000. Is that a difference, or is it the seed?</p>
+
+<div class="box definition">
+  <span class="box-tag">Definition · the permutation test</span>
+  <p>Two groups, $a$ (size $n_a$) and $b$ (size $n_b$), and an observed statistic
+  $T_{\text{obs}} = |\bar a - \bar b|$.</p>
+  <p><strong>Null hypothesis:</strong> both groups are draws from the same distribution. Under that
+  hypothesis the group labels carry no information — the data is
+  <strong>exchangeable</strong>, meaning any reassignment of the labels was equally likely to
+  have been the one you saw.</p>
+  <p><strong>Procedure:</strong> pool all $n_a + n_b$ values. Shuffle. Call the first $n_a$ of them
+  group $a$ and the rest group $b$. Recompute $T$. Repeat $M$ times, and count how many shuffles
+  gave $T \ge T_{\text{obs}}$. Report</p>
+  $$p = \frac{\#\{T^{\text{perm}} \ge T_{\text{obs}}\} + 1}{M + 1}.$$
+  <p>Python twin: <code>permutation_test(a, b, n_perm, rng)</code>.</p>
+</div>
+
+<p>What makes this attractive is how little it assumes. No normality, no equal variances, no formula for the standard error of the statistic. The null distribution is not looked up in a table; it is <em>built</em>, out of your own data, by the only operation the null hypothesis licenses. The single assumption is exchangeability, and it is worth checking rather than reciting: if your two groups differ in some way other than the one you are testing (different seeds is fine; different numbers of cells per type, or one group measured before a code change, is not), the labels are not exchangeable and the test answers a question you did not ask.</p>
+
+<div class="box example">
+  <span class="box-tag">Why the $+1$, and why $p = 0$ is not a number you may print</span>
+  <p>Suppose 2000 shuffles produce nothing as extreme as what you observed. Without the correction
+  you would report $p = 0/2000 = 0$: the claim that a result this extreme is <em>impossible</em>
+  under the null. You have no evidence for that. What you have evidence for is that it is rarer
+  than about one in two thousand.</p>
+  <p>The add-one correction says so honestly. With $M$ shuffles the smallest value the formula can
+  return is</p>
+  $$p_{\min} = \frac{0 + 1}{M + 1},$$
+  <p>which is $1/2001 \approx 0.0005$ for the project's $M = 2000$. The resolution of the test is
+  set by how many shuffles you paid for, exactly as the resolution of a ruler is set by how finely
+  it is engraved. Reporting $p = 0$ claims a ruler with infinitely many marks.</p>
+  <p>There is a second, sharper justification. The observed labelling is itself one of the possible
+  permutations. Counting it — which is what the $+1$ in the numerator does — is what makes the
+  test valid rather than slightly anti-conservative. <code>tests/test_stats.py</code> pins this
+  down: with 100 shuffles and two groups that could not be more different, the p-value must come
+  back as exactly $1/101$, not 0.</p>
+</div>
+
+<div class="box pitfall">
+  <span class="box-tag">The one that will catch you</span>
+  A permutation test on <em>simulated</em> data with a large number of cells will return
+  $p = 1/(M+1)$ for almost any difference you care to test, because you can always simulate more
+  cells until any difference is detectable. That is not a discovery; it is a statement about your
+  compute budget. Statistical significance answers "is this difference distinguishable from
+  zero", never "is this difference big enough to matter". For the second question, report the
+  difference and its interval and let the reader judge — which is why this project's headline
+  figure is <code>week13_divergence.png</code>, a plot of measured minus predicted with intervals,
+  rather than a table of p-values.
+</div>
+
+<h2>7 &nbsp;Eight depths, eight chances to be wrong</h2>
+
+<p>Here is a subtler way to fool yourself, and the project walks straight into it.</p>
+
+<p>The depth sweep evaluates the same hypothesis — "measured accuracy equals $\Phi(d'/2)$" — at eight different depths. Suppose the theory is exactly right everywhere, and suppose at each depth you test it at the 5% level. At each single depth you have a 95% chance of not raising a false alarm. If the eight tests were independent, the chance of getting through all eight cleanly is</p>
+
+$$0.95^8 = 0.6634,$$
+
+<p>so the probability of <strong>at least one</strong> false alarm is</p>
+
+$$1 - 0.95^8 = 0.3366 \approx 34\%.$$
+
+<p>A one-in-three chance of finding a "significant deviation from theory" somewhere in the sweep when the theory is perfect. And the deviation you find will be at some particular depth, and you will be able to tell a story about why <em>that</em> depth is special, because you are human and stories are free.</p>
+
+<div class="box definition">
+  <span class="box-tag">Definition · family-wise error rate, and Bonferroni</span>
+  <p>The <strong>family-wise error rate</strong> is the probability of at least one false positive
+  across a whole family of tests. For $m$ independent tests each at level $\alpha$ it is
+  $1 - (1-\alpha)^m$.</p>
+  <p><strong>Bonferroni's correction:</strong> test each hypothesis at level $\alpha/m$ instead.
+  Then by the union bound the family-wise rate is at most
+  $m \times (\alpha/m) = \alpha$, whatever the dependence between tests. For the eight-point
+  sweep, $\alpha/m = 0.05/8 = 0.00625$. Python twin: <code>bonferroni(alpha, n_tests)</code>.</p>
+  <p class="muted">The union bound step is the whole proof:
+  $P(\bigcup_i A_i) \le \sum_i P(A_i)$, with $A_i$ the event that test $i$ falsely rejects.
+  No independence needed, which is why Bonferroni is safe and also why it is conservative.</p>
+</div>
+
+<p>Bonferroni is one fix. It is a blunt one: at $\alpha = 0.00625$ per test you will fail to detect real deviations that a single well-designed test would have caught, and with eight correlated points (they share a simulator, a seed, and a marker set) the correction is more conservative than it needs to be.</p>
+
+<div class="box warning">
+  <span class="box-tag">The other fix, which is the honest one for this project</span>
+  <p>Declare the sweep <strong>exploratory</strong>, and say so in the report:</p>
+  <p><em>"The depth sweep is exploratory. No claim is made about any individual depth. What is
+  claimed is the shape of the whole curve, and the pre-registered comparison is the one stated in
+  Week 6 before the data existed: the fitted exponent against the predicted $1/2$."</em></p>
+  <p>This is better than Bonferroni here, for a reason worth understanding. Multiple-comparison
+  corrections exist to control the damage from testing many hypotheses and reporting the winner.
+  The cure for that is not only a smaller threshold — it is <strong>deciding what you were testing
+  before you looked</strong>. You did that in Week 6, when you designed the bead experiment and
+  wrote down the exponent you expected. Honour it. One pre-specified test on the exponent, plus a
+  sweep presented as a picture rather than as eight verdicts, is a stronger and more honest
+  analysis than eight Bonferroni-corrected tests.</p>
+</div>
+
+<h2>8 &nbsp;The claim ledger</h2>
+
+<p>Now the part that outlasts the project. Every claim you make gets a status, written next to it, in the log and in the report. There are four.</p>
+
+<div class="box definition">
+  <span class="box-tag">The four statuses</span>
+  <p><span class="claim proved">proved</span> <strong>You can derive it at the whiteboard, on
+  demand, without notes</strong>, from assumptions you can also state. Not "I read a proof once"
+  and not "it is a standard result" — those are <em>cited</em>. The test is a mentor with a marker
+  saying "show me".</p>
+  <p><span class="claim cited">cited</span> <strong>Someone else established it and you give the
+  reference</strong>, specifically enough that a reader can check it: author, year, and where in
+  the paper. You are responsible for whether the citation supports the claim, and for the size of
+  the uncertainty the source itself reports.</p>
+  <p><span class="claim observed">observed</span> <strong>You measured it here</strong>, with a
+  seed, a sample size and an interval — and you did <em>not</em> derive it. Observed claims are
+  the backbone of the results section and they are worth exactly as much as their error bars.</p>
+  <p><span class="claim conjectured">conjectured</span> <strong>You believe it and you say so as a
+  belief.</strong> Plausible, unmeasured or under-measured, stated in the open. A conjecture
+  clearly labelled is a contribution; a conjecture dressed as a result is a defect.</p>
+</div>
+
+<div class="box example">
+  <span class="box-tag">Worked examples from this project's own results</span>
+  <table class="simple">
+    <tr><th>claim</th><th>status</th><th>why that status and not the one above it</th></tr>
+    <tr><td>For a Poisson variable, variance $=$ mean</td>
+        <td><span class="claim proved">proved</span></td>
+        <td>Derived in Week 2 from the pmf; you can do it on a board in three lines.</td></tr>
+    <tr><td>$d' \propto \sqrt{\text{depth}}$ for Poisson counts</td>
+        <td><span class="claim proved">proved</span></td>
+        <td>Week 3, from variance $=$ mean. Proved <em>under its assumptions</em> — which is what
+        "proved" always means, and why every derivation ends with its assumption list.</td></tr>
+    <tr><td>Evidence from $k$ independent genes adds in quadrature, so $d'\propto\sqrt{k}$</td>
+        <td><span class="claim proved">proved</span></td>
+        <td>Week 5. The independence assumption is part of the claim, not a footnote to it.</td></tr>
+    <tr><td>Droplet molecular capture efficiency is roughly 10–30%</td>
+        <td><span class="claim cited">cited</span></td>
+        <td>You did not measure it and cannot; it comes from spike-in studies, it is
+        protocol-dependent, and the sources disagree. Give the reference and the spread.</td></tr>
+    <tr><td>Dropout at rate $q$ is equivalent to depth $D(1-q)$</td>
+        <td><span class="claim proved">proved</span></td>
+        <td>Week 9, from the thinning theorem — <em>and</em> Week 9 measured the collapse, so it is
+        also observed. When both apply, say "proved, and verified numerically".</td></tr>
+    <tr><td>The median Fano factor of PBMC marker genes is 2.4</td>
+        <td><span class="claim observed">observed</span></td>
+        <td>Measured in Week 11 at SEED 111 on one donor. No derivation predicts 2.4. Quote your
+        own run's number, with the gene set and the expression cutoff that produced it.</td></tr>
+    <tr><td>Simulated accuracy matches $\Phi(d'/2)$ to within 0.02 above depth 250</td>
+        <td><span class="claim observed">observed</span></td>
+        <td>That is a measurement with a seed and a gate, Week 9. It is not a theorem: the theorem
+        is $\Phi(d'/2)$ itself, and "matches to 0.02" is a fact about a particular run.</td></tr>
+    <tr><td>Real counts are overdispersed, so deeper sequencing eventually stops helping</td>
+        <td><span class="claim observed">observed</span> + <span class="claim proved">proved</span></td>
+        <td>Split it. <em>Real counts are overdispersed</em> is observed (Week 11). <em>If
+        $\mathrm{Var}=m+\phi m^2$ then $d'$ saturates</em> is proved (Week 11's algebra). Two
+        claims wearing one sentence is the commonest ledger error.</td></tr>
+    <tr><td>The bead exponent is $1/2$ in the physical experiment</td>
+        <td><span class="claim conjectured">conjectured</span></td>
+        <td>The fit is $0.42 \pm 0.20$: consistent with $1/2$, and consistent with a great deal
+        else. It becomes observed only when the interval is tight enough to exclude something.</td></tr>
+    <tr><td>The same law governs real sequencing runs at production depth</td>
+        <td><span class="claim conjectured">conjectured</span></td>
+        <td>Downsampling a shallow dataset is not the same experiment as sequencing deeper. You
+        believe the extrapolation; you have not tested it; say so.</td></tr>
+  </table>
+</div>
+
+<div class="box warning">
+  <span class="box-tag">Why an unlabelled claim is inadmissible</span>
+  <p>Because the label is the only thing that stops a claim from drifting upward. Left unlabelled,
+  claims migrate one level per retelling: what was conjectured in the notebook is observed in the
+  slides and proved in the abstract, and no one lied at any step. Each retelling just dropped a
+  qualifier that felt like clutter.</p>
+  <p>The label also tells a reader what to do with the claim. <em>Proved</em> invites them to check
+  the derivation. <em>Cited</em> invites them to check the source. <em>Observed</em> invites them
+  to check the seed and the interval. <em>Conjectured</em> invites them to disagree, which is a
+  gift and not a threat. An unlabelled claim offers a reader no way in at all, so the only
+  available response is to believe you or not — and a reader who has to choose will choose not.</p>
+  <p>And it protects you. The most common failure of a student research project is not fabrication;
+  it is a good measurement described in language that promised more than it delivered. The ledger
+  makes that impossible to do by accident.</p>
+</div>
+
+<div class="box pitfall">
+  <span class="box-tag">Three ledger mistakes to expect in your own first pass</span>
+  <ul>
+    <li><strong>"It is standard" is not <span class="claim proved">proved</span>.</strong> If you
+    cannot produce the argument on demand, it is <span class="claim cited">cited</span>, and it
+    needs a reference. Half a dozen entries will move down a level when you apply this rule
+    honestly, and that is the point of applying it.</li>
+    <li><strong>Compound claims.</strong> "Real data is overdispersed and therefore the theory
+    fails" is two claims with different statuses. Split every sentence containing "and",
+    "therefore" or "which shows that" until each row has exactly one status.</li>
+    <li><strong>Observed without a seed.</strong> An observed claim whose row does not name the
+    script, the seed and the sample size is not observed; it is remembered. Go and re-run it.</li>
+  </ul>
+</div>
+
+<h2>9 &nbsp;Your Python laboratory</h2>
+
+<div class="box python">
+  <span class="box-tag">This week in the celldetect project</span>
+  <p>Implement all three functions in <code>python/celldetect/stats.py</code>:</p>
+  <ul>
+    <li><code>wilson_interval(k, n, z=1.96)</code> — the centre and half-width you derived in
+    Section 3, clipped into $[0,1]$, returning <code>(0.0, 1.0)</code> when <code>n &lt;= 0</code>
+    and raising <code>ValueError</code> if $k$ is outside $0..n$.</li>
+    <li><code>bootstrap_ci(values, statistic, n_boot, rng, alpha=0.05)</code> — resample the
+    indices with <code>rng.integers(0, n, size=n)</code>, recompute, take the
+    <code>np.percentile</code> endpoints. It must work for any callable, so test it with
+    <code>np.median</code> as well as <code>np.mean</code>.</li>
+    <li><code>permutation_test(a, b, n_perm, rng)</code> — pool, <code>rng.permutation</code>,
+    compare $|\bar a - \bar b|$, and return <code>(count + 1) / (n_perm + 1)</code>.</li>
+  </ul>
+  <p>Two more are <strong>provided</strong>, not to be reimplemented:
+  <code>standard_error_of_proportion(k, n)</code> (for annotation only, never for an interval) and
+  <code>bonferroni(alpha, n_tests)</code>.</p>
+  <p>Check yourself with <code>pytest tests/test_stats.py</code>. Read the test names before you
+  write any code — they are the specification. Three in particular are the chapter in executable
+  form: <code>test_wilson_interval_stays_inside_zero_one</code>,
+  <code>test_wilson_interval_has_width_even_at_the_extremes</code>, and
+  <code>test_permutation_test_never_returns_exactly_zero</code>, which requires the p-value to come
+  back as exactly $1/101$.</p>
+  <p>Then run <code>python experiments/week13_error_bars.py</code> (<strong>SEED 113</strong>,
+  about 30 seconds). It writes:</p>
+  <ul>
+    <li><code>figures/week13_intervals.png</code> — Wilson against naive at $n = 20, 40, 200$, with
+    the impossible regions shaded. Your own version of Lab 1.</li>
+    <li><code>figures/week13_divergence.png</code> — measured minus predicted accuracy across the
+    six regimes in the script's <code>REGIMES</code> list (very low / low / mid / high depth, many
+    genes, heavy dropout), each with a Wilson interval. This is the figure that decides which
+    claims survive into the report, and it becomes <strong>F6</strong> in Week 14.</li>
+    <li><code>progress/week13_claims.md</code> — the claim ledger, one row per regime, with
+    measured, predicted, the Wilson interval, the bootstrap interval, and an "agrees?" column.
+    <strong>The STATUS column is left blank on purpose.</strong> The script cannot know whether you
+    can defend a claim at the whiteboard. Fill it in by hand, in the file, and commit it.</li>
+  </ul>
+  <p>The script also runs one worked permutation test (depth 2000 against depth 2400, same marker
+  set) and prints its p-value — a concrete instance of Section 6 on data you generated.</p>
+  <p>Finally, go back through Weeks 1–12 and add intervals to every figure that shows a proportion.
+  <code>experiments/_common.py</code> provides <code>wilson_errorbar(ax, xs, ks, ns, **kw)</code>
+  for exactly this: give it the successes and the trial counts and it plots the points with their
+  Wilson bars. Re-run each week's script and commit the updated figures.</p>
+</div>
+
+<div class="box pitfall">
+  <span class="box-tag">The bug that will cost you an hour</span>
+  <code>wilson_interval</code> takes a <em>count</em>, not a proportion. Passing
+  <code>0.85</code> where <code>34</code> belongs gives $k/n = 0.85/40 = 0.021$ and an interval
+  around 2% — silently, with no error, because 0.85 is a perfectly legal count as far as the
+  arithmetic is concerned. If an error bar lands somewhere absurd, check this first. The same
+  applies when you retro-fit bars to old figures: you almost certainly stored accuracies, and you
+  now need $k = \text{round}(\text{accuracy} \times n)$ and the $n$ that produced it — which is
+  the moment you find out whether your earlier scripts recorded $n$ at all. If one did not, that
+  is a real finding about your record-keeping, and the fix is to re-run it, not to guess.
+</div>
+
+<h2>10 &nbsp;Exercises</h2>
+<p class="muted">Stars mark difficulty: ★ routine · ★★ requires an idea · ★★★ challenge. Do the arithmetic by hand at least once — the point of this week is that you never again take an interval on trust.</p>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 13.1</span><span class="stars">★</span></div>
+  <div class="ex-body">A bead point: 38 correct out of $n = 40$ trials. Compute the naive normal interval and the Wilson interval by hand, with $z = 1.96$. State what is wrong with the first one and give the width of each.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p><strong>Naive.</strong> $\hat p = 38/40 = 0.95$, and
+      $\hat p(1-\hat p)/n = (0.95)(0.05)/40 = 0.0011875$, whose square root is $0.03446$. Times
+      $1.96$: half-width $0.06754$. Interval $[0.8825,\ 1.0175]$, width $0.135$.</p>
+      <p><strong>Wilson.</strong> $z^2 = 3.8416$, so $z^2/n = 0.09604$ and the denominator is
+      $1.09604$.</p>
+      $$\text{centre} = \frac{0.95 + 3.8416/80}{1.09604} = \frac{0.95 + 0.04802}{1.09604}
+      = \frac{0.99802}{1.09604} = 0.91057.$$
+      $$\text{half} = \frac{1.96\sqrt{0.0011875 + 3.8416/6400}}{1.09604}
+      = \frac{1.96\sqrt{0.0017878}}{1.09604} = \frac{1.96 \times 0.042281}{1.09604} = 0.075607.$$
+      <p>Interval $[0.8350,\ 0.9862]$, width $0.151$.</p>
+      <p><strong>What is wrong with the naive one:</strong> its upper end is 1.0175, a probability
+      above 1, which is impossible. Note also that the Wilson interval is <em>wider</em> here
+      (0.151 against 0.135) and is shifted downward — both correct. There is more room below 0.95
+      than above it, so the honest interval reaches further down.</p>
+      <p class="muted">This is a real point from Week 12's figure. Redo the arithmetic for your own
+      largest bead draw size and put both numbers in the notebook, because in Week 15 someone will
+      ask why your top point has an error bar at all.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 13.2</span><span class="stars">★</span></div>
+  <div class="ex-body">You run 20 trials of something and it never happens. (a) What does the naive interval say? (b) Compute the Wilson interval. (c) A rule of thumb says that if an event does not occur in $n$ trials, the upper 95% limit for its probability is about $3/n$. Compare. (d) Give the probability that a genuinely 10%-likely event fails to occur in 20 trials.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) $\hat p = 0$, so $\sqrt{\hat p(1-\hat p)/n} = 0$ and the interval is $[0, 0]$: the
+      event is impossible. From twenty trials.</p>
+      <p>(b) $z^2/n = 3.8416/20 = 0.19208$, denominator $1.19208$.
+      centre $= (0 + 0.09604)/1.19208 = 0.08056$;
+      half $= 1.96\sqrt{0 + 3.8416/1600}\,/1.19208 = 1.96 \times 0.049/1.19208 = 0.08056$.
+      So the interval is $[0,\ 0.1611]$ — the lower end lands exactly on 0 (centre and half-width
+      are equal when $\hat p = 0$, which is a pleasant check on your algebra), and the upper end is
+      16%.</p>
+      <p>(c) The rule of three gives $3/20 = 0.15$, close to Wilson's $0.161$. The rule of three is
+      the exact binomial answer in disguise: $P(\text{0 events}) = (1-p)^n \approx e^{-np}$, and
+      setting $e^{-np} = 0.05$ gives $np = 2.996$.</p>
+      <p>(d) $0.9^{20} = 0.1216$. About one time in eight — not a freak occurrence at all.</p>
+      <p class="muted">Part (d) is the whole argument in one number. The naive interval calls
+      impossible an outcome that would occur about 12% of the time if the probability were 10%.
+      Any interval that says "impossible" about something that happens one time in eight is not an
+      interval, it is a mistake.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 13.3</span><span class="stars">★★</span></div>
+  <div class="ex-body">Show that the Wilson centre can be written $\dfrac{k + z^2/2}{n + z^2}$, and interpret it. Then explain, using that form, why the Wilson and naive intervals agree in the middle of the range and diverge at the ends.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>Start from the derived centre and multiply numerator and denominator by $n$:</p>
+      $$\frac{\hat p + \frac{z^2}{2n}}{1 + \frac{z^2}{n}}
+      = \frac{n\hat p + \frac{z^2}{2}}{n + z^2} = \frac{k + z^2/2}{n + z^2},$$
+      <p>using $n\hat p = k$. With $z = 1.96$ this is $(k + 1.92)/(n + 3.84)$: add roughly two
+      successes and two failures, then divide.</p>
+      <p><strong>Interpretation.</strong> The centre is a compromise between the data's $k/n$ and
+      the value $1/2$, weighted by $n$ against $z^2 \approx 4$. With $n = 40$ the data gets 40
+      units of weight and the pull toward $1/2$ gets about 4, so the shift is around 10% of the
+      distance to $1/2$; with $n = 4000$ the pull is negligible.</p>
+      <p><strong>Why they agree in the middle.</strong> Two separate effects. The centre shift is
+      proportional to $(1/2 - \hat p)$, which vanishes at $\hat p = 1/2$. And the extra term
+      $z^2/4n^2$ under the square root is negligible compared with $\hat p(1-\hat p)/n = 1/(4n)$
+      when $\hat p \approx 1/2$: their ratio is $z^2/n$. Both corrections switch off at once, which
+      is why the two intervals for 20/40 agree to three decimal places.</p>
+      <p><strong>Why they diverge at the ends.</strong> As $\hat p \to 1$ the naive standard error
+      $\sqrt{\hat p(1-\hat p)/n} \to 0$ while the Wilson term $z^2/4n^2$ stays put, so Wilson keeps
+      a half-width of about $(z^2/2n)/(1 + z^2/n)$ while the naive one collapses. The centre shift
+      is also largest there.</p>
+      <p class="muted">The "add two successes and two failures" form is the one to remember for the
+      Q&amp;A in Week 15. It is a one-sentence answer to "why did you not use the interval I was
+      taught", and it makes the correction sound like the small, sensible thing it is.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 13.4</span><span class="stars">★★</span></div>
+  <div class="ex-body">(a) Compute the family-wise error rate for the eight-point depth sweep at $\alpha = 0.05$. (b) How many independent tests before the chance of at least one false positive exceeds 50%? (c) What per-test threshold does Bonferroni prescribe for eight tests, and what does it cost you? (d) Your bead experiment has five draw sizes and two arms, so ten points. If you test every one of them against theory, what is the family-wise rate, and what should you do instead?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) $1 - 0.95^8$. Compute by repeated squaring: $0.95^2 = 0.9025$, $0.95^4 = 0.81451$,
+      $0.95^8 = 0.66342$. So the family-wise rate is $0.3366$, about <strong>34%</strong>.</p>
+      <p>(b) Solve $1 - 0.95^m > 0.5$, i.e. $0.95^m < 0.5$, i.e.
+      $m > \ln 0.5 / \ln 0.95 = (-0.6931)/(-0.05129) = 13.51$. So $m = 14$ tests. (Check:
+      $0.95^{13} = 0.5133$, $0.95^{14} = 0.4877$.) Fourteen honest tests of a true hypothesis and
+      you are more likely than not to "refute" it somewhere.</p>
+      <p>(c) $\alpha/m = 0.05/8 = 0.00625$, which is <code>bonferroni(0.05, 8)</code>. The cost is
+      power: to clear 0.00625 you need $z = 2.73$ rather than $1.96$, so the effect must be about
+      $(2.73/1.96)^2 = 1.94$ times larger — or you need nearly twice the trials — to detect a real
+      deviation. And the eight points are positively correlated (same simulator, same seed, same
+      markers), so the true family-wise rate is below 34% and Bonferroni over-corrects.</p>
+      <p>(d) Ten tests gives $1 - 0.95^{10} = 0.401$, about 40%. What to do instead: report the ten
+      points with their Wilson intervals as a picture, and run <em>one</em> pre-specified test — the
+      fitted exponent against the predicted $1/2$, which is what Week 6 committed to before any
+      beads were drawn. One test decided in advance beats ten tests decided afterwards, whatever
+      threshold you attach to them.</p>
+      <p class="muted">Part (d) is the answer to a question you will be asked at a science fair:
+      "you have a lot of points here, how do you know one of them is not just luck?" The good
+      answer is not a correction factor. It is "no individual point is being claimed, and the test
+      I am claiming was chosen in week 6".</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 13.5</span><span class="stars">★★</span></div>
+  <div class="ex-body">You bootstrap over the 2,700 cells of PBMC 3k and obtain a 95% interval of $[0.918, 0.937]$ for classification accuracy at full depth. (a) State precisely what that interval is an interval <em>for</em>. (b) A reader asks "so if I ran this on my own blood sample, would I get something in that range?" Answer honestly. (c) Design the experiment that would let you answer their question, and say what the analysis would look like. (d) Why can you not simply widen the interval by some factor to "account for" donors?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) It is an interval for the accuracy you would measure <em>if you drew a different random
+      set of cells from this same donor's sample, processed on this same run, with this same
+      pipeline</em>. It quantifies cell-sampling variability and nothing else. It does not include
+      donor-to-donor variation, batch effects between 10x runs, or error in the cell-type labels
+      themselves (which came from clustering the same data — see Week 10).</p>
+      <p>(b) No, and I cannot say what you would get. Everything that differs between you and this
+      donor — genotype, age, whether you have a cold, how long the sample sat before processing — is
+      outside the interval by construction. With one donor there is no way to estimate how large
+      that variation is; a sample of one has no measurable spread. The honest answer is: "this
+      interval does not address your question, and my data cannot".</p>
+      <p>(c) You would need several donors, at minimum three to five and preferably more, each
+      processed independently. Then: compute the accuracy <em>per donor</em>, treat the donor
+      accuracies as the sample — one number per donor, not per cell — and put an interval on their
+      mean (a $t$ interval, or a bootstrap over donors). The unit of analysis must be the unit you
+      want to generalize over. Ten million cells from one donor is still $n = 1$ for a claim about
+      people.</p>
+      <p>(d) Because the widening factor is exactly the unknown quantity. Between-donor variance is
+      typically larger than within-sample variance, but "typically" is not a measurement, and the
+      ratio depends on the cell types, the tissue and the protocol. Multiplying by an invented
+      factor would produce an interval with no defined coverage — it would look more honest while
+      being just as uninformed. Stating the limitation is the only defensible move.</p>
+      <p class="muted">This exercise <em>is</em> a paragraph of your Week 14 limitations section.
+      Write the answer to (a) and (b) in full sentences and keep them; you will paste them almost
+      unchanged.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 13.6</span><span class="stars">★★★</span></div>
+  <div class="ex-body">In Lab 2, hold $n = 20$ fixed and step the true $p$ from 0.05 to 0.95. The exact Wilson coverage does not sit at 0.95; it jumps around, sometimes above and sometimes below. (a) Explain why any interval procedure for a binomial proportion must behave this way. (b) Predict where the jumps occur. (c) Is a procedure with coverage always at least 95% available, and what would it cost? (d) What does this imply about how precisely you should quote a coverage number?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) Because $k$ is discrete. For fixed $n$ there are only $n+1$ possible outcomes and hence
+      only $n+1$ possible intervals. Coverage at a given $p$ is the total binomial probability of
+      those $k$ whose interval happens to contain $p$:</p>
+      $$c(p) = \sum_{k \,:\, p \in [\text{lo}_k,\, \text{hi}_k]} \binom{n}{k} p^k (1-p)^{n-k}.$$
+      <p>The set of qualifying $k$ changes only at isolated values of $p$, so $c(p)$ is a piecewise
+      smooth function with jumps — it is a sum of a whole number of lumps of probability, and you
+      cannot make a sum of 21 lumps equal 0.95 for every $p$ simultaneously. This is a property of
+      discreteness, not a defect of Wilson.</p>
+      <p>(b) The jumps happen at the values of $p$ where an endpoint crosses: at $p = \text{lo}_k$
+      or $p = \text{hi}_k$ for some $k$. At such a $p$ the outcome $k$ enters or leaves the covering
+      set, and coverage changes by exactly that outcome's binomial probability
+      $\binom{n}{k}p^k(1-p)^{n-k}$ — so the biggest jumps are at endpoints belonging to likely
+      outcomes, i.e. those with $k \approx np$.</p>
+      <p>(c) Yes: the Clopper–Pearson ("exact") interval guarantees coverage at least 95% for every
+      $p$. It costs width — it is systematically conservative, often noticeably so at small $n$,
+      with actual coverage frequently 97–99%. So you trade "never below 95%" for "usually well
+      above 95%, and a wider bar". Wilson wobbles around 95%; Clopper–Pearson sits above it. For
+      reporting a scientific measurement, wobbling around the nominal level is usually the better
+      trade, and it is the one this project makes. Say which you chose and why — that sentence
+      belongs in the methods section.</p>
+      <p>(d) Do not quote coverage to more precision than the wobble. "The Wilson interval has
+      coverage close to 95% for the sample sizes used here (exact coverage 94–96% at
+      $n = 40$ across the range of $p$ we report), while the naive interval falls below 90% for
+      $p &gt; 0.9$" is a defensible sentence. "Wilson has 95% coverage" is not, and neither is
+      quoting 94.7% as though it were a constant.</p>
+      <p class="muted">This is the deepest idea in the chapter: a continuous promise (95%) made
+      about a discrete experiment cannot be kept exactly, and every named interval is a different
+      opinion about how to fail. Knowing that is what separates using a formula from understanding
+      one — and it is a genuinely good answer to give a judge who asks why you did not use the
+      "exact" method.</p>
+    </div>
+  </details>
+</div>
+
+<h2>11 &nbsp;Research notebook</h2>
+
+<p>A milestone week, and the notebook is where the ledger is defended:</p>
+
+<ul>
+  <li>The Wilson derivation, written from memory: score statistic, square, collect the quadratic,
+  quadratic formula, and the cancellation of $\hat p^2$ in the discriminant. Then the two
+  consequences (cannot leave $[0,1]$, cannot have zero width) and the assumption list.</li>
+  <li>The four-row table of Exercise 13.1's arithmetic done by hand for <em>your</em> largest bead
+  point, and the naive interval next to it with the impossible endpoint circled.</li>
+  <li>A printed copy of <code>progress/week13_claims.md</code> with the STATUS column filled in
+  <strong>in pen</strong>, plus every other claim in the project you can think of — pull them from
+  Weeks 1–12's notebook pages and from the objectives lists. Aim for twenty to thirty rows. For
+  each one, one line saying why that status and not the one above it.</li>
+  <li>The donor sentence from Section 5, in final form.</li>
+  <li>The decision on multiple comparisons, written as a decision: which you chose (Bonferroni or
+  exploratory), why, and what you would have had to do differently to make the other one work.</li>
+  <li>Exercises 13.5 and 13.6 in full.</li>
+  <li>Your updated <strong>"assumptions I am making"</strong> list, with this week's addition:
+  <em>every interval in this project treats the trials within a run as independent, and the
+  real-data intervals treat one donor as the population</em>.</li>
+</ul>
+
+<p>Scan to <code>notebook/week13/</code>, fill in <code>progress/week13.md</code>, and commit
+<code>progress/week13_claims.md</code> with the STATUS column completed, both figures, and every
+Weeks 1–12 figure you regenerated with error bars. There is no tag this week — M6 is a
+verification, not a release — but <code>pytest tests/</code> should be fully green before you go
+into the check-in.</p>
+
+<div class="box verify">
+  <span class="box-tag">MILESTONE M6 · verification (with mentor)</span>
+  <ul>
+    <li><strong>Every figure from Weeks 1–12 that shows a proportion now has intervals.</strong>
+    Open them one at a time. For each, say what $n$ produced each point and where that $n$ is
+    recorded in the script. A point whose $n$ you cannot name is a point that gets re-run.</li>
+    <li><strong>Derive the Wilson interval at the whiteboard</strong>, from
+    $|\hat p - p_0| \le z\sqrt{p_0(1-p_0)/n}$ to the two formulas in the code, and then state the
+    two failures of the naive interval with the numbers for 38/40 and 0/20.</li>
+    <li><strong>The coverage lab has been run</strong>, and you can quote what you found: Wilson
+    near 95% at $p = 0.9$, $n = 20$; the naive interval near 88%. Say in one sentence what
+    "95% coverage" is a promise about.</li>
+    <li><strong>The claim ledger is filled in and defensible line by line.</strong> Your mentor
+    picks three rows at random. For a <span class="claim proved">proved</span> row you derive it on
+    the spot; for <span class="claim cited">cited</span> you produce the reference; for
+    <span class="claim observed">observed</span> you give the script, the seed and the interval; for
+    <span class="claim conjectured">conjectured</span> you say what measurement would change its
+    status.</li>
+    <li><strong>The donor limitation is stated out loud, unprompted</strong>, in one sentence, and
+    you can say what experiment would fix it and why widening the bar by a fudge factor would not.</li>
+    <li><strong>The multiple-comparisons decision is made and written down</strong>, with
+    $1 - 0.95^8 = 0.34$ computed on the spot and the reason for your choice.</li>
+    <li><strong><code>pytest tests/</code> fully green</strong>, including all of
+    <code>test_stats.py</code>.</li>
+  </ul>
+  <p class="muted">M6 has no git tag, and that is deliberate: this week does not add a result, it
+  decides which of the existing results are allowed into the report. Everything Week 14 writes down
+  is drawn from the ledger you defend here.</p>
+</div>
+
+<h2>12 &nbsp;Going deeper</h2>
+<ul>
+  <li>Brown, Cai &amp; DasGupta (2001), <em>Interval Estimation for a Binomial Proportion</em>, Statistical Science 16(2). <span class="muted">The definitive treatment, and unusually readable. Their Figure 1 — the coverage of the naive interval oscillating wildly below 0.95 — is the figure Lab 2 recreates. They call the standard interval's behaviour "persistently chaotic". <span class="claim cited">cited</span></span></li>
+  <li>Wilson (1927), <em>Probable Inference, the Law of Succession, and Statistical Inference</em>, JASA 22. <span class="muted">The original, four pages, and the algebra is exactly what you did in Section 3. Worth reading once to see how little has changed in a century.</span></li>
+  <li>Efron &amp; Tibshirani, <em>An Introduction to the Bootstrap</em> (1993), chapters 6 and 12. <span class="muted">Chapter 6 is the percentile method you implemented; chapter 12 is where the caveats live. Read 6 now and 12 before you write the limitations section.</span></li>
+  <li>Good, <em>Permutation, Parametric and Bootstrap Tests of Hypotheses</em> (2005), chapter 3. <span class="muted">On exchangeability specifically — what it means and the ways it quietly fails. Ten pages.</span></li>
+  <li>Gelman &amp; Loken (2013), <em>The Garden of Forking Paths</em>. <span class="muted">Why multiple comparisons are a problem even when you did not consciously run multiple tests. This is the essay that explains why Section 7's "declare it exploratory" is a stronger fix than a threshold. Read it before Week 14.</span></li>
+  <li>Course extras: <a href="../extras/notation.html">notation card</a> · <a href="../extras/glossary.html">glossary</a> · <a href="../extras/problem-bank.html">problem bank</a> · <a href="../extras/how-to-use.html">how to use this course</a></li>
+</ul>
+
+</div>
+
+<footer class="site">How Much Data Does It Take to Tell Two Cell Types Apart? · Week 13 · <a href="../index.html">Course home</a></footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  /* ---------------- Lab 1: Wilson vs naive across the range of p --------- */
+  (function () {
+    const NS = [20, 40, 200];
+    let ni = 0, showNaive = true;
+
+    function naiveInt(k, n) {
+      const p = k / n, h = 1.96 * Math.sqrt(p * (1 - p) / n);
+      return [p - h, p + h];
+    }
+    // CD.wilson returns the raw roots; celldetect.stats.wilson_interval clips
+    // them into [0,1]. Clip here too, so the lab and the Python agree exactly.
+    function wilsonInt(k, n) {
+      const w = CD.wilson(k, n, 1.96);
+      return [Math.max(0, w[0]), Math.min(1, w[1])];
+    }
+
+    function run() {
+      const n = NS[ni];
+      const P = CD.plot("w13lab1", { xmin: 0, xmax: 1, ymin: -0.35, ymax: 1.35,
+                                     xlabel: "observed proportion  k / n",
+                                     ylabel: "95% interval for the true p" });
+      P.clear();
+      const ctx = P.ctx;                       // shade the impossible regions
+      ctx.fillStyle = "rgba(148,163,184,0.30)";
+      ctx.fillRect(P.X(0), P.Y(0), P.X(1) - P.X(0), P.Y(-0.35) - P.Y(0));
+      ctx.fillRect(P.X(0), P.Y(1.35), P.X(1) - P.X(0), P.Y(1) - P.Y(1.35));
+      P.axes();
+
+      const wlo = [], whi = [], nlo = [], nhi = [], diag = [];
+      for (let k = 0; k <= n; k++) {
+        const p = k / n, w = wilsonInt(k, n), nv = naiveInt(k, n);
+        wlo.push([p, w[0]]); whi.push([p, w[1]]);
+        nlo.push([p, nv[0]]); nhi.push([p, nv[1]]); diag.push([p, p]);
+      }
+      P.line(diag, { color: CD.C.gray, width: 1, dash: [4, 4] });
+      P.line(wlo, { color: CD.C.blue, width: 2.6 });
+      P.line(whi, { color: CD.C.blue, width: 2.6 });
+      if (showNaive) {
+        P.line(nlo, { color: CD.C.red, width: 2, dash: [6, 4] });
+        P.line(nhi, { color: CD.C.red, width: 2, dash: [6, 4] });
+      }
+      P.label(0.03, 1.15, "impossible: p > 1", { color: CD.C.red });
+      P.label(0.03, -0.27, "impossible: p < 0", { color: CD.C.red });
+      P.label(0.40, 0.06, "Wilson (blue) · naive normal (dashed red)", { color: CD.C.navy });
+
+      const rows = [0, Math.round(n / 2), n - 1, n].map(k => {
+        const w = wilsonInt(k, n), nv = naiveInt(k, n);
+        const bad = (nv[0] < 0 || nv[1] > 1) ? "leaves [0,1]"
+                  : (nv[1] - nv[0] < 1e-9 ? "zero width" : "ok");
+        return [k + " / " + n, (k / n).toFixed(3),
+                "[" + nv[0].toFixed(3) + ", " + nv[1].toFixed(3) + "]",
+                "[" + w[0].toFixed(3) + ", " + w[1].toFixed(3) + "]", bad];
+      });
+      CD.table("w13lab1out", ["data", "p-hat", "naive normal", "Wilson", "naive verdict"], rows);
+    }
+
+    CD.slider("w13lab1ctl", { label: "trials n", min: 0, max: NS.length - 1,
+                              step: 1, value: ni, fmt: i => NS[i] },
+              i => { ni = i; run(); });
+    CD.button("w13lab1ctl", "Toggle naive interval", () => { showNaive = !showNaive; run(); }, true);
+  })();
+
+  /* ---------------- Lab 2: does the interval actually cover? ------------- */
+  (function () {
+    const NS = [10, 20, 40, 100, 400], M = 4000;
+    let ni = 1, ptrue = 0.90, bump = 0;
+
+    function wilson2(k, n) {          // clipped, exactly as celldetect.stats does
+      const w = CD.wilson(k, n, 1.96);
+      return [Math.max(0, w[0]), Math.min(1, w[1])];
+    }
+
+    function run() {
+      const n = NS[ni];
+      const r = CD.rng(1130 + ni * 31 + Math.round(ptrue * 100) + bump * 977);
+      let cw = 0, cn = 0;
+      const wpts = [], npts = [];
+      for (let t = 1; t <= M; t++) {
+        const k = CD.binomial(n, ptrue, r);
+        const w = wilson2(k, n);
+        if (w[0] <= ptrue && ptrue <= w[1]) cw++;
+        const ph = k / n, h = 1.96 * Math.sqrt(ph * (1 - ph) / n);
+        if (ph - h <= ptrue && ptrue <= ph + h) cn++;
+        if (t >= 100 && t % 25 === 0) { wpts.push([t, cw / t]); npts.push([t, cn / t]); }
+      }
+      // Exact coverage: sum the binomial pmf over every outcome k.
+      let ew = 0, en = 0, pk = Math.pow(1 - ptrue, n);
+      for (let k = 0; k <= n; k++) {
+        const w = wilson2(k, n);
+        if (w[0] <= ptrue && ptrue <= w[1]) ew += pk;
+        const ph = k / n, h = 1.96 * Math.sqrt(ph * (1 - ph) / n);
+        if (ph - h <= ptrue && ptrue <= ph + h) en += pk;
+        pk *= ((n - k) / (k + 1)) * (ptrue / (1 - ptrue));
+      }
+
+      const P = CD.plot("w13lab2", { xmin: 0, xmax: M, ymin: 0.70, ymax: 1.0,
+                                     xlabel: "experiments run so far",
+                                     ylabel: "fraction whose interval contained p" });
+      P.clear(); P.axes();
+      P.line([[0, 0.95], [M, 0.95]], { color: CD.C.orange, width: 2 });
+      P.label(M * 0.62, 0.958, "the promise: 0.95", { color: CD.C.orange });
+      P.line(wpts, { color: CD.C.blue, width: 2.4 });
+      P.line(npts, { color: CD.C.red, width: 2.4, dash: [6, 4] });
+      P.label(M * 0.05, 0.735, "Wilson (blue) · naive (dashed red)", { color: CD.C.navy });
+
+      CD.table("w13lab2out",
+        ["interval", "covered", "measured coverage", "exact coverage"],
+        [["Wilson", cw + " / " + M, (cw / M * 100).toFixed(1) + "%", (ew * 100).toFixed(1) + "%"],
+         ["naive normal", cn + " / " + M, (cn / M * 100).toFixed(1) + "%", (en * 100).toFixed(1) + "%"]]);
+    }
+
+    CD.slider("w13lab2ctl", { label: "true p", min: 0.05, max: 0.95, step: 0.05,
+                              value: ptrue, fmt: v => v.toFixed(2) },
+              v => { ptrue = v; run(); });
+    CD.slider("w13lab2ctl", { label: "trials per experiment n", min: 0, max: NS.length - 1,
+                              step: 1, value: ni, fmt: i => NS[i] },
+              i => { ni = i; run(); });
+    CD.button("w13lab2ctl", "New seed", () => { bump++; run(); }, true);
+  })();
+});
+</script>
+</body>
+</html>

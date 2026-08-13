@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notation card</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="unstuck.html">How to get unstuck →</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Reference · print it, or keep it open in a second tab</span>
+    </div>
+    <h1 class="chapter-title">Notation card</h1>
+    <div class="chapter-sub">Every symbol in the project · what it means · where it is introduced · and its name in the code</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<p>Print this, or keep it open in a second tab. Two thirds of the confusion in a mathematical project is not conceptual: it is not remembering whether $\lambda$ was a rate per cell or per gene, or whether $q$ was the probability a molecule survives or the probability it is lost. This page is the single place where each of those questions has an answer.</p>
+
+<p>The last column matters as much as the others. A symbol that has a Python name has a definition you can execute and a test that pins it down; keeping the two vocabularies aligned is what stops a derivation and its implementation from quietly drifting apart.</p>
+
+<h2>1 &nbsp;Conventions</h2>
+
+<div class="box definition">
+  <span class="box-tag">Read these four rules once and most of the table becomes predictable</span>
+  <ul>
+    <li><strong>Subscript $g$ indexes genes.</strong> $p_g$ is one gene's share of the
+    transcriptome; $x_g$ is one gene's observed count; $\lambda_g$ is one gene's expected count.
+    A symbol with no $g$ is either a scalar or a whole vector over genes, and the sentence around
+    it will say which.</li>
+    <li><strong>Superscript $(1)$ and $(2)$ indexes cell types.</strong> $p^{(1)}$ is type 1's
+    whole expression profile. Where both indices appear the type comes first and the parentheses
+    are often dropped in subscripts: $\lambda_{1g}$ is "type 1, gene $g$". In code the two types
+    are rows 0 and 1 of a profile matrix, and the labels in <code>y</code> are 0 and 1 — so
+    <strong>type 1 in the maths is index 0 in the code</strong>. Every chapter that mixes them says
+    so; do not let it bite you at a check-in.</li>
+    <li><strong>A bar means "pooled over the two types".</strong> $\bar\lambda = (\lambda_1 +
+    \lambda_2)/2$, $\bar p = (p_1 + p_2)/2$. It is an average over <em>types</em>, never over cells
+    or genes.</li>
+    <li><strong>A hat means "estimated from data".</strong> $\hat d'$ is the separation index
+    measured from a sample; $d'$ is the one the theory predicts. $\hat\varphi$ is the
+    method-of-moments dispersion estimate; $\varphi$ is the quantity it is trying to estimate.
+    When you compare a hat to a non-hat you are comparing measurement to prediction, which is
+    what the entire project consists of.</li>
+  </ul>
+</div>
+
+<p>Two smaller conventions. $\log$ with no base is the natural logarithm throughout (the only base-10 logs are on log–log plot axes, where they are written $\log_{10}$ explicitly). And a primed symbol is not a derivative anywhere in this project: $d'$ is a single name, pronounced "d-prime", inherited from the psychophysics literature of the 1950s.</p>
+
+<h2>2 &nbsp;The master table</h2>
+
+<table class="simple">
+  <tr><th>Symbol</th><th>Meaning</th><th>Introduced</th><th>Python name</th></tr>
+
+  <tr><td>$D$</td>
+      <td><strong>Depth</strong>, also called library size: the number of molecules counted from one cell. A few thousand for 10x data.</td>
+      <td>Week 1</td>
+      <td><code>depth</code> (argument of <code>simulate_cells</code>, <code>expected_rates</code>); measured from data by <code>total_counts(matrix)</code></td></tr>
+
+  <tr><td>$D_{\text{eff}}$</td>
+      <td>Effective depth after dropout, $D_{\text{eff}} = D(1-q)$. The thinning theorem says a dropout experiment <em>is</em> a shallower experiment.</td>
+      <td>Week 9</td>
+      <td><code>depth * (1 - dropout)</code>, computed inside <code>expected_rates</code></td></tr>
+
+  <tr><td>$p_g$</td>
+      <td>The fraction of a cell's transcripts belonging to gene $g$; equivalently the probability that a randomly captured molecule is gene $g$. Sums to 1 over all genes.</td>
+      <td>Week 1</td>
+      <td>entries of <code>profile</code>; the arrays <code>p1</code>, <code>p2</code> returned by <code>marker_profiles</code></td></tr>
+
+  <tr><td>$p^{(1)}, p^{(2)}$</td>
+      <td>The two cell types' expression profiles, as vectors over genes. In this project a "cell type" <em>is</em> such a vector.</td>
+      <td>Week 1</td>
+      <td><code>profiles</code>, a <code>(2, n_genes)</code> array</td></tr>
+
+  <tr><td>$\bar p$</td>
+      <td>Pooled fraction, $(p_1 + p_2)/2$, per gene.</td>
+      <td>Week 3</td>
+      <td>— (appears inside <code>d_prime</code>)</td></tr>
+
+  <tr><td>$\lambda$</td>
+      <td><strong>Poisson rate</strong> = expected count. For one gene in one cell, $\lambda = D p_g$. Mean and variance are both $\lambda$.</td>
+      <td>Week 1</td>
+      <td><code>lam</code>, <code>lam1</code>, <code>lam2</code></td></tr>
+
+  <tr><td>$\lambda_{cg}$</td>
+      <td>Expected count of gene $g$ in a cell of type $c$: $\lambda_{cg} = D\,p_g^{(c)}$.</td>
+      <td>Week 5</td>
+      <td>rows of <code>expected_rates(profiles, depth, dropout)</code>; estimated from real data by <code>estimate_rates(X, y)</code></td></tr>
+
+  <tr><td>$\bar\lambda$</td>
+      <td>Pooled expected count, $(\lambda_1+\lambda_2)/2$ — the pooled variance, and therefore the right noise scale.</td>
+      <td>Week 3</td>
+      <td>— (the denominator inside <code>d_prime</code>)</td></tr>
+
+  <tr><td>$k$</td>
+      <td><strong>Number of marker genes</strong> in the panel. The $\sqrt{k}$ of the headline law. <span class="claim cited">see the collision warning in Section 4</span></td>
+      <td>Week 5</td>
+      <td><code>n_genes</code> in <code>marker_profiles</code>; <code>n_markers</code> in <code>select_markers</code></td></tr>
+
+  <tr><td>$x_g$</td>
+      <td>The <strong>observed count</strong> for gene $g$ in one cell — an integer, the thing the sequencer actually hands you.</td>
+      <td>Week 1</td>
+      <td>an entry of <code>X</code>; one cell is a row <code>X[i]</code></td></tr>
+
+  <tr><td>$X$</td>
+      <td>The count matrix, cells $\times$ genes. Raw integers, never normalized.</td>
+      <td>Week 7</td>
+      <td><code>X</code> (from <code>simulate_dataset</code> or <code>load_pbmc</code>)</td></tr>
+
+  <tr><td>$y$</td>
+      <td>Cell-type labels, one per cell, values 0 and 1.</td>
+      <td>Week 8</td>
+      <td><code>y</code></td></tr>
+
+  <tr><td>$F$</td>
+      <td><strong>Fano factor</strong>, variance divided by mean. Exactly 1 for Poisson data; above 1 means overdispersed.</td>
+      <td>Week 1</td>
+      <td><code>fano_factor(samples)</code>; per gene on a matrix, <code>gene_fano(X)</code></td></tr>
+
+  <tr><td>$q$</td>
+      <td><strong>Dropout probability</strong>: the probability a captured molecule is <em>lost</em>. $q = 0.6$ means 60% of molecules disappear.</td>
+      <td>Week 9</td>
+      <td><code>dropout</code> (in <code>apply_dropout</code>, <code>simulate_cells</code>, <code>bead_d_prime</code>)</td></tr>
+
+  <tr><td>$1-q$</td>
+      <td><strong>Keep (survival) probability.</strong> The thinning theorem is stated in terms of this, not of $q$.</td>
+      <td>Week 2</td>
+      <td><code>keep_prob</code> (in <code>downsample_counts</code>, <code>downsample_matrix</code>)</td></tr>
+
+  <tr><td>$s$</td>
+      <td>Generic survival probability in the statement of the thinning theorem: $X \sim \mathrm{Poisson}(\lambda)$ thinned by $s$ is $\mathrm{Poisson}(s\lambda)$.</td>
+      <td>Week 2</td>
+      <td>— (instantiated as <code>keep_prob</code>)</td></tr>
+
+  <tr><td>$d'$</td>
+      <td>The <strong>separation index</strong>, $d' = |\lambda_1-\lambda_2| / \sqrt{\bar\lambda}$: a difference of means measured in units of its own noise. The centre of the project.</td>
+      <td>Week 3</td>
+      <td><code>d_prime(lam1, lam2)</code></td></tr>
+
+  <tr><td>$d'_g$</td>
+      <td>The separation index contributed by a single gene $g$.</td>
+      <td>Week 5</td>
+      <td>an element of the array <code>d_prime</code> returns when given vectors</td></tr>
+
+  <tr><td>$d'_{\text{total}}$</td>
+      <td>Separation from the whole panel: independent genes add <em>in quadrature</em>, $d'_{\text{total}} = \sqrt{\sum_g (d'_g)^2}$, giving $\sqrt{k}$ for $k$ equal genes.</td>
+      <td>Week 5</td>
+      <td><code>combine_d_prime(dprimes)</code>; from rates directly, <code>d_prime_total(lam1, lam2)</code></td></tr>
+
+  <tr><td>$d'_\infty$</td>
+      <td>The <strong>ceiling</strong> on $d'$ under overdispersion: $d'_\infty = |p_1-p_2| / (\bar p \sqrt{\varphi})$. No depth appears in it.</td>
+      <td>Week 11</td>
+      <td>— (the large-$D$ limit of <code>d_prime_overdispersed</code>)</td></tr>
+
+  <tr><td>$\hat d'$</td>
+      <td>The separation index <em>measured</em> from a sample: $|\bar x_1 - \bar x_2| / \sqrt{\tfrac12(s_1^2+s_2^2)}$, with the sample variances at <code>ddof=1</code>.</td>
+      <td>Week 3</td>
+      <td>computed inline in <code>experiments/week03_dprime_depth.py</code></td></tr>
+
+  <tr><td>$\Phi$</td>
+      <td><strong>Standard normal CDF</strong>: $\Phi(z) = P(Z \le z)$ for $Z \sim \mathcal N(0,1)$. Accuracy $= \Phi(d'/2)$.</td>
+      <td>Week 4</td>
+      <td><code>normal_cdf(z)</code>; in JavaScript, <code>CD.Phi(z)</code></td></tr>
+
+  <tr><td>$\mathrm{erf}$</td>
+      <td>The <strong>error function</strong>, $\mathrm{erf}(u) = \frac{2}{\sqrt\pi}\int_0^u e^{-t^2}dt$. Related to $\Phi$ by $\Phi(z) = \tfrac12\big(1 + \mathrm{erf}(z/\sqrt2)\big)$ — bookkeeping, not new mathematics.</td>
+      <td>Week 4</td>
+      <td><code>scipy.special.erf</code>; its inverse <code>erfinv</code> is used by <code>d_prime_from_auc</code>; in JavaScript <code>CD.erf(x)</code></td></tr>
+
+  <tr><td>$\varphi$</td>
+      <td><strong>Negative-binomial dispersion</strong>: the excess variance parameter in $\mathrm{Var} = m + \varphi m^2$. $\varphi = 0$ is Poisson. <span class="claim cited">read Section 4 before using this symbol</span></td>
+      <td>Week 11</td>
+      <td>argument <code>phi</code> of <code>d_prime_overdispersed(lam1, lam2, phi)</code></td></tr>
+
+  <tr><td>$\hat\varphi$</td>
+      <td>Method-of-moments estimate of $\varphi$ from data: $\hat\varphi = (s^2 - \bar x)/\bar x^2$. The raw value can come out negative, which is not an error but a gene that is Poisson within noise; the function clips at 0.</td>
+      <td>Week 11</td>
+      <td><code>negative_binomial_dispersion(X)</code></td></tr>
+
+  <tr><td>$\mathrm{LLR}$</td>
+      <td><strong>Log-likelihood ratio</strong>, $\log \frac{P(x\mid 1)}{P(x\mid 2)}$. For Poisson genes it is linear in the counts: $\sum_g\big[x_g\log(\lambda_{1g}/\lambda_{2g}) - (\lambda_{1g}-\lambda_{2g})\big]$. Positive means type 1.</td>
+      <td>Week 5</td>
+      <td><code>log_likelihood_ratio(X, lam1, lam2)</code>; in JavaScript <code>CD.nbLogRatio(x, l1, l2)</code></td></tr>
+
+  <tr><td>$w$, $b$</td>
+      <td>Weight vector and offset of a linear decision rule, "call type 1 if $w\cdot x + b > 0$". For naive Bayes, $w_g = \log(\lambda_{1g}/\lambda_{2g})$ and $b = -\sum_g(\lambda_{1g}-\lambda_{2g})$.</td>
+      <td>Week 5</td>
+      <td><code>clf.w</code>, <code>clf.b</code> on a fitted <code>LogisticRegression</code></td></tr>
+
+  <tr><td>$\pi_1, \pi_2$</td>
+      <td>Prior probabilities of the two types. Equal priors ($\pi_1=\pi_2=\tfrac12$) put the decision threshold at $\mathrm{LLR} = 0$; unequal priors move it to $\log(\pi_2/\pi_1)$.</td>
+      <td>Week 4</td>
+      <td><code>priors</code> argument of <code>posterior_log_odds(X, rates, priors)</code></td></tr>
+
+  <tr><td>AUC</td>
+      <td><strong>Area under the ROC curve</strong>: the probability that a random type-1 cell scores above a random type-2 cell. Related to $d'$ by $\mathrm{AUC} = \Phi(d'/\sqrt2)$.</td>
+      <td>Week 4</td>
+      <td><code>roc_auc(scores, labels)</code>; inverted by <code>d_prime_from_auc(auc)</code></td></tr>
+
+  <tr><td>TPR, FPR</td>
+      <td>True- and false-positive rates: the vertical and horizontal axes of the ROC curve.</td>
+      <td>Week 4</td>
+      <td>the two arrays returned by <code>roc_curve(scores, labels)</code></td></tr>
+
+  <tr><td>$z$</td>
+      <td>A standard-normal quantile used as a <strong>multiplier</strong> for confidence intervals. $z = 1.96$ gives 95% because $\Phi(1.96) = 0.975$ and $2(1-0.975) = 0.05$. Also written $z$ for a generic standardized value.</td>
+      <td>Week 13</td>
+      <td><code>z</code> argument of <code>wilson_interval(k, n, z=1.96)</code> and <code>trials_needed(p_true, half_width, z=1.96)</code></td></tr>
+
+  <tr><td>$\alpha$</td>
+      <td>Significance level; $\alpha = 0.05$ pairs with $z = 1.96$. Divided by the number of tests under a Bonferroni correction.</td>
+      <td>Week 13</td>
+      <td><code>alpha</code> in <code>bonferroni(alpha, n_tests)</code></td></tr>
+
+  <tr><td>$p_A, p_B$</td>
+      <td><strong>Bead fractions</strong>: the proportion of red beads in jar A and jar B. The planned design is $p_A = 0.30$ against $p_B = 0.35$ or $0.40$.</td>
+      <td>Week 6</td>
+      <td><code>p_a</code>, <code>p_b</code> in <code>bead_d_prime(n, p_a, p_b, dropout)</code> and <code>predicted_accuracy</code></td></tr>
+
+  <tr><td>$n$ <span class="muted">(beads)</span></td>
+      <td>The number of beads <strong>drawn in one trial</strong>. It plays exactly the role $D$ plays for cells: $d'(n) = \sqrt n\,|p_A-p_B| / \sqrt{\bar p(1-\bar p)}$.</td>
+      <td>Week 6</td>
+      <td><code>n</code> in <code>bead_d_prime</code>, and the <code>n</code> column of a tally CSV</td></tr>
+
+  <tr><td>$n$ <span class="muted">(sample size)</span></td>
+      <td>The number of independent observations behind a statistic: cells in a Fano estimate, trials in a proportion. <span class="claim cited">collision — see Section 4</span></td>
+      <td>Weeks 1, 13</td>
+      <td><code>n</code> in <code>wilson_interval(k, n, z)</code>; <code>n_samples</code>, <code>n_cells</code>, <code>n_trials</code> elsewhere</td></tr>
+
+  <tr><td>$f$</td>
+      <td><strong>Fold change</strong> between the two types on a marker gene, $f = p^{(1)}_g / p^{(2)}_g$. A 1.5-fold marker is modest; a 10-fold marker is spectacular and rare.</td>
+      <td>Week 7</td>
+      <td><code>fold_change</code> in <code>marker_profiles(n_genes, fold_change, marker_mass)</code></td></tr>
+
+  <tr><td>$m$</td>
+      <td>Marker mass: the fraction of the transcriptome the whole marker panel accounts for, averaged over the two types. Default 0.02.</td>
+      <td>Week 7</td>
+      <td><code>marker_mass</code></td></tr>
+
+  <tr><td>$N$</td>
+      <td>Number of cells in a dataset (as opposed to molecules in a cell). Cells and depth are interchangeable for estimating a population quantity and <em>not</em> for classifying one cell.</td>
+      <td>Week 1</td>
+      <td><code>n_cells</code>, <code>n_cells_per_type</code>, <code>n_samples</code></td></tr>
+
+  <tr><td>$\mu$, $\sigma^2$, $\sigma$</td>
+      <td>Generic mean, variance and standard deviation. For Poisson counts $\mu = \sigma^2 = \lambda$, which is the coincidence the whole project rests on.</td>
+      <td>Week 1</td>
+      <td><code>.mean()</code>, <code>.var(ddof=1)</code>, <code>.std(ddof=1)</code></td></tr>
+
+  <tr><td>$E[\cdot]$, $\mathrm{Var}(\cdot)$</td>
+      <td>Expectation and variance. $E$ is linear always; variances add only for <em>independent</em> terms, and that asymmetry is what the $\sqrt k$ law turns on.</td>
+      <td>Weeks 1–2</td>
+      <td>—</td></tr>
+
+  <tr><td>$h$</td>
+      <td>Half-width of a target confidence interval, used when planning how many bead trials to run.</td>
+      <td>Week 6</td>
+      <td><code>half_width</code> in <code>trials_needed(p_true, half_width, z)</code></td></tr>
+
+  <tr><td>$j^\star$</td>
+      <td>The bead-count cut: call jar B if the number of red beads exceeds $j^\star$. The exact optimal cut from the likelihood ratio, which is very close to $\bar p\, n$.</td>
+      <td>Week 6</td>
+      <td>— (the decision card in the Week 6 chapter)</td></tr>
+</table>
+
+<h2>3 &nbsp;Maths to <code>celldetect</code>, at a glance</h2>
+
+<p>The same content as the last column, arranged the other way round: start from the formula you are trying to compute and find the function that computes it.</p>
+
+<table class="simple">
+  <tr><th>What you want</th><th>Formula</th><th>Function</th><th>Module</th></tr>
+  <tr><td>Poisson counts</td><td>$X \sim \mathrm{Poisson}(\lambda)$</td><td><code>sample_counts(lam, n_samples, rng)</code></td><td><code>counting</code></td></tr>
+  <tr><td>Fano factor</td><td>$F = s^2/\bar x$</td><td><code>fano_factor(samples)</code></td><td><code>counting</code></td></tr>
+  <tr><td>Poisson pmf / log pmf</td><td>$\lambda^j e^{-\lambda}/j!$</td><td><code>poisson_pmf(k, lam)</code>, <code>poisson_logpmf(k, lam)</code></td><td><code>counting</code></td></tr>
+  <tr><td>Thinning (depth reduction, dropout)</td><td>$\mathrm{Poisson}(\lambda) \to \mathrm{Poisson}(s\lambda)$</td><td><code>downsample_counts(counts, keep_prob, rng)</code></td><td><code>counting</code></td></tr>
+  <tr><td>Library size per cell</td><td>$D_i = \sum_g x_{ig}$</td><td><code>total_counts(matrix)</code></td><td><code>counting</code></td></tr>
+  <tr><td>Standard normal CDF</td><td>$\Phi(z)$</td><td><code>normal_cdf(z)</code></td><td><code>detection</code></td></tr>
+  <tr><td>Separation index</td><td>$|\lambda_1-\lambda_2|/\sqrt{\bar\lambda}$</td><td><code>d_prime(lam1, lam2)</code></td><td><code>detection</code></td></tr>
+  <tr><td>Quadrature over genes</td><td>$\sqrt{\sum_g (d'_g)^2}$</td><td><code>combine_d_prime(dprimes)</code>, <code>d_prime_total(lam1, lam2)</code></td><td><code>detection</code></td></tr>
+  <tr><td>Accuracy prediction</td><td>$\Phi(d'/2)$</td><td><code>accuracy_from_d_prime(dp)</code></td><td><code>detection</code></td></tr>
+  <tr><td>Exact Bayes error (no Gaussian step)</td><td>$\tfrac12\sum_j \min\{P(j\mid 1), P(j\mid 2)\}$</td><td><code>bayes_error_exact(lam1, lam2, max_k)</code></td><td><code>detection</code></td></tr>
+  <tr><td>Optimal decision score</td><td>$\mathrm{LLR}(x)$</td><td><code>log_likelihood_ratio(X, lam1, lam2)</code></td><td><code>detection</code></td></tr>
+  <tr><td>ROC and AUC</td><td>TPR against FPR</td><td><code>roc_curve(scores, labels)</code>, <code>roc_auc(scores, labels)</code></td><td><code>detection</code></td></tr>
+  <tr><td>$d'$ from an AUC</td><td>$d' = \sqrt2\,\Phi^{-1}(\mathrm{AUC})$</td><td><code>d_prime_from_auc(auc)</code></td><td><code>detection</code></td></tr>
+  <tr><td>More than two types</td><td>posterior log-odds with priors</td><td><code>posterior_log_odds(X, rates, priors)</code></td><td><code>detection</code></td></tr>
+  <tr><td>Two profiles $f$-fold apart</td><td>$p^{(1)}_g/p^{(2)}_g = f$</td><td><code>marker_profiles(n_genes, fold_change, marker_mass)</code></td><td><code>simulate</code></td></tr>
+  <tr><td>Synthetic cells</td><td>$x_g \sim \mathrm{Poisson}(D p_g)$</td><td><code>simulate_cells(profile, depth, n_cells, rng, dropout)</code></td><td><code>simulate</code></td></tr>
+  <tr><td>A labelled two-type dataset</td><td>$(X, y)$</td><td><code>simulate_dataset(profiles, depth, n_cells_per_type, rng, ...)</code></td><td><code>simulate</code></td></tr>
+  <tr><td>Dropout at rate $q$</td><td>keep with probability $1-q$</td><td><code>apply_dropout(X, dropout, rng)</code></td><td><code>simulate</code></td></tr>
+  <tr><td>The truth the theory uses</td><td>$\lambda_{cg} = D(1-q)p^{(c)}_g$</td><td><code>expected_rates(profiles, depth, dropout)</code></td><td><code>simulate</code></td></tr>
+  <tr><td>Honest train/test split</td><td>—</td><td><code>train_test_split(X, y, test_fraction, rng)</code></td><td><code>classify</code></td></tr>
+  <tr><td>The theory's own classifier</td><td>call type 1 iff $\mathrm{LLR} > 0$</td><td><code>naive_bayes_predict(X, lam1, lam2)</code></td><td><code>classify</code></td></tr>
+  <tr><td>Fitted linear rule / nearest neighbours</td><td>$\sigma(w\cdot x + b)$</td><td><code>LogisticRegression</code>, <code>knn_predict(X_train, y_train, X_query, k)</code></td><td><code>classify</code></td></tr>
+  <tr><td>Marker selection without leakage</td><td>rank genes on the training split only</td><td><code>select_markers(X, y, n_markers, min_cells)</code></td><td><code>realdata</code></td></tr>
+  <tr><td>Downsample a real matrix</td><td>thin every entry</td><td><code>downsample_matrix(X, keep_prob, rng)</code></td><td><code>realdata</code></td></tr>
+  <tr><td>Rates from labelled real cells</td><td>$\hat\lambda_{cg}$</td><td><code>estimate_rates(X, y)</code></td><td><code>realdata</code></td></tr>
+  <tr><td>Per-gene Fano and dispersion</td><td>$F_g$, $\hat\varphi_g$</td><td><code>gene_fano(X)</code>, <code>negative_binomial_dispersion(X)</code></td><td><code>realdata</code></td></tr>
+  <tr><td>$d'$ with overdispersion</td><td>$|\lambda_1-\lambda_2|/\sqrt{\bar\lambda + \varphi\bar\lambda^2}$</td><td><code>d_prime_overdispersed(lam1, lam2, phi)</code></td><td><code>realdata</code></td></tr>
+  <tr><td>Bead theory</td><td>$\sqrt n\,|p_A-p_B|/\sqrt{\bar p(1-\bar p)}$</td><td><code>bead_d_prime(n, p_a, p_b, dropout)</code>, <code>predicted_accuracy(...)</code></td><td><code>beads</code></td></tr>
+  <tr><td>Bead data in and checked</td><td>—</td><td><code>load_tally(path)</code>, <code>validate_tally(records)</code>, <code>accuracy_by_n(records, dropout)</code></td><td><code>beads</code></td></tr>
+  <tr><td>Fitted exponent on log–log axes</td><td>$y = c\,x^{a}$</td><td><code>fit_power_law(ns, values)</code></td><td><code>beads</code></td></tr>
+  <tr><td>How many trials to plan</td><td>$n \ge z^2 p(1-p)/h^2$</td><td><code>trials_needed(p_true, half_width, z)</code></td><td><code>beads</code></td></tr>
+  <tr><td>Interval on a proportion</td><td>Wilson score interval</td><td><code>wilson_interval(k, n, z)</code></td><td><code>stats</code></td></tr>
+  <tr><td>Interval on anything else</td><td>percentile bootstrap</td><td><code>bootstrap_ci(values, statistic, n_boot, ...)</code></td><td><code>stats</code></td></tr>
+  <tr><td>Is this difference real?</td><td>permutation p-value</td><td><code>permutation_test(a, b, n_perm, ...)</code></td><td><code>stats</code></td></tr>
+</table>
+
+<p class="muted">The JavaScript library used by the interactive labs mirrors a subset of this with camelCase names: <code>CD.poisson</code>, <code>CD.thin</code>, <code>CD.dPrime</code>, <code>CD.combineDPrime</code>, <code>CD.accuracyFromDPrime</code>, <code>CD.nbLogRatio</code>, <code>CD.wilson</code>, <code>CD.sampleCell</code>, <code>CD.markerProfiles</code>. One deliberate difference: <code>CD.roc</code> does not collapse tied scores and therefore inflates the AUC on integer counts. It exists so that Week 4 can show you the size of that error. Never report a number from it.</p>
+
+<h2>4 &nbsp;Collisions and false friends</h2>
+
+<p>Four places where one glyph means two things, or two glyphs look alike. Every one of them has caused a real error somewhere; read them once now and again before Week 11.</p>
+
+<div class="box warning">
+  <span class="box-tag">$\varphi$ is not $\Phi$, and both appear in Week 11</span>
+  <p>$\Phi$ (capital, "Phi") is the <strong>standard normal CDF</strong>. It is a function; it eats a
+  number and returns a probability between 0 and 1. It appears in
+  $\text{accuracy} = \Phi(d'/2)$.</p>
+  <p>$\varphi$ (lower case, "phi") is the <strong>negative-binomial dispersion parameter</strong>. It
+  is a number, typically between 0 and about 2 for real gene counts, and it says how much a gene's
+  variance exceeds its mean: $\mathrm{Var} = m + \varphi m^2$.</p>
+  <p>They have nothing to do with each other, and Week 11 contains sentences with both in them —
+  for instance, the accuracy at the ceiling is $\Phi(d'_\infty/2)$ with
+  $d'_\infty = |p_1-p_2|/(\bar p\sqrt{\varphi})$. This course writes the dispersion as
+  <code>\varphi</code> ($\varphi$) rather than <code>\phi</code> ($\phi$) precisely to widen the
+  visual gap. Note that the literature is not so careful: papers write the same dispersion as
+  $\phi$, $\alpha$, or $\theta$ (and some use $\theta = 1/\varphi$, so the <em>larger</em> value
+  means <em>less</em> variability). Whenever you read a negative-binomial formula elsewhere, find
+  the variance equation before trusting the letter.</p>
+  <p class="muted">In code there is no ambiguity: $\Phi$ is <code>normal_cdf</code> and $\varphi$ is
+  the argument <code>phi</code>. If you are unsure which one a line of maths means, ask which
+  function you would call.</p>
+</div>
+
+<div class="box warning">
+  <span class="box-tag">$n$ means two different things, and context disambiguates</span>
+  <p><strong>$n$ = beads drawn in one trial</strong> (Weeks 6 and 12). This is a quantity of
+  <em>data per decision</em>. It is the bead experiment's analogue of $D$, and it is the axis of the
+  headline bead plot: accuracy against $n$, predicted to rise like $\Phi(\sqrt n\,c/2)$.</p>
+  <p><strong>$n$ = sample size</strong> (Weeks 1, 6, 13). This is a quantity of <em>repetitions</em>:
+  how many cells went into a Fano estimate, how many trials went into a measured proportion. It
+  controls the width of your <em>error bar</em>, not the accuracy itself.</p>
+  <p><strong>How to tell them apart:</strong> ask what gets bigger when $n$ does. If the
+  <em>accuracy</em> improves, $n$ is beads per draw. If the <em>error bar</em> shrinks while the
+  accuracy stays where it is, $n$ is a sample size. In the bead chapters both are present in one
+  sentence — "40 trials at each of $n = 10, 25, 50, 100, 200$" — and there the sample size is always
+  called <em>trials</em>. In code they never collide, because the tally CSV column is <code>n</code>
+  and the interval function's is also <code>n</code> but they are never passed to the same
+  function.</p>
+</div>
+
+<div class="box warning">
+  <span class="box-tag">$k$ means three things, two of them only in code</span>
+  <p>In the mathematics, <strong>$k$ is the number of marker genes</strong> — the $\sqrt k$ of the
+  scaling law. That is the only meaning in the chapters' derivations.</p>
+  <p>In the code it is also: the <strong>number of successes</strong> in
+  <code>wilson_interval(k, n, z)</code> (as in "$k$ correct out of $n$ trials"); the <strong>count
+  value</strong> at which a pmf is evaluated in <code>poisson_pmf(k, lam)</code>; and the
+  <strong>number of neighbours</strong> in <code>knn_predict(..., k=5)</code>. All three are
+  standard conventions in their own contexts, which is why they were kept.</p>
+  <p class="muted">If you find yourself writing $\sqrt k$ in a comment above a call to
+  <code>wilson_interval</code>, stop and rename a variable.</p>
+</div>
+
+<div class="box pitfall">
+  <span class="box-tag">$q$ versus <code>keep_prob</code>: the inversion that produces a plausible wrong figure</span>
+  <p>$q$ is the probability a molecule is <strong>lost</strong>. <code>keep_prob</code> is the
+  probability it <strong>survives</strong>. They sum to 1, and
+  <code>apply_dropout(X, dropout, rng)</code> exists precisely to do the subtraction once, in one
+  place: it calls <code>downsample_counts(X, 1 - dropout, rng)</code>.</p>
+  <p>Get it backwards and nothing crashes. The counts are still integers, the curve is still smooth,
+  the tests you happen to run may still pass — and every point is at the wrong depth. This is the
+  single most likely silent error in Weeks 9 and 11. The check that catches it in ten seconds:
+  <strong>set dropout to 0.9 and confirm the counts get much smaller, not much larger.</strong></p>
+</div>
+
+<h2>5 &nbsp;The five formulas worth memorizing</h2>
+
+<p>Everything else can be looked up. These five you should be able to write on a whiteboard with no notes, because the check-ins will ask.</p>
+
+<table class="simple">
+  <tr><th>Formula</th><th>Says</th><th>From</th></tr>
+  <tr><td>$P(X = j) = \dfrac{\lambda^j e^{-\lambda}}{j!}$, &nbsp; $E[X] = \mathrm{Var}(X) = \lambda$</td><td>Counting noise has one parameter, and it sets both the signal and the noise.</td><td>Weeks 1–2</td></tr>
+  <tr><td>$d' = \dfrac{|\lambda_1-\lambda_2|}{\sqrt{\bar\lambda}}$</td><td>Separation measured in units of its own noise.</td><td>Week 3</td></tr>
+  <tr><td>$\text{accuracy} = \Phi\!\left(\dfrac{d'}{2}\right)$</td><td>A parameter-free prediction: no fitting, nothing tuned.</td><td>Week 4</td></tr>
+  <tr><td>$d'_{\text{total}} = \sqrt{D\,k}\;\dfrac{|p_1-p_2|}{\sqrt{\bar p}}$</td><td>Depth and gene count enter symmetrically, both as square roots.</td><td>Week 5</td></tr>
+  <tr><td>$d'_\infty = \dfrac{|p_1-p_2|}{\bar p\,\sqrt{\varphi}}$</td><td>With overdispersion there is a ceiling, and depth is not in it.</td><td>Week 11</td></tr>
+</table>
+
+<h2>6 &nbsp;Related pages</h2>
+<ul>
+  <li><a href="glossary.html">Glossary</a> — the words, where this page is the symbols.</li>
+  <li><a href="biology-background.html">Biology background</a> — what a transcript, a UMI and a marker gene actually are.</li>
+  <li><a href="unstuck.html">How to get unstuck</a> — whose step 1 is "re-read the definition of every symbol in the statement", which is what this page is for.</li>
+  <li><a href="how-to-use.html">How to use this course</a> · <a href="big-picture.html">The big picture</a></li>
+</ul>
+
+</div>
+
+<footer class="site">How Much Data Does It Take to Tell Two Cell Types Apart? · Course extras · <a href="../index.html">Course home</a></footer>
+
+</body>
+</html>

@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 1 — Counting Noise and the Question</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="week02.html">Week 2 →</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Week 1</span>
+      <span class="badge aim1">Aim 1 · Theory</span>
+      <span class="badge win">WIN: the counting-noise figure</span>
+    </div>
+    <h1 class="chapter-title">Counting Noise and the Question</h1>
+    <div class="chapter-sub">Why a sequencer's output is a sample · variance equals mean · setting up your laboratory</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<h2>Objectives</h2>
+<ul class="objectives">
+  <li>State the central research question of the project in your own words, in two sentences, without using the word "machine learning".</li>
+  <li>Explain why a single-cell RNA-seq count is a <em>sample</em> and not a measurement.</li>
+  <li>Define the Poisson distribution and state, from memory, that its variance equals its mean.</li>
+  <li>Explain the difference between a demonstration ("I ran it and it looked right") and a derivation.</li>
+  <li>Set up Python with NumPy, SciPy, matplotlib and pytest, and get one test to go green.</li>
+  <li>Reproduce the counting-noise figure: Poisson samples at four rates, with the measured mean and variance printed on each panel.</li>
+  <li>Open your research notebook and write your first entries.</li>
+</ul>
+
+<h2>1 &nbsp;Where we are going</h2>
+
+<p>A human cell contains a few hundred thousand messenger RNA molecules. A single-cell RNA sequencing experiment — the standard 10x Genomics protocol, say — captures and reads a few thousand of them. Not a few thousand <em>kinds</em>: a few thousand <em>molecules</em>, total, spread over twenty thousand genes. Most genes come back as a zero. Many come back as a one.</p>
+
+<p>So when a paper says "this cell expresses <em>CD3D</em> at 4 counts and that one at 6", the honest translation is: <em>we drew a small random sample from each cell, and got 4 and 6</em>. Draw again and you would get 3 and 8. The question this project exists to answer is what that irreducible randomness costs you.</p>
+
+<div class="box definition">
+  <span class="box-tag">The central question</span>
+  How does the accuracy of cell-type classification scale with (a) sequencing depth per cell
+  and (b) the number of informative marker genes? And where — precisely — does that scaling
+  law stop being true?
+</div>
+
+<p>By the end of Week 5 you will have <em>derived</em> an answer with no free parameters:</p>
+
+$$\text{accuracy} = \Phi\!\left(\frac{d'}{2}\right), \qquad d' \propto \sqrt{\text{depth}\times k}.$$
+
+<p>Nothing in that formula is obvious yet, and two of its three symbols are undefined. What matters today is the shape of the claim: <strong>discriminability grows as a square root</strong>, so doubling how well you can tell two cell types apart costs <em>four times</em> the data. In Weeks 7–12 you will test that claim three independent ways, and in Week 11 you will find the place where it breaks.</p>
+
+<div class="box biology">
+  <span class="box-tag">What a "cell type" is, for our purposes</span>
+  <p>Biologists group cells into types — T cell, monocyte, neuron — by what they do and what
+  they express. For this project a cell type is simply <strong>a probability distribution over
+  which gene the next transcript belongs to</strong>. Type 1 is a vector $p^{(1)}$, type 2 a vector
+  $p^{(2)}$, both summing to 1 over all genes. A <em>marker gene</em> is one where the two vectors
+  differ noticeably.</p>
+  <p>This is a simplification, and it is worth naming as one right now: real cells of the "same
+  type" differ from each other, which is exactly what breaks the theory in Week 11. Writing the
+  assumption down today is what lets you measure its failure in ten weeks. See
+  <a href="../extras/biology-background.html">the biology background page</a> for what is being
+  glossed over.</p>
+</div>
+
+<h2>2 &nbsp;Counting is noisy, and the noise has a law</h2>
+
+<p>Here is the model, and it is almost embarrassingly simple. A cell of type 1 has a fraction $p_g$ of its transcripts belonging to gene $g$. The sequencer captures $D$ molecules at random (this $D$ is the <strong>depth</strong>, or library size — a few thousand for 10x data). The number of captured molecules that turn out to be gene $g$ is then a count out of $D$ independent draws, each landing on gene $g$ with probability $p_g$: a <strong>binomial</strong>.</p>
+
+<p>When $D$ is large and $p_g$ is small — thousands of draws, one gene in ten thousand — the binomial is indistinguishable from something simpler:</p>
+
+<div class="box definition">
+  <span class="box-tag">Definition · the Poisson distribution</span>
+  A random variable $X$ is <strong>Poisson</strong> with rate $\lambda > 0$, written $X \sim \mathrm{Poisson}(\lambda)$, if
+  $$P(X = k) = \frac{\lambda^k e^{-\lambda}}{k!}, \qquad k = 0, 1, 2, \dots$$
+  Its mean is $\lambda$. Its variance is <em>also</em> $\lambda$. You will prove both in Week 2.
+</div>
+
+<p>That second sentence is the hinge of the entire project, so it deserves its own box:</p>
+
+<div class="box theorem">
+  <span class="box-tag">The coincidence everything rests on</span>
+  For a Poisson variable, <strong>variance = mean</strong>. So the standard deviation is $\sqrt{\lambda}$,
+  and the <em>relative</em> noise is
+  $$\frac{\text{standard deviation}}{\text{mean}} = \frac{\sqrt{\lambda}}{\lambda} = \frac{1}{\sqrt{\lambda}}.$$
+  Count ten molecules and you are off by about three. Count a thousand and you are off by about
+  thirty — which is a much smaller <em>fraction</em>. Every square root in this project descends
+  from this one line.
+</div>
+
+<p>It is worth pausing on how unusual this is. Most distributions have a mean and a spread you can set independently: a normal distribution can have mean 100 and standard deviation 1, or mean 100 and standard deviation 50. A Poisson cannot. Fix the mean and the noise is decided. That rigidity is what makes an exact, parameter-free prediction possible at all.</p>
+
+<h2>3 &nbsp;Lab: watch the noise track the signal</h2>
+
+<p>Before any algebra, look at the thing. Drag the rate slider and watch two numbers: the sample mean and the sample variance. They should stay locked together.</p>
+
+<div class="lab">
+  <div class="lab-title">Lab 1 · Poisson counts at a rate you control</div>
+  <div class="lab-desc">Each sample is one "cell": a Poisson count for a single gene at rate $\lambda$. The histogram shows many such cells. Watch the mean and the variance in the readout — and watch the <em>relative</em> width, which is what actually matters for telling cells apart.</div>
+  <canvas id="lab1" height="330"></canvas>
+  <div class="controls" id="lab1ctl"></div>
+  <div class="readout" id="lab1out"></div>
+</div>
+
+<p>Two things to notice. First, the mean and the variance stay equal (up to sampling error) no matter where you put the slider — that is the Fano factor, defined below, sitting at 1. Second, as $\lambda$ grows the histogram gets <em>wider in absolute terms</em> and <em>narrower relative to its mean</em>. Deeper sequencing does not make the noise go away; it makes the noise small compared to the signal. That distinction is the whole project in one sentence.</p>
+
+<div class="box definition">
+  <span class="box-tag">Definition · the Fano factor</span>
+  For a sample of counts, the <strong>Fano factor</strong> is
+  $$F = \frac{\text{variance}}{\text{mean}}.$$
+  Poisson data has $F = 1$ exactly. $F > 1$ means <em>overdispersed</em>: something beyond
+  counting noise is varying. $F < 1$ means <em>underdispersed</em>, which essentially never
+  happens in this setting.
+  <p class="muted">Remember this number. In Week 11 you will compute it on real PBMC data and find
+  it is not 1, and that single measurement is the most important negative result in the project.</p>
+</div>
+
+<div class="lab">
+  <div class="lab-title">Lab 2 · How well can you <em>measure</em> a Fano factor?</div>
+  <div class="lab-desc">The Fano factor of true Poisson data is 1 — but you never have infinite cells. This lab draws many independent samples of the size you choose and histograms the Fano factors you would have reported. Ask yourself: at 50 cells, would you be able to tell $F = 1$ from $F = 1.3$?</div>
+  <canvas id="lab2" height="320"></canvas>
+  <div class="controls" id="lab2ctl"></div>
+  <div class="readout" id="lab2out"></div>
+</div>
+
+<div class="box warning">
+  <span class="box-tag">The lesson of Lab 2, stated early because it will save you a month</span>
+  A statistic computed from a small sample is itself a random variable. "The Fano factor is 1.3,
+  so the data is overdispersed" is only a claim if you know how much 1.3 could have wobbled. In
+  Week 13 you will put an interval on every number in the project; Lab 2 is the first hint of why
+  that is not optional.
+</div>
+
+<h2>4 &nbsp;What a derivation is, and what it is not</h2>
+
+<p>You have just <em>observed</em> that variance tracks mean. That is evidence. It is not a derivation, and the difference matters more in this project than it might in a class.</p>
+
+<p>A derivation is an argument that covers every case at once — including the cases nobody will ever run. It starts from stated assumptions and moves by steps a skeptical reader can check. The reason it matters here is specific and practical: <strong>a derivation tells you when it stops applying</strong>. Lab 1 will never tell you that the $\sqrt{\text{depth}}$ law fails under overdispersion; the derivation in Week 3 will, because you will be able to point at the exact line that used "variance = mean" and ask what happens when that line is false.</p>
+
+<div class="box example">
+  <span class="box-tag">Worked derivation 1 · the mean of a sum</span>
+  <p><strong>Claim.</strong> If $X$ and $Y$ are random variables, $E[X + Y] = E[X] + E[Y]$ — whether or not they are independent.</p>
+  <p><strong>Argument.</strong> Expectation is a weighted sum over outcomes. For each joint outcome $(x, y)$ with probability $P(x,y)$,
+  $$E[X+Y] = \sum_{x,y} (x + y) P(x,y) = \sum_{x,y} x\,P(x,y) + \sum_{x,y} y\,P(x,y) = E[X] + E[Y],$$
+  where the last step collapses each double sum over the variable it does not involve. Nothing about independence was used. <span class="qed">∎</span></p>
+  <p class="muted">Keep this in view: the corresponding claim for <em>variance</em> does need
+  independence, and that asymmetry is exactly what Week 5's $\sqrt{k}$ law turns on.</p>
+</div>
+
+<div class="box example">
+  <span class="box-tag">Worked derivation 2 · why a square root, in general</span>
+  <p><strong>Claim.</strong> If $X_1, \dots, X_n$ are independent with common mean $\mu$ and variance $\sigma^2$, then the sum $S = \sum_i X_i$ has mean $n\mu$ and standard deviation $\sigma\sqrt{n}$ — so the ratio (mean to standard deviation) grows like $\sqrt{n}$.</p>
+  <p><strong>Argument.</strong> $E[S] = n\mu$ by the previous result. For independent variables variances add, so $\mathrm{Var}(S) = n\sigma^2$ and $\mathrm{sd}(S) = \sigma\sqrt{n}$. Therefore
+  $$\frac{E[S]}{\mathrm{sd}(S)} = \frac{n\mu}{\sigma\sqrt{n}} = \frac{\mu}{\sigma}\sqrt{n}. \qquad \blacksquare$$</p>
+  <p class="muted">This is the skeleton of every square-root law you will meet — in depth (Week 3),
+  in the number of genes (Week 5), in the number of beads (Week 12), and even in the width of
+  your own error bars (Week 13). Four of the five appearances are this one argument wearing
+  different clothes. Recognizing that is worth more than memorizing any of them.</p>
+</div>
+
+<div class="box warning">
+  <span class="box-tag">Three habits to build from day one</span>
+  <ul>
+    <li><strong>Say what you assumed.</strong> Every derivation in this project should end with a
+    one-line list of the assumptions it used. That list is what Week 11 will attack.</li>
+    <li><strong>Do not verify and call it proving.</strong> Ten examples are evidence. Label it
+    <span class="claim observed">observed</span> and move on honestly.</li>
+    <li><strong>Write down the failures.</strong> "I tried to get the variance by squaring the
+    mean; that is wrong because…" is worth more in eight weeks than a clean page.</li>
+  </ul>
+</div>
+
+<h2>5 &nbsp;Your Python laboratory</h2>
+
+<div class="box python">
+  <span class="box-tag">This week in the celldetect project</span>
+  <p>Follow <code>python/SETUP.md</code> in the repo to install Python, NumPy, SciPy, matplotlib
+  and pytest. Then open <code>python/celldetect/counting.py</code> and implement your first two
+  functions (the <code>TODO</code> comments and docstrings tell you exactly what each must do):</p>
+  <ul>
+    <li><code>sample_counts(lam, n_samples, rng)</code> — draw independent Poisson counts</li>
+    <li><code>fano_factor(samples)</code> — variance over mean, with the unbiased variance</li>
+  </ul>
+  <p>Check yourself with <code>pytest tests/test_counting.py -k "sample_counts or fano"</code>,
+  then run <code>python experiments/week01_counting_noise.py</code> to produce your own version of
+  Lab 1's and Lab 2's figures into <code>figures/</code>. Commit everything, including the figures,
+  and note the seed (101) in your progress log.</p>
+  <p>If you get stuck, full reference implementations live in <code>python/solutions/</code> —
+  this is a textbook, not a test; read them <em>after</em> a real attempt.</p>
+</div>
+
+<div class="box pitfall">
+  <span class="box-tag">The one that catches everyone in Week 1</span>
+  <code>fano_factor</code> must use the <em>unbiased</em> variance (<code>ddof=1</code>, dividing by
+  $n-1$). NumPy's default divides by $n$, which biases the Fano factor low by a factor
+  $(n-1)/n$. At the 50-cell sample size of Lab 2 that is a 2% bias — the same size as the effect
+  you will be hunting in Week 11. A test in <code>test_counting.py</code> is calibrated to catch it.
+</div>
+
+<h2>6 &nbsp;Exercises</h2>
+<p class="muted">Stars mark difficulty: ★ routine · ★★ requires an idea · ★★★ challenge. Write full sentences; every claim needs a reason. Solutions are provided — attempt first, then compare.</p>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 1.1</span><span class="stars">★</span></div>
+  <div class="ex-body">A gene makes up a fraction $p = 0.002$ of a cell's transcripts. The sequencer captures $D = 3000$ molecules. What is the expected count for that gene, and what is its standard deviation? What is the relative noise?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      The expected count is $\lambda = Dp = 3000 \times 0.002 = 6$. For a Poisson variable the
+      variance equals the mean, so the standard deviation is $\sqrt{6} \approx 2.45$. The relative
+      noise is $2.45 / 6 \approx 41\%$.
+      <p class="muted">Forty-one percent. And $p = 0.002$ makes this a <em>well-expressed</em>
+      gene — most genes are an order of magnitude rarer. This single number is why the project
+      is not trivial.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 1.2</span><span class="stars">★</span></div>
+  <div class="ex-body">You want the relative noise on that gene's count down to 10%. What depth $D$ do you need? What multiple of the original depth is that?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      Relative noise is $1/\sqrt{\lambda}$, so $1/\sqrt{\lambda} = 0.10$ gives $\lambda = 100$, and
+      $D = \lambda/p = 100/0.002 = 50{,}000$ molecules per cell — about $17\times$ the original
+      depth.
+      <p class="muted">Note the shape of the answer: to improve the noise by a factor of 4
+      ($41\% \to 10\%$) you needed roughly $4^2 = 16$ times the data. The square-root law, met
+      before it is derived.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 1.3</span><span class="stars">★★</span></div>
+  <div class="ex-body">Two cell types express a marker gene at $p_1 = 0.0030$ and $p_2 = 0.0036$. At depth $D = 3000$, write down both expected counts and both standard deviations. Sketch the two distributions on one axis. Would you be willing to classify a single cell from this one gene? Say why in one sentence, using numbers.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>$\lambda_1 = 9$ and $\lambda_2 = 10.8$, with standard deviations $3.0$ and $3.29$.</p>
+      <p>The two means are $1.8$ apart while each distribution is about $3$ wide: the separation is
+      well under one standard deviation, so the two histograms overlap almost completely. From one
+      gene in one cell you would be guessing — barely better than a coin.</p>
+      <p class="muted">The ratio $1.8/3.1 \approx 0.58$ is the quantity you will name $d'$ in
+      Week 3, and $\Phi(0.58/2) \approx 0.61$ will turn out to be the exact accuracy of the best
+      possible rule. You are two weeks from being able to say that instead of "you would be
+      guessing".</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 1.4</span><span class="stars">★★</span></div>
+  <div class="ex-body">Prove that if $X$ and $Y$ are <em>independent</em> then $\mathrm{Var}(X+Y) = \mathrm{Var}(X) + \mathrm{Var}(Y)$, and give a concrete example (any two dependent variables you like) showing the claim fails without independence.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>Write $\mathrm{Var}(Z) = E[Z^2] - (E[Z])^2$. With $Z = X + Y$,
+      $$E[(X+Y)^2] = E[X^2] + 2E[XY] + E[Y^2], \qquad (E[X+Y])^2 = (E[X])^2 + 2E[X]E[Y] + (E[Y])^2.$$
+      Subtracting,
+      $$\mathrm{Var}(X+Y) = \mathrm{Var}(X) + \mathrm{Var}(Y) + 2\big(E[XY] - E[X]E[Y]\big).$$
+      The bracketed term is the covariance, which is zero for independent variables. ∎</p>
+      <p>Counterexample: take $Y = X$ with $\mathrm{Var}(X) = \sigma^2 > 0$. Then
+      $\mathrm{Var}(X+Y) = \mathrm{Var}(2X) = 4\sigma^2$, not $2\sigma^2$. Take $Y = -X$ and the
+      variance of the sum is $0$.</p>
+      <p class="muted">Keep the general formula, not just the independent case. In Week 5 you will
+      assume genes are independent in order to add their evidence; the covariance term is precisely
+      what you are throwing away, and a good Week 14 limitations section names it.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 1.5</span><span class="stars">★★</span></div>
+  <div class="ex-body">A friend proposes: "Instead of sequencing deeper, just measure more cells. Ten times as many cells is the same as ten times the depth." Is that right? Answer for two different questions: (a) estimating the average expression of a gene in a cell type, and (b) classifying one particular cell.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p><strong>(a) Yes, essentially.</strong> The mean expression over $N$ cells at depth $D$ is
+      built from $ND$ molecules in total, and its standard error falls as $1/\sqrt{ND}$. For
+      estimating a <em>population</em> quantity, cells and depth are interchangeable.</p>
+      <p><strong>(b) No, not at all.</strong> Classifying <em>this</em> cell uses only the molecules
+      captured from <em>this</em> cell. Sequencing a million other cells does not tell you anything
+      more about which type this one is — except indirectly, by pinning down the rates
+      $p^{(1)}, p^{(2)}$ the classifier uses. Once those are known accurately, more cells buy
+      nothing for a per-cell decision.</p>
+      <p class="muted">This distinction — population estimation versus per-cell detection — is why
+      the project is about depth and genes rather than about cell numbers, and it is the single
+      most common misunderstanding you will have to correct in the Q&amp;A in Week 15. Write the
+      two-sentence answer in your notebook now.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 1.6</span><span class="stars">★★★</span></div>
+  <div class="ex-body">In Lab 2, the spread of the measured Fano factor shrinks as the number of cells grows. Guess the rate at which it shrinks (as a power of $n$), test your guess in the lab by comparing $n = 50$ to $n = 200$, and say why the answer is not a coincidence. <em>Hint: the Fano factor is built from a sample variance, and a sample variance of $n$ values is itself an average of $n$ things.</em></div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>The spread shrinks like $1/\sqrt{n}$: quadrupling the number of cells halves the width of
+      the Fano-factor distribution. In the lab, $n = 200$ should give a histogram about half as
+      wide as $n = 50$.</p>
+      <p>Why: the sample variance is an average of $n$ terms (roughly, the squared deviations), and
+      an average of $n$ independent things has a standard deviation falling as $1/\sqrt{n}$ — the
+      same argument as Worked derivation 2. For Poisson data one can go further and show the
+      standard deviation of $F$ is close to $\sqrt{2/n}$; at $n = 50$ that is $0.20$, which matches
+      the lab.</p>
+      <p class="muted">So the tool you use to <em>detect</em> a square-root law is itself governed
+      by one. That is not a coincidence: both are the central limit theorem, which is also where
+      the $\Phi$ in Week 4's formula comes from. Three of this project's main results are one
+      theorem in three costumes.</p>
+    </div>
+  </details>
+</div>
+
+<h2>7 &nbsp;Research notebook: your first entries</h2>
+
+<p>Start your notebook this week (any bound notebook; leave the first two pages for a table of contents). This week's entries:</p>
+
+<ul>
+  <li>The central question, written in your own words, dated.</li>
+  <li>The two worked derivations above, rewritten from memory without looking.</li>
+  <li>Exercises 1.4 and 1.5 in full.</li>
+  <li>A list, started today and added to all semester, headed <strong>"assumptions I am making"</strong>. It has three entries so far: cells of one type are identical; genes are independent; capture is a simple random sample. Every one of those is false, and finding out how false is what Weeks 9–11 are for.</li>
+</ul>
+
+<p>Scan and upload to <code>notebook/week01/</code> in the repo, and fill in <code>progress/week01.md</code> from <code>progress/TEMPLATE.md</code>. Failed attempts belong in the notebook too — they are data about the problem, not embarrassments.</p>
+
+<div class="box verify">
+  <span class="box-tag">Verification this week (with mentor)</span>
+  <ul>
+    <li>You state the research question out loud in two sentences, without saying "machine learning", and explain why it is a detection problem.</li>
+    <li>You explain why a sequencing count is a sample, and what the relative noise on a count of 9 is, from memory.</li>
+    <li>Your counting-noise figure is committed with the seed recorded, and you can point to the line where the seed is set.</li>
+    <li><code>pytest tests/test_counting.py -k "sample_counts or fano"</code> is green on your machine, and you can say what each test is checking.</li>
+    <li>Your "assumptions I am making" list exists and has at least three entries.</li>
+  </ul>
+</div>
+
+<h2>8 &nbsp;Going deeper</h2>
+<ul>
+  <li>Luecken &amp; Theis (2019), <em>Current best practices in single-cell RNA-seq analysis</em> — read the introduction and the section on normalization only. <span class="muted">Skim; do not drown. You are reading it to see what the field takes for granted, not to learn a pipeline.</span></li>
+  <li>The <a href="https://scanpy-tutorials.readthedocs.io/">scanpy PBMC 3k tutorial</a> — click through it now, hands-on, without trying to understand every step. You will come back to it properly in Week 10. <span class="muted">~40 min</span></li>
+  <li>StatQuest, <em>The Poisson Distribution, Clearly Explained</em> — a gentle first pass at the pmf. <span class="muted">~10 min</span></li>
+  <li>Course extras: <a href="../extras/big-picture.html">the big picture</a> · <a href="../extras/how-to-use.html">how to use this course</a> · <a href="../extras/notation.html">notation card</a> · <a href="../extras/ai-policy.html">using AI tools honestly</a></li>
+</ul>
+
+</div>
+
+<footer class="site">How Much Data Does It Take to Tell Two Cell Types Apart? · Week 1 · <a href="../index.html">Course home</a></footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  /* ---------------- Lab 1: Poisson counts at a chosen rate ---------------- */
+  (function () {
+    const RATES = [0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500];
+    let ri = 4, showPmf = true;
+    const N = 6000;
+
+    function run() {
+      const lam = RATES[ri];
+      const r = CD.rng(20260813 + ri);           // seed depends on the rate
+      const data = [];
+      for (let i = 0; i < N; i++) data.push(CD.poisson(lam, r));
+
+      const hi = Math.max(6, Math.ceil(lam + 4.5 * Math.sqrt(lam) + 3));
+      const mean = data.reduce((a, b) => a + b, 0) / N;
+      const varr = data.reduce((a, b) => a + (b - mean) * (b - mean), 0) / (N - 1);
+      const ymax = Math.max(0.08, 1.25 / Math.sqrt(2 * Math.PI * Math.max(lam, 0.4)));
+
+      const P = CD.plot("lab1", { xmin: -0.5, xmax: hi, ymin: 0, ymax: ymax,
+                                  xlabel: "count for one gene in one cell",
+                                  ylabel: "fraction of cells" });
+      P.clear(); P.axes();
+      P.histogram(data, hi, { normalize: "density" });
+      if (showPmf) {
+        // Overlay the normal with mean = variance = lambda: the approximation
+        // that Week 4's whole formula depends on.
+        const s = Math.sqrt(lam);
+        P.funcPlot(x => Math.exp(-(x - lam) * (x - lam) / (2 * s * s)) / (s * Math.sqrt(2 * Math.PI)),
+                   { color: CD.C.orange, width: 2.5 });
+        P.label(hi * 0.52, ymax * 0.88, "normal(λ, λ)", { color: CD.C.orange });
+      }
+      P.vline(lam, "λ = " + lam, { color: CD.C.navy });
+      document.getElementById("lab1out").innerHTML =
+        "λ = " + lam + " &nbsp;·&nbsp; " + N + " cells &nbsp;·&nbsp; mean = " + mean.toFixed(3) +
+        " &nbsp;·&nbsp; variance = " + varr.toFixed(3) +
+        " &nbsp;·&nbsp; <b>Fano = " + (varr / mean).toFixed(3) + "</b>" +
+        " &nbsp;·&nbsp; relative noise = " + (Math.sqrt(varr) / mean * 100).toFixed(1) + "%";
+    }
+
+    CD.slider("lab1ctl", { label: "expected count λ", min: 0, max: RATES.length - 1,
+                           step: 1, value: ri, fmt: i => RATES[i] },
+              i => { ri = i; run(); });
+    CD.button("lab1ctl", "Toggle normal overlay", () => { showPmf = !showPmf; run(); }, true);
+    CD.button("lab1ctl", "Resample", () => { run(); }, true);
+  })();
+
+  /* ---------------- Lab 2: sampling distribution of the Fano factor ------- */
+  (function () {
+    const SIZES = [10, 20, 50, 100, 200, 500, 1000];
+    let si = 2;
+    const REPEATS = 1200, LAM = 20;
+
+    function run() {
+      const n = SIZES[si];
+      const r = CD.rng(777 + si);
+      const fanos = [];
+      for (let t = 0; t < REPEATS; t++) {
+        let s = 0, s2 = 0;
+        for (let i = 0; i < n; i++) { const x = CD.poisson(LAM, r); s += x; s2 += x * x; }
+        const m = s / n;
+        const v = (s2 - n * m * m) / (n - 1);        // unbiased variance
+        fanos.push(v / m);
+      }
+      const mean = fanos.reduce((a, b) => a + b, 0) / REPEATS;
+      const sd = Math.sqrt(fanos.reduce((a, x) => a + (x - mean) * (x - mean), 0) / (REPEATS - 1));
+
+      const P = CD.plot("lab2", { xmin: 0.3, xmax: 1.8, ymin: 0, ymax: 6.5,
+                                  xlabel: "Fano factor you would have reported",
+                                  ylabel: "density" });
+      P.clear(); P.axes();
+      P.histogram(fanos, 46, { normalize: "density", color: "rgba(124,58,237,0.5)",
+                               edge: "rgba(124,58,237,0.9)" });
+      P.vline(1.0, "truth = 1", { color: CD.C.orange, width: 2.5, dash: [] });
+      P.vline(1.3, "would you call this overdispersed?", { color: CD.C.red });
+      document.getElementById("lab2out").innerHTML =
+        n + " cells per sample &nbsp;·&nbsp; " + REPEATS + " independent samples &nbsp;·&nbsp; " +
+        "mean Fano = " + mean.toFixed(3) + " &nbsp;·&nbsp; <b>sd = " + sd.toFixed(3) + "</b>" +
+        " &nbsp;·&nbsp; √(2/n) = " + Math.sqrt(2 / n).toFixed(3);
+    }
+
+    CD.slider("lab2ctl", { label: "cells per sample", min: 0, max: SIZES.length - 1,
+                           step: 1, value: si, fmt: i => SIZES[i] },
+              i => { si = i; run(); });
+    CD.button("lab2ctl", "Resample", () => { run(); }, true);
+  })();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Using AI tools honestly — How Much Data Does It Take to Tell Two Cell Types Apart?</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="how-to-use.html">How to use this course</a><a href="unstuck.html">How to get unstuck</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Policy · read in Week 1, re-read before every milestone</span>
+    </div>
+    <h1 class="chapter-title">Using AI tools honestly</h1>
+    <div class="chapter-sub">One principle, two explicit lists, four grey areas, and the disclosure line that goes in every progress log</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<p>This is a working policy, not a compliance document. It exists because you will use these tools — they are on your laptop, they are genuinely useful, and pretending otherwise would make this page a fiction. What it does is draw a line in a place that protects the thing the project is actually for.</p>
+
+<h2>1 &nbsp;The principle</h2>
+
+<div class="box definition">
+  <span class="box-tag">The whole policy, in one sentence</span>
+  <p><strong>At every milestone, you must be able to explain and defend every line you present, without notes, to someone who is trying to find the hole in it.</strong></p>
+  <p>Everything else on this page is a consequence of that sentence. Two corollaries, and they are not symmetric:</p>
+  <p><strong>Disclosure is never punished.</strong> There is no penalty, no mark against you, no raised eyebrow, for writing "I asked an AI to explain the quadrature step and then re-derived it myself" in a progress log. None. Not once, not ten times, not every week.</p>
+  <p><strong>Undisclosed reliance is the one thing that is.</strong> Presenting as your own something you could not reproduce, and not saying so, is the single failure that this project treats as serious — more serious than a wrong answer, a failed milestone, or a null result.</p>
+</div>
+
+<p>Read those two corollaries again, because students routinely get the asymmetry backwards. The risk you are managing is not "getting caught using a tool". It is <strong>standing in front of a whiteboard in Week 15 with a marker in your hand and no idea why the $\sqrt{k}$ appears</strong>, in front of a room that has just been told you derived it.</p>
+
+<h2>2 &nbsp;Why the policy has this shape</h2>
+
+<p>It would be easy to write a rule that said "no AI" and easy to write one that said "anything goes". This one is neither, and the reason is worth spelling out, because a rule you understand is one you can apply to a case nobody anticipated — and this document cannot anticipate every case.</p>
+
+<h3>2.1 &nbsp;The value of this project to you is entirely in what you can defend</h3>
+
+<p>Consider what you will actually have at the end of fifteen weeks. Not a discovery: the $\sqrt{\text{depth}}$ law is not new, PBMC 3k has been analysed ten thousand times, and nobody needed your bead experiment. What you will have is <strong>the demonstrated ability to take a question, derive an answer, test it three ways, find where it breaks, and defend the whole chain against a skeptical adult</strong>. That capability is the entire output. It is what a research supervisor, an admissions reader, or an interviewer is trying to assess when they ask you a follow-up question.</p>
+
+<p>Now notice what happens if a chunk of the chain is not yours. The report still exists. The figures are still there. But the capability — the only thing being produced — has a hole in it exactly where the borrowed piece is, and the hole is invisible until somebody asks. At which point the whole thing is worth less than a smaller project you genuinely own, because a claim you cannot defend does not merely fail to help you; it makes your other claims less believable.</p>
+
+<div class="box warning">
+  <span class="box-tag">The Q&amp;A test</span>
+  <p>Week 15 includes an adversarial Q&amp;A rehearsal, and it is not theatre. The questions are of the form: "why is there a square root there?", "what happens to that argument if the genes are correlated?", "show me why the variance is $n\bar p(1-\bar p)$ and not $n p_A(1-p_A)$", "your exponent is 0.34, why are you telling me that agrees with 0.5?"</p>
+  <p>None of those can be answered from a memorized sentence. Each needs the derivation to be <em>in your head</em>, available to be re-run under pressure and adapted to a question you have not heard before. That is the standard, and it is the reason the line falls where it falls: not because using a tool is immoral, but because <strong>anything you cannot re-derive under pressure is not going to be there when you need it.</strong></p>
+</div>
+
+<h3>2.2 &nbsp;A scientific claim is signed</h3>
+
+<p>The second reason is not about you at all. When you write "the fitted exponent is $0.41 \pm 0.15$, consistent with the predicted $0.5$", you are doing something socially specific: you are telling a reader that they may now use that number without checking it, on your authority. That is what a scientific claim <em>is</em>. It is a promise that somebody stood behind this.</p>
+
+<p>If the person who signed it cannot say how it was computed, the promise is empty, and the reader who relied on it has been misled — not maliciously, but effectively. This is why the project labels every claim <span class="claim proved">proved</span> / <span class="claim cited">cited</span> / <span class="claim observed">observed</span> / <span class="claim conjectured">conjectured</span>, and why <span class="claim proved">proved</span> is defined operationally as "you can derive it at the whiteboard, on demand, without notes". The label is a statement about <em>you</em>, not about the mathematics.</p>
+
+<p class="muted">An AI system can produce a correct derivation. It cannot sign it, because it will not be in the room when somebody asks the follow-up, and it has no stake in whether the answer was right. Signing is the part that has to be human, and it is the part that has to be earned.</p>
+
+<h3>2.3 &nbsp;What the policy is not</h3>
+
+<p>It is not a claim that these tools are bad, or that using them is cheating in some general sense, or that a "real" researcher would not. Working scientists use them constantly, for exactly the things in the allowed list below. The restriction here is tighter than a professional's would be, for one specific reason: <strong>a professional already owns the understanding that this project exists to build in you.</strong> When a postdoc asks a model to write a matplotlib loop, nothing is lost, because they could have written it and the point of their day was elsewhere. When you ask it to write your first classifier, the point of your week <em>was</em> the classifier.</p>
+
+<p>The rule of thumb this generates: <strong>the tool may do things that are not the point of the week. It may not do the thing that is the point of the week.</strong></p>
+
+<h2>3 &nbsp;Allowed</h2>
+
+<p>Explicitly, unambiguously fine. Disclose it and move on.</p>
+
+<div class="box example">
+  <span class="box-tag">The allowed list</span>
+  <table class="simple">
+    <tr><th>What</th><th>Example</th><th>Why it is fine</th></tr>
+    <tr><td><strong>Debugging an error message</strong></td>
+        <td>"<code>ValueError: operands could not be broadcast together with shapes (500,) (500,20)</code> — what does this mean and where do I look?"</td>
+        <td>The error is an obstacle between you and the work, not the work. Understanding NumPy broadcasting rules is worth having, but you get that from the explanation, not from the struggle.</td></tr>
+    <tr><td><strong>Explaining a concept that you then re-derive yourself</strong></td>
+        <td>"Explain why the log-likelihood ratio for Poisson counts is linear in the counts." Then close the window and do it on paper.</td>
+        <td>This is what a textbook is. The condition is the second half: you re-derive it, from scratch, and it goes in the notebook in your handwriting. If you cannot, you have not learned it and must say so.</td></tr>
+    <tr><td><strong>Syntax and library lookup</strong></td>
+        <td>"How do I make a matplotlib error bar with asymmetric limits?" "What is the argument order of <code>np.polyfit</code>?"</td>
+        <td>This is a faster manual. Nobody is assessing your recall of the matplotlib API, and nobody should.</td></tr>
+    <tr><td><strong>Improving the prose of something you wrote</strong></td>
+        <td>Paste your own paragraph: "this is clunky, tighten it without changing the claims."</td>
+        <td>The ideas, the judgements and the structure are yours; the sentence rhythm is not what is being assessed. Read the result critically — polish sometimes strengthens a claim past what your evidence supports, and that is on you.</td></tr>
+    <tr><td><strong>Generating test cases that you then verify</strong></td>
+        <td>"Give me five edge cases for a function that computes a Wilson interval." Then check each one by hand: does $(k,n) = (0,20)$ really need $\text{lo} = 0$?</td>
+        <td>A test you have verified is your test. A test you have not verified is a second untested thing in your repository, which is worse than no test.</td></tr>
+    <tr><td><strong>Rubber-ducking a stuck point</strong></td>
+        <td>"Here is my reasoning about why dropout should be equivalent to reduced depth. Where is it weak?"</td>
+        <td>You brought the argument. Criticism of your reasoning strengthens your reasoning; it does not replace it. Use <a href="unstuck.html">the unstuck protocol</a> first, so you arrive with a specific gap rather than "it doesn't work".</td></tr>
+    <tr><td><strong>Reformatting, boilerplate and mechanical edits</strong></td>
+        <td>Docstring formatting, renaming a variable across a file, converting a printed table into a CSV.</td>
+        <td>No intellectual content, no assessment value, real time saved.</td></tr>
+    <tr><td><strong>Finding the name of something you have described</strong></td>
+        <td>"There is a correction factor for sampling without replacement from a finite pool — what is it called?"</td>
+        <td>You already had the concept; you needed the vocabulary to search with. This is one of the highest-value uses there is, and it is why Section 6's citation rules matter so much.</td></tr>
+  </table>
+</div>
+
+<h2>4 &nbsp;Not allowed</h2>
+
+<p>Explicitly, unambiguously not. These are not judgement calls.</p>
+
+<div class="box warning">
+  <span class="box-tag">The not-allowed list</span>
+  <table class="simple">
+    <tr><th>What</th><th>Example</th><th>Why it is out</th></tr>
+    <tr><td><strong>Asking for a derivation you then present as yours</strong></td>
+        <td>"Derive $d' \propto \sqrt{k}$ for $k$ independent genes" $\to$ into the notebook, into the report.</td>
+        <td>This is the thing the project is for. Weeks 1–5 exist to produce a person who can do this; outsourcing it produces a document instead of a person. And it fails at the whiteboard, publicly, in Week 15.</td></tr>
+    <tr><td><strong>Generating code for a scaffold function you have not attempted</strong></td>
+        <td>Pasting the docstring of <code>bead_d_prime</code> or <code>log_likelihood_ratio</code> and asking for the body.</td>
+        <td>Every scaffold in <code>python/celldetect/</code> has numbered hints in the body and a full reference implementation in <code>python/solutions/</code>. If you are going to read an answer, read the project's own — it is written for you, it is correct, and reading it after a real attempt is explicitly encouraged. Getting a different answer from a model gives you code you own even less.</td></tr>
+    <tr><td><strong>Writing report prose about your results</strong></td>
+        <td>Pasting your accuracy table and asking for a "Results" paragraph, or for the limitations section.</td>
+        <td>Deciding what a table means <em>is the science</em>. The sentence "the exponent is consistent with 0.5 but the interval is wide" is a scientific judgement with a defence behind it; generated text is a plausible-sounding sentence with nothing behind it, and the two are indistinguishable on the page and completely different under questioning.</td></tr>
+    <tr><td><strong>Choosing what to conclude from data</strong></td>
+        <td>"Here are my numbers — does this support the hypothesis?" "Should I say this agrees with theory?"</td>
+        <td>This is the single most damaging use, because it is the one that changes the scientific content while feeling like advice. Whether $0.34 \pm 0.18$ supports $0.5$ is <em>your</em> call, defended by <em>your</em> reasoning about power and intervals, and it is precisely what a reviewer will interrogate.</td></tr>
+    <tr><td><strong>Producing citations</strong></td>
+        <td>"Give me three references for overdispersion in scRNA-seq."</td>
+        <td>See Section 6. Asking for the <em>topic</em> is fine; taking the <em>citation</em> is not, because you have no way to know whether it exists.</td></tr>
+    <tr><td><strong>Deciding an analysis choice you cannot justify</strong></td>
+        <td>"Should I use 5 or 10 marker genes?" and then doing what it said.</td>
+        <td>You may ask what considerations bear on the choice. The choice itself must be made by you, for a stated reason, recorded in the log — because in Week 15 somebody will ask why you used 5, and "it seemed reasonable" is a bad answer while "with 10 the marginal genes had $d' < 0.1$ each and I was worried about selection leakage" is a good one.</td></tr>
+    <tr><td><strong>Anything at all during a closed-book exercise</strong></td>
+        <td>Week 6, Section 3.</td>
+        <td>The closed-book challenge is a measurement instrument pointed at you. Contaminating it destroys the only honest reading you get of where you actually stand, which is information you need more than the mentor does.</td></tr>
+  </table>
+</div>
+
+<div class="box pitfall">
+  <span class="box-tag">The most common way a good student crosses this line</span>
+  <p>Not by cheating. By being stuck at 11pm on a Thursday with a milestone on Friday.</p>
+  <p>The failure mode is always the same shape: two hours lost to a bug, frustration, "I understand the concept, I just need this to work", paste, it works, relief, move on. Nothing was decided; it happened. And in three weeks a question about that function has no answer.</p>
+  <p>The countermeasure is structural, not moral. <strong>Milestones are checked against what you can explain, not against what runs</strong>, so a function you cannot explain buys you nothing at the check-in anyway. And a missed deadline is cheap in this project — <a href="../s/week06.html">Week 6</a> and <a href="../s/week13.html">Week 13</a> are buffer weeks, the plans in <code>plans/</code> carry a fallback ladder (F1–F4) that contracts the scope on purpose, and every chapter says out loud that a smaller honest result beats a larger borrowed one. <strong>Arriving on Friday with three functions you own and one you did not finish is a good check-in.</strong> Arriving with four you cannot explain is a bad one.</p>
+</div>
+
+<h2>5 &nbsp;Grey areas</h2>
+
+<p>These are genuinely ambiguous, and the resolutions below are the ones this project uses. All four resolve by the same test:</p>
+
+<div class="box definition">
+  <span class="box-tag">The ownership test</span>
+  <strong>If you could not reproduce it tomorrow, from understanding, without the source in front of you, then you do not yet own it.</strong>
+  <p class="muted">Note "tomorrow", not "right now". Immediately after reading something, you can always reproduce it — that is short-term memory, not understanding. The overnight gap is what distinguishes them, and it is why the test is stated with a delay in it.</p>
+</div>
+
+<h3>Case 1 &nbsp;You get an explanation, understand it, and write it in your own words</h3>
+
+<p>You are stuck on why evidence from independent genes adds in quadrature. You ask for an explanation. It clicks. You then write the argument out in your notebook in your own words, in your own order, with your own example.</p>
+
+<p><strong>Resolution: allowed, and this is one of the best uses of the tool.</strong> But the "own words" part is not the test — paraphrasing is easy and proves nothing. The test is the ownership test with the overnight delay: come back the next day, with the notebook closed, and derive it on a blank page. Week 6's closed-book challenge is literally this, formalized, which is why it is in the schedule.</p>
+
+<p>If you cannot reproduce it the next day, you have not learned it yet; you have read it. Say so in the log ("re-derived the quadrature argument on Tuesday, failed; got it on Thursday"), and try again. That sentence is not an admission of weakness. It is a record of learning happening, and it is exactly the kind of thing the notebook is for.</p>
+
+<p><strong>What would push this over the line:</strong> writing the paraphrase straight into the report and never testing yourself. Then you have a paragraph and not a capability, and you will find out which in Week 15.</p>
+
+<h3>Case 2 &nbsp;Ninety minutes stuck on a scaffold function, and you look at working code</h3>
+
+<p>You have been trying to implement <code>validate_tally</code> all evening. Nothing works. You ask, and get a clean implementation that obviously works.</p>
+
+<p><strong>Resolution: do not paste it. Ever. Not one line.</strong> The procedure is:</p>
+
+<ol>
+  <li><strong>Read it to find your bug,</strong> not to get the answer. Nine times in ten the difference is one line, and finding that line is worth more than the whole function.</li>
+  <li><strong>Close the window.</strong> Physically. Then go and do something else for at least an hour, or sleep on it.</li>
+  <li><strong>Re-implement from scratch.</strong> Your version will differ, and that is a good sign.</li>
+  <li><strong>Write the bug in the log</strong>, specifically: "I was comparing <code>r['correct']</code> as a string to an int, so every row failed check 1." A named bug is a thing you will never do again; "I was stuck and then it worked" is not.</li>
+  <li><strong>Disclose it</strong> in the Tools used line.</li>
+</ol>
+
+<p>And note that this project already has a designed exit for exactly this situation: <code>python/solutions/celldetect_solutions/</code> contains a full reference implementation of every scaffold, written for you, correct, and consistent with the tests. Week 1 says it out loud — "this is a textbook, not a test; read them <em>after</em> a real attempt." If you are going to read an answer, read that one. It is the same procedure above, with a source that will not quietly invent a different convention.</p>
+
+<p><strong>The line:</strong> reading an implementation to understand it, then rebuilding, is learning. Pasting is a transaction that leaves you with code you cannot maintain, cannot explain, and cannot debug when the test fails for a different reason in Week 12.</p>
+
+<h3>Case 3 &nbsp;Polishing a paragraph about your own results</h3>
+
+<p>You wrote the limitations paragraph yourself. It is honest and badly written. You paste it and ask for a tightened version.</p>
+
+<p><strong>Resolution: allowed, with one check.</strong> Prose polish on text you wrote, whose claims you decided, is in the allowed list. But read the returned version adversarially, because polishing systematically strengthens language, and strengthened language about a weak result is an overclaim you did not intend to make. Watch specifically for: "suggests" becoming "demonstrates"; "consistent with" becoming "confirms"; hedges deleted; a numerical qualifier dropped because it interrupted the rhythm.</p>
+
+<p><strong>The check:</strong> put the polished paragraph down and say it out loud from memory. If you find yourself saying something weaker than what is on the page, the page is wrong. Change the page.</p>
+
+<p><strong>What is over the line:</strong> giving it the table and asking for the paragraph. The difference is whether the judgements existed before the tool did.</p>
+
+<h3>Case 4 &nbsp;It suggests an idea you had not thought of</h3>
+
+<p>You mention that you are fitting a power law to accuracy and are getting a strange exponent. It tells you accuracy saturates at 1 so no power law describes it, and that you should convert accuracy back to $d'$ via $d' = 2\Phi^{-1}(\text{accuracy})$ before fitting.</p>
+
+<p>This is a real methodological idea, it is correct, it is central to Week 12, and it was not yours.</p>
+
+<p><strong>Resolution: you may use it, you must disclose it, and you must be able to defend it — which means you must be able to derive it.</strong> Here that is achievable: Week 4 gives you $\text{accuracy} = \Phi(d'/2)$, $\Phi$ is strictly increasing so it inverts, and the saturation argument is a two-line explanation you can give at a whiteboard. Once you can do that, the idea is yours to use.</p>
+
+<div class="box definition">
+  <span class="box-tag">The rule for ideas</span>
+  <strong>An idea you can defend is yours to use, with credit. An idea you cannot defend is not usable at all</strong> — not with credit, not with a hedge, not in a footnote. There is no version of a scientific document in which you assert something you do not understand and label the uncertainty away.
+</div>
+
+<p>Note what this rules out in practice. If a tool suggested an analysis whose correctness you cannot establish — "use a beta-binomial here", "the right correction is Benjamini–Hochberg" — you do not get to use it because it sounded authoritative. You either learn it well enough to defend it, or you do the simpler thing you understand. In a 15-week project the second option is usually correct, and a simpler analysis you can defend is a stronger report than a sophisticated one you cannot.</p>
+
+<h3>A fifth, briefly: editor autocomplete</h3>
+
+<p>Inline completion sits awkwardly across the line because it is continuous rather than a decision. The workable version: <strong>accepting a completion of a line you were already writing is fine; accepting a completion that writes the body of a function you had not worked out is not.</strong> If you find yourself pressing Tab and reading afterwards to see what happened, turn it off for the duration of the project. You can turn it back on in January.</p>
+
+<h2>6 &nbsp;Citations, and references that do not exist</h2>
+
+<p>This section is separate because the failure mode is different in kind. Everywhere else on this page, the risk is that you present something you do not understand. Here, the risk is that you present something that <strong>is not true and never was</strong>, in a form specifically designed to look checkable.</p>
+
+<div class="box warning">
+  <span class="box-tag">Fabricated references</span>
+  <p>Language models produce citations that are structurally perfect and factually invented: a plausible author for the field, a plausible journal, a plausible year, a title that sounds exactly like a paper that ought to exist. Sometimes the authors are real and the paper is not. Sometimes the paper is real and the finding attributed to it is not. Sometimes everything is real except the year, or the volume, or the claim.</p>
+  <p>This is not an occasional glitch to be corrected by asking more carefully. It is what happens when a system that produces plausible text is asked for a bibliography, and no amount of "please only give me real references" removes it.</p>
+  <p><strong>The consequence for you is severe and specific.</strong> A fabricated citation in a report is the one error a reader can verify in thirty seconds, from their phone, without understanding any of your science. And when they find one, they do not conclude that you made a mistake. They conclude that <em>nothing else in the document has been checked either</em> — which, from their position, is a reasonable inference.</p>
+</div>
+
+<div class="box definition">
+  <span class="box-tag">The rule</span>
+  <p><strong>Every reference in the report must be one you have opened and read.</strong> Not "read about". Not "found cited elsewhere". Opened, with your eyes on the actual page, at least the abstract plus the specific section or figure your claim rests on.</p>
+  <p>And for every one, record at the point of reading: authors, year, full title, venue, DOI or URL, <strong>the date you accessed it</strong>, and one sentence in your own words saying what you took from it. That sentence is the part people skip and the part that pays: in Week 14, when you are writing at speed, it is the difference between citing a paper correctly and citing it approximately.</p>
+</div>
+
+<p>Practical consequences:</p>
+
+<ul>
+  <li><strong>Asking for topics is fine; taking citations is not.</strong> "What is the standard argument for why RNA-seq counts are modelled as negative binomial?" is a good question and the answer will point you at real vocabulary — overdispersion, gamma–Poisson mixture, the DESeq2/edgeR lineage. Then <em>you</em> go and find the papers, in a search engine or a library, and read them.</li>
+  <li><strong>If you cannot find it in ten minutes, assume it does not exist.</strong> Real papers are findable by title. A title that returns nothing on a search engine and nothing on the journal's site is a title that was generated.</li>
+  <li><strong>Never cite second-hand.</strong> "As cited in Luecken &amp; Theis" is a way of passing on a claim you have not checked, and if the intermediate source got it wrong you have now published the error under your own name.</li>
+  <li><strong>Check that the paper says what you say it says.</strong> This is the harder half. A real reference attached to a wrong claim survives a spot check and fails a careful reader, which makes it worse than an obvious fabrication. When you write "Wilson (1927) showed that the score interval has better coverage than the Wald interval near $p = 0$", you must have seen the part of Wilson that supports it.</li>
+  <li><strong>Record the access date for anything online.</strong> Tutorials move, documentation is versioned, repositories are reorganized. <a href="resources.html">The resource library</a> has more on link rot.</li>
+</ul>
+
+<p class="muted">The same discipline applies to numbers you did not compute. "Typical 10x depth is a few thousand UMIs per cell" is a claim, and it needs either a source you have read or a hedge that says you are reporting a rough figure. The project's own convention handles this: label it <span class="claim cited">cited</span> with the reference, or do not state it.</p>
+
+<h2>7 &nbsp;The disclosure line</h2>
+
+<p>Every progress log ends with a <strong>Tools used</strong> line. It is in <code>progress/TEMPLATE.md</code>, it is not optional, and it is never empty — if you used nothing, write <code>none</code>, which is itself a disclosure.</p>
+
+<div class="box python">
+  <span class="box-tag">The format</span>
+  <p>One plain line per use, semicolon-separated, in this shape:</p>
+  <pre><code>Tools used: &lt;tool&gt; — &lt;what you asked for&gt; — &lt;what you did with the answer&gt;</code></pre>
+  <p>The third clause is the one that matters. "Asked Claude about Poisson" tells a reader nothing. "Asked Claude why the Fano factor needs <code>ddof=1</code>; re-derived the $(n-1)/n$ bias myself and put it in the notebook" tells them exactly where the boundary of your understanding was that week, which is what the line is for.</p>
+  <p>Non-AI sources go on the same line: videos, textbooks, Stack Overflow answers, a conversation with a teacher. The line is a record of <em>where your understanding came from</em>, not a confession about one category of tool.</p>
+</div>
+
+<h3>Three worked examples</h3>
+
+<div class="box example">
+  <span class="box-tag">Example 1 · a debugging week</span>
+  <pre><code>Tools used: Claude — pasted a NumPy broadcasting error from downsample_counts
+and asked what shape mismatch causes it — found I was passing the whole matrix
+where the function wanted one row; fixed it myself, noted the bug in the
+notebook; StatQuest video on the binomial distribution (~12 min) as a warm-up
+before Week 2's derivation.</code></pre>
+  <p class="muted">Good because: names the specific thing asked, names what was learned, and separates "found the bug" from "was given the code". A mentor reading this knows the student can now debug a shape error.</p>
+</div>
+
+<div class="box example">
+  <span class="box-tag">Example 2 · a week where a concept did not land the first time</span>
+  <pre><code>Tools used: Claude — asked for an explanation of why independent evidence adds
+in quadrature rather than linearly, after failing to get it from Week 5 §4 —
+understood the variance-of-a-sum step; re-derived it closed-book on Thursday
+(failed Tuesday, succeeded Thursday), notebook p.31. Did NOT use it for the
+sqrt(k) proof itself, which is in the notebook in my own steps.</code></pre>
+  <p class="muted">Good because: it records a failed attempt and a later success, which is the shape of actual learning, and it draws an explicit line around what was and was not assisted. The "did NOT" clause is doing real work — it is the sentence that makes the surrounding disclosure credible.</p>
+</div>
+
+<div class="box example">
+  <span class="box-tag">Example 3 · a week where an idea came from outside</span>
+  <pre><code>Tools used: Claude — while stuck on a power-law fit that returned 0.10, it
+pointed out that accuracy saturates at 1 so no power law fits it, and suggested
+converting accuracy back to d' via d' = 2*Phi^-1(acc) before fitting. The idea
+was NOT mine. I derived the inversion from Week 4's accuracy = Phi(d'/2) and
+checked it against the exact accuracies in Week 12 §4 (slope 0.104 on accuracy,
+0.50 on d'). I can defend it at the whiteboard. Also: scanpy docs for
+read_10x_mtx arguments (accessed 2026-04-02).</code></pre>
+  <p class="muted">Good because: it says plainly that the idea was not the student's, then says what was done to earn it, then makes the defensibility claim explicitly. This is exactly the Case 4 resolution, written down. A mentor reading it will ask the student to derive the inversion at the next check-in, and that is the system working.</p>
+</div>
+
+<h3>And what a bad line looks like</h3>
+
+<pre><code>Tools used: some AI help with the code.</code></pre>
+
+<p>This is worse than writing <code>none</code>, because it looks like a disclosure while conveying nothing. Which code? For what? What was learned? A reader cannot tell whether this covers a formatting fix or the entire week's assignment, and the ambiguity is doing work in your favour, which is what makes it dishonest rather than merely vague.</p>
+
+<h2>8 &nbsp;In the report and the talk</h2>
+
+<p>The progress logs carry the week-by-week detail. The final report needs one short, plain statement — a "Tools and sources" note in the methods or in an appendix — covering: which tools were used, for what categories of task, and an explicit statement that all derivations, analysis choices, conclusions and prose about results are the author's own. Two or three sentences. No apology, no hedge, no throat-clearing.</p>
+
+<div class="box example">
+  <span class="box-tag">A serviceable version</span>
+  <p><em>"AI assistance (Claude) was used for debugging Python errors, for library syntax lookup, and for explanations of standard results that were subsequently re-derived by the author and recorded in the research notebook. The conversion of measured accuracy to $d'$ before fitting the exponent (Section 4.2) was suggested by that tool and is derived from first principles in Appendix B. All derivations, analysis choices, figures, conclusions and text describing results are the author's own. Every cited reference was obtained and read in full or in the specific part cited; access dates for online sources are given in the bibliography."</em></p>
+</div>
+
+<p>Say it out loud in the talk too, in one sentence, if asked or if it fits. It costs nothing, it is true, and — the same logic as Week 12's note about the vertical offsets in the four-arm figure — <strong>the person who raises a point gets to frame it</strong>. Disclosed, it is a professional footnote. Discovered, it is a problem.</p>
+
+<h2>9 &nbsp;The milestone check</h2>
+
+<div class="box verify">
+  <span class="box-tag">Before each milestone, ask yourself these five questions honestly</span>
+  <ul>
+    <li>Can I derive every result I am about to present, on a blank page, without notes? If not, which one, and have I said so?</li>
+    <li>Can I explain every function I am about to show, line by line, including why each line is there and what breaks if it is removed?</li>
+    <li>For every number in my figures: do I know which script produced it, with which seed, and could I reproduce it from a clean checkout?</li>
+    <li>Have I opened and read every reference I am about to cite, and does each one actually say what I say it says?</li>
+    <li>Is my Tools used line complete for every week since the last milestone — including the weeks when I would rather it were shorter?</li>
+  </ul>
+  <p>A "no" to any of these is not a crisis. It is a thing to say at the top of the check-in, in one sentence, before anybody asks. <strong>"I can run <code>fit_power_law</code> but I could not rebuild it from scratch today"</strong> is a completely respectable thing to say to a mentor, and it converts a hidden weakness into an agenda item. That is the entire purpose of this page.</p>
+</div>
+
+<h2>10 &nbsp;If you have already crossed the line</h2>
+
+<p>Some readers will get here having already pasted something in Week 3. The response is short: <strong>say so, now, in this week's log, and fix it.</strong></p>
+
+<p>Not "start disclosing from here on". Go back to the specific thing, name it in the current log ("the implementation of <code>combine_d_prime</code> committed in Week 5 was not mine; I have rewritten it and can now explain it"), rebuild it, and move on. There is no penalty. There is genuinely no penalty. The only outcome that is bad for you is the one where it stays hidden until somebody asks a question in Week 15 that you cannot answer, in front of a room, about a project with your name on it.</p>
+
+<p class="muted">Related: <a href="how-to-use.html">how to use this course</a> · <a href="unstuck.html">how to get unstuck</a> (use it before you reach for a tool — it converts "it doesn't work" into a specific gap, and a specific gap is answerable in one question) · <a href="resources.html">resource library</a> for sources you can actually cite · <a href="../s/week13.html">Week 13</a> for the claim ledger, where the labels this page depends on are defined · <a href="../s/week15.html">Week 15</a> for the adversarial Q&amp;A this policy exists to prepare you for.</p>
+
+</div>
+
+<footer class="site">How Much Data Does It Take to Tell Two Cell Types Apart? · Using AI tools honestly · <a href="../index.html">Course home</a></footer>
+</body>
+</html>

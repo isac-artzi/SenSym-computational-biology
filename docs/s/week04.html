@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 4 — From d′ to an Error Probability</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="week03.html">← Week 3</a><a href="week05.html">Week 5 →</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Week 4</span>
+      <span class="badge aim1">Aim 1 · Theory</span>
+    </div>
+    <h1 class="chapter-title">From $d'$ to an Error Probability</h1>
+    <div class="chapter-sub">The optimal decision rule · the Gaussian approximation · $\Phi(d'/2)$ · ROC and AUC · and the exact answer that judges them all</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<h2>Objectives</h2>
+<ul class="objectives">
+  <li>State what a decision rule is, and prove that with equal priors the error-minimising rule keeps whichever probability mass function is larger at the observed count.</li>
+  <li>Show that for two Poisson rates the optimal rule is a <em>threshold</em> rule, and write down where the threshold goes.</li>
+  <li>Derive $\text{accuracy} = \Phi(d'/2)$ from the Gaussian approximation, naming every assumption used, and check it at $d' = 0$ and $d' \to \infty$.</li>
+  <li>Define $\Phi$, relate it to $\mathrm{erf}$, and recall $\Phi(0)$, $\Phi(0.5)$, $\Phi(1)$ and $\Phi(1.96)$ from memory.</li>
+  <li>Compute the <em>exact</em> error probability $\tfrac{1}{2}\sum_k \min(P_1(k), P_2(k))$ by summation, and use it to measure how wrong $\Phi(d'/2)$ is.</li>
+  <li>Explain what an ROC curve is, why $\mathrm{AUC} = \Phi(d'/\sqrt{2})$ under the Gaussian model, and why the project compares measurements in $d'$ rather than in accuracy.</li>
+  <li>Implement <code>normal_cdf</code>, <code>accuracy_from_d_prime</code>, <code>bayes_error_exact</code>, <code>roc_curve</code>, <code>roc_auc</code> and <code>d_prime_from_auc</code>, and get <code>tests/test_detection.py</code> green.</li>
+</ul>
+
+<h2>1 &nbsp;Where we are, and what is still missing</h2>
+
+<p>Last week you built the separation index. Two cell types express a gene at expected counts $\lambda_1$ and $\lambda_2$, and the amount by which they are distinguishable is</p>
+
+$$d' = \frac{|\lambda_1 - \lambda_2|}{\sqrt{\bar\lambda}}, \qquad \bar\lambda = \frac{\lambda_1 + \lambda_2}{2},$$
+
+<p>which is a distance measured in units of the noise, and which grows like $\sqrt{\text{depth}}$ because the Poisson standard deviation is $\sqrt{\lambda}$ and not $\lambda$.</p>
+
+<p>That is a number, but it is not yet an <em>answer</em>. Nobody funds a sequencing run to raise a dimensionless index from 1.2 to 1.7. They want to know: if I sequence this deeply, what fraction of my cells will I label correctly? This week converts the index into that fraction, and the conversion turns out to be one of the tidiest results in applied probability:</p>
+
+$$\boxed{\ \text{accuracy} = \Phi\!\left(\frac{d'}{2}\right)\ }$$
+
+<p>There is no fitted parameter in that formula, no tuning constant, nothing you get to adjust after seeing the data. It is a prediction in the strong sense — it can be wrong, and in Week 9 and Week 11 you will find the two places where it is. Today's job is to derive it honestly, to know exactly what it assumes, and to build the yardstick that will later be used to convict it.</p>
+
+<div class="box definition">
+  <span class="box-tag">The setting, stated once</span>
+  <p>One gene. One cell. The cell is type 1 or type 2, each with probability $1/2$ (<strong>equal priors</strong>). You observe a single count $x$, which is $\mathrm{Poisson}(\lambda_1)$ if the cell is type 1 and $\mathrm{Poisson}(\lambda_2)$ if it is type 2. You know both rates. You must guess the type.</p>
+  <p>Throughout, take $\lambda_1 \gt \lambda_2$ — type 1 is the type that expresses the gene more strongly. Nothing is lost by this: if it is the other way round, swap the labels.</p>
+</div>
+
+<h2>2 &nbsp;The decision rule, and where the threshold goes</h2>
+
+<p>A <strong>decision rule</strong> is nothing more than a list of which counts you will call type 1. Formally, choose a set $A$ of non-negative integers and say "type 1 if $x \in A$, type 2 otherwise". A rule is not an algorithm, not a program, not a model — it is a partition of the possible observations into two bins. There are $2^{\infty}$ of them, and exactly one family of them is best.</p>
+
+<p>Your instinct is surely that $A$ should be a set of the form $\{x \ge t\}$: a big count means the strongly expressing type. That instinct is correct, but it is worth seeing <em>why</em>, because the argument is short, it is completely general, and it hands you the exact answer for free.</p>
+
+<div class="box theorem">
+  <span class="box-tag">Theorem · the error-minimising rule <span class="claim proved">proved</span></span>
+  <p>With equal priors, the rule that minimises the probability of a wrong answer is: <strong>call type 1 exactly when $P_1(x) \gt P_2(x)$</strong>, where $P_c(k)$ is the Poisson pmf under type $c$. (Ties may be broken either way; they contribute the same error.) Its error probability is
+  $$\varepsilon^\star = \frac{1}{2}\sum_{k=0}^{\infty} \min\big(P_1(k), P_2(k)\big).$$</p>
+</div>
+
+<div class="box proof">
+  <span class="box-tag">Proof</span>
+  <p>Fix any rule $A$. Two ways to be wrong: the cell is type 1 and $x \notin A$, or the cell is type 2 and $x \in A$. Each type occurs with probability $\tfrac12$, so</p>
+  $$\varepsilon(A) = \frac{1}{2}\sum_{k \notin A} P_1(k) \;+\; \frac{1}{2}\sum_{k \in A} P_2(k).$$
+  <p>The first sum is over the complement of $A$, which is awkward. Replace it using $\sum_{k \notin A} P_1(k) = 1 - \sum_{k \in A} P_1(k)$:</p>
+  $$\varepsilon(A) = \frac{1}{2} + \frac{1}{2}\sum_{k \in A}\big(P_2(k) - P_1(k)\big).$$
+  <p>Now look at what you control. Every integer $k$ either is in $A$ or is not, and putting it in adds the single term $\tfrac12\big(P_2(k) - P_1(k)\big)$ to the error. To make the total as small as possible, include $k$ precisely when that term is negative — that is, when $P_1(k) \gt P_2(k)$. There is no interaction between the choices, since each count contributes its own separate term, so deciding each count on its own merits gives the global optimum.</p>
+  <p>With $A^\star = \{k : P_1(k) \gt P_2(k)\}$, the error becomes
+  $$\varepsilon^\star = \frac{1}{2} + \frac{1}{2}\sum_{k \in A^\star}\big(P_2(k) - P_1(k)\big)
+   = \frac{1}{2}\left[\sum_{k \in A^\star} P_2(k) + \sum_{k \notin A^\star} P_1(k)\right]
+   = \frac{1}{2}\sum_{k} \min\big(P_1(k), P_2(k)\big),$$
+  where the middle step used $1 = \sum_k P_1(k)$ again, and the last step is the observation that on $A^\star$ the smaller pmf is $P_2$ and off it the smaller pmf is $P_1$. <span class="qed">∎</span></p>
+  <p class="muted"><strong>Assumptions used:</strong> equal priors; both pmfs known exactly; the two errors cost the same. Nothing about Poisson, nothing about Gaussians. This argument is as true for beads in a jar as for transcripts in a cell.</p>
+</div>
+
+<p>So far the rule is "compare two probabilities". Now put the Poisson pmfs in and watch it collapse into a threshold.</p>
+
+<div class="box example">
+  <span class="box-tag">Worked derivation · the optimal rule is a threshold, and here it is <span class="claim proved">proved</span></span>
+  <p>Write out the comparison $P_1(k) \gt P_2(k)$ using $P_c(k) = e^{-\lambda_c}\lambda_c^k / k!$:</p>
+  $$\frac{e^{-\lambda_1}\lambda_1^{k}}{k!} \;\gt\; \frac{e^{-\lambda_2}\lambda_2^{k}}{k!}.$$
+  <p>The $k!$ cancels — it does not know which hypothesis it belongs to. (Remember that cancellation; in Week 5 it is the entire reason the multi-gene rule is linear.) Take logarithms of both sides, which is safe because both sides are positive and $\log$ is increasing:</p>
+  $$-\lambda_1 + k\log\lambda_1 \;\gt\; -\lambda_2 + k\log\lambda_2
+  \quad\Longleftrightarrow\quad
+  k\log\!\frac{\lambda_1}{\lambda_2} \;\gt\; \lambda_1 - \lambda_2.$$
+  <p>Since $\lambda_1 \gt \lambda_2$ the logarithm is positive, so dividing does not flip the inequality:</p>
+  $$k \;\gt\; k^\star \equiv \frac{\lambda_1 - \lambda_2}{\log(\lambda_1/\lambda_2)}.$$
+  <p>The optimal $A^\star$ is therefore everything above a single cut point: <strong>call type 1 if the count exceeds $k^\star$</strong>. Because counts are integers, the practical rule is "call type 1 if $x \ge \lceil k^\star \rceil$". <span class="qed">∎</span></p>
+  <p class="muted">The quantity $k^\star$ is called the <em>logarithmic mean</em> of $\lambda_1$ and $\lambda_2$, and it always lies strictly between them and strictly below their arithmetic mean $\bar\lambda$. Example: $\lambda_1 = 10.8$, $\lambda_2 = 9$ gives $k^\star = 1.8/\log(1.2) = 9.873$, against a midpoint of $9.9$. The gap is small here and it shrinks as the two rates get closer — which is exactly why the Gaussian derivation below, which puts the threshold at the midpoint, gets away with it.</p>
+</div>
+
+<h2>3 &nbsp;The Gaussian approximation, and the formula</h2>
+
+<p>The threshold rule above is exact and it is also, in a sense, useless: it gives you a rule but not a number. To get an error <em>probability</em> in closed form you need to be able to integrate the Poisson, and you cannot. So you approximate it by something you can integrate.</p>
+
+<div class="box theorem">
+  <span class="box-tag">The approximation everything rests on <span class="claim cited">cited</span></span>
+  <p>For large $\lambda$, $\mathrm{Poisson}(\lambda) \approx \mathrm{Normal}(\lambda, \lambda)$ — same mean, same variance, in the sense that the probability of any interval agrees to a relative error that vanishes as $\lambda$ grows.</p>
+  <p><strong>Why it is true, in one line:</strong> a $\mathrm{Poisson}(\lambda)$ variable is the sum of $n$ independent $\mathrm{Poisson}(\lambda/n)$ variables for <em>any</em> $n$ (add the rates — Week 2), so it is a sum of arbitrarily many independent identically distributed pieces, and the central limit theorem applies. The mean and variance of the limit must be the mean and variance of the thing itself, both of which are $\lambda$.</p>
+  <p><strong>When to trust it:</strong> the usual working rule is $\lambda \gtrsim 10$. Section 5 replaces that rule of thumb with a measurement.</p>
+</div>
+
+<p>Now the derivation. It is four short steps and you should be able to reproduce all four at a whiteboard by the end of the week; Week 5's milestone will ask you to.</p>
+
+<div class="box example">
+  <span class="box-tag">Derivation · accuracy $= \Phi(d'/2)$ <span class="claim proved">proved</span> (given the approximation above)</span>
+
+  <p><strong>Step 1 — replace both Poissons by normals.</strong> Under type 1 the count is approximately $\mathcal{N}(\lambda_1, \lambda_1)$; under type 2, $\mathcal{N}(\lambda_2, \lambda_2)$.</p>
+
+  <p><strong>Step 2 — give them a common variance.</strong> Replace both variances by the pooled value $\bar\lambda = (\lambda_1+\lambda_2)/2$. This is a genuine second approximation and deserves to be named: it is the <strong>equal-variance Gaussian model</strong>, and it is accurate when $|\lambda_1 - \lambda_2| \ll \bar\lambda$, because then $\lambda_1$ and $\lambda_2$ are both close to $\bar\lambda$ anyway. Marker genes with a 20–50% fold change satisfy this comfortably; a gene that is ten times higher in one type does not, and you will see the consequence in Section 5.</p>
+
+  <p><strong>Step 3 — standardise.</strong> Measure the count in units of the noise, from the midpoint:
+  $$Z = \frac{X - \bar\lambda}{\sqrt{\bar\lambda}}.$$
+  This is a linear change of variable, so $Z$ is normal with unit variance under both hypotheses. Its mean under type 1 is
+  $$\frac{\lambda_1 - \bar\lambda}{\sqrt{\bar\lambda}} = \frac{\lambda_1 - \frac{\lambda_1+\lambda_2}{2}}{\sqrt{\bar\lambda}} = \frac{(\lambda_1 - \lambda_2)/2}{\sqrt{\bar\lambda}} = \frac{d'}{2},$$
+  and by the identical computation its mean under type 2 is $-d'/2$. So the whole problem has been reduced to one line:
+  $$Z \sim \mathcal{N}\!\left(+\tfrac{d'}{2},\, 1\right) \text{ under type 1}, \qquad
+    Z \sim \mathcal{N}\!\left(-\tfrac{d'}{2},\, 1\right) \text{ under type 2}.$$
+  <em>Two bell curves of width 1, separated by exactly $d'$, straddling zero.</em> That picture is the entire content of the week; if you remember one image, remember that one.</p>
+
+  <p><strong>Step 4 — find the threshold and integrate.</strong> By the theorem of Section 2 the optimal rule keeps the larger density. With $\varphi$ the standard normal density,
+  $$\log\frac{\varphi(z - d'/2)}{\varphi(z + d'/2)}
+    = -\frac{(z-d'/2)^2}{2} + \frac{(z+d'/2)^2}{2} = z\,d',$$
+  which is positive exactly when $z \gt 0$ (recall $d' \gt 0$). <strong>The optimal threshold is $z = 0$</strong> — the midpoint, by symmetry, as it had to be. The accuracy is then the probability that a type-1 cell lands on the correct side:
+  $$P(Z \gt 0 \mid \text{type 1}) = P\!\left(\mathcal{N}(d'/2, 1) \gt 0\right) = P\!\left(\mathcal{N}(0,1) \gt -\tfrac{d'}{2}\right) = \Phi\!\left(\frac{d'}{2}\right).$$
+  By symmetry a type-2 cell is classified correctly with the same probability, so the overall accuracy — an average over two equally likely types — is $\Phi(d'/2)$ as well. <span class="qed">∎</span></p>
+
+  <p class="muted"><strong>Assumptions used, in order:</strong> (i) Poisson counts; (ii) $\lambda$ large enough for the normal approximation; (iii) the two variances close enough to pool; (iv) equal priors; (v) both rates known exactly; (vi) one gene. Assumption (vi) goes next week, (ii) and (iii) are measured in Section 5, (i) fails on real data in Week 11, and (v) is what Week 10 has to estimate rather than assume. Write this list in your notebook — it is the skeleton of your report's limitations section.</p>
+</div>
+
+<div class="box definition">
+  <span class="box-tag">Definition · $\Phi$, and its relation to erf</span>
+  <p>$\Phi(z)$ is the <strong>standard normal cumulative distribution function</strong>: the probability that a $\mathcal{N}(0,1)$ variable comes out below $z$,
+  $$\Phi(z) = \int_{-\infty}^{z} \frac{1}{\sqrt{2\pi}} e^{-u^2/2}\,du.$$
+  It has no expression in elementary functions, which is why it gets its own name. Software usually offers instead the <em>error function</em> $\mathrm{erf}(x) = \frac{2}{\sqrt{\pi}}\int_0^x e^{-s^2}ds$, and the two are the same object in different clothes:
+  $$\Phi(z) = \frac{1}{2}\left(1 + \mathrm{erf}\!\left(\frac{z}{\sqrt{2}}\right)\right).$$
+  Exercise 4.2 asks you to derive that identity by substitution; it is four lines and you should do it once in your life. Two facts to carry around: $\Phi(-z) = 1 - \Phi(z)$, and $\Phi$ is strictly increasing from 0 to 1.</p>
+</div>
+
+<p>You need a feel for $\Phi$ the way you have a feel for $\sin$. Learn the first four rows of this table; the rest you can reconstruct.</p>
+
+<table class="simple">
+  <tr><th>$z$</th><th>$\Phi(z)$</th><th>meaning if $z = d'/2$</th><th>the $d'$ that gets you there</th></tr>
+  <tr><td>0</td><td>0.500</td><td>chance</td><td>$d' = 0$</td></tr>
+  <tr><td>0.25</td><td>0.599</td><td>barely better than a coin</td><td>$d' = 0.5$</td></tr>
+  <tr><td>0.5</td><td>0.691</td><td>about seven in ten</td><td>$d' = 1$</td></tr>
+  <tr><td>1.0</td><td>0.841</td><td>about one error in six</td><td>$d' = 2$</td></tr>
+  <tr><td>1.28</td><td>0.900</td><td>one error in ten</td><td>$d' = 2.56$</td></tr>
+  <tr><td>1.645</td><td>0.950</td><td>one error in twenty</td><td>$d' = 3.29$</td></tr>
+  <tr><td>1.96</td><td>0.975</td><td>one error in forty</td><td>$d' = 3.92$</td></tr>
+  <tr><td>2.58</td><td>0.995</td><td>one error in two hundred</td><td>$d' = 5.15$</td></tr>
+</table>
+
+<p class="muted">The last column is the one that will hurt. To get from 69% accuracy to 97.5% you must take $d'$ from 1 to 3.92 — a factor of about four — and since $d' \propto \sqrt{\text{depth}}$, that is <strong>sixteen times the sequencing</strong>. The formula is cheap; the biology it demands is not.</p>
+
+<div class="box warning">
+  <span class="box-tag">Three sanity checks, which you should run on every formula you ever derive</span>
+  <ul>
+    <li><strong>Chance level.</strong> $d' = 0$ means the two types have identical rates. Then $\Phi(0) = 0.5$: you are guessing. A formula that gave anything other than $1/2$ here would be indefensible, because with identical distributions no rule can beat a coin.</li>
+    <li><strong>Saturation.</strong> As $d' \to \infty$, $\Phi(d'/2) \to 1$, and it approaches 1 from below and never reaches it. Correct: with Poisson counts, however far apart the rates are, a type-2 cell can always fluke a huge count. Perfect classification has probability zero of being achievable.</li>
+    <li><strong>Monotonicity.</strong> $\Phi$ is increasing, so more separation is never worse. Also correct, and worth stating because it means the entire project can be phrased in $d'$ and translated to accuracy at the end.</li>
+  </ul>
+  <p>The Python test <code>test_accuracy_from_d_prime_endpoints_and_monotonicity</code> checks all three. That is not a coincidence: a good test suite is a list of the sanity checks you would have done by hand.</p>
+</div>
+
+<h2>4 &nbsp;Lab: put the threshold where you like, and pay for it</h2>
+
+<div class="lab">
+  <div class="lab-title">Lab 1 · One gene, one threshold, four different numbers</div>
+  <div class="lab-desc">The two Poisson pmfs are drawn as bars: type 1 in blue (the higher rate), type 2 in purple. The dashed line is your threshold — everything at or above it is called type 1. The <span style="color:#b91c1c"><strong>red</strong></span> bars are the mistakes: type-1 mass below the line, type-2 mass above it. The threshold slider is calibrated in units of $\sqrt{\bar\lambda}$ away from the midpoint, so $z = 0$ is the Gaussian prediction of the best place to stand. Push it left and right and watch the accuracy fall away on both sides. <em>One honesty note:</em> the "measured" row samples cells with <code>CD.poisson</code>, which switches to a rounded normal above $\lambda = 30$ (cd.js says so in a comment). Above that rate the measured row is no longer an independent check on the Gaussian formula — it is the Gaussian formula, measured. The two exact rows always are.</div>
+  <canvas id="lab1" height="340"></canvas>
+  <div class="controls" id="lab1ctl"></div>
+  <div class="readout" id="lab1out"></div>
+</div>
+
+<p>Four things to do with this lab before you move on.</p>
+
+<ul>
+  <li>At the default rates, move the threshold one step either way from the optimum and see how little the accuracy changes. The error is <em>flat</em> at its minimum — a first-order-zero, because you are at the bottom of a smooth curve. This is why classifiers with slightly wrong thresholds still work, and why "my accuracy went up when I tuned the cutoff" is usually noise.</li>
+  <li>Press <em>Snap to the exact optimum</em> and read the threshold off. Compare it to the midpoint. They differ by less than one count at a modest fold change.</li>
+  <li>Set the rate to 100 and the fold change to 1.2. The Gaussian formula and the exact sum should agree in the third decimal place.</li>
+  <li>Now set the rate to 0.2 and the fold change to 5. They will not. Hold that thought for exactly one section.</li>
+</ul>
+
+<h2>5 &nbsp;The exact answer, and how good the approximation really is</h2>
+
+<p>Section 2 already gave you the exact error with no Gaussian anywhere in sight:</p>
+
+<div class="box theorem">
+  <span class="box-tag">The yardstick <span class="claim proved">proved</span> (Section 2)</span>
+  $$\varepsilon^\star = \frac{1}{2}\sum_{k=0}^{\infty}\min\big(P_1(k), P_2(k)\big), \qquad
+  \text{accuracy}^\star = 1 - \varepsilon^\star.$$
+  <p>At each possible count the optimal rule keeps the larger pmf, so the smaller pmf is precisely the probability mass it gets wrong; sum that over all counts and halve it for the equal priors. This is <em>the</em> best achievable accuracy for one gene — not the best achievable by a threshold rule, or by your favourite classifier, but by any rule whatsoever.</p>
+</div>
+
+<p>In principle the sum is infinite; in practice the Poisson tail dies faster than exponentially, so truncating at ten standard deviations past the larger mean leaves an error far below anything you would print. That is exactly what <code>bayes_error_exact</code> does, and it is why the function takes an optional <code>max_k</code>.</p>
+
+<p>Now you have two numbers for the same quantity, one approximate and one exact, and comparing them is a small piece of research rather than a debugging exercise.</p>
+
+<div class="box data">
+  <span class="box-tag">Result · where the Gaussian formula bends <span class="claim observed">observed</span></span>
+  <p>Running <code>experiments/week04_accuracy_roc.py</code> sweeps $\lambda_2$ from $0.2$ to $300$ at a fixed fold change of $1.4$ and plots both answers. Three findings, and the third is the interesting one.</p>
+  <ul>
+    <li><strong>At high rate the two agree to three decimals.</strong> At $\lambda_2 = 200$, $\lambda_1 = 260$: $d' = 60/\sqrt{230} = 3.956$, so $\Phi(d'/2) = 0.9760$, while the exact sum gives $0.9763$. A difference of $0.0003$ — nothing you could measure without a million cells. The test <code>test_accuracy_from_d_prime_matches_exact_bayes_at_high_rate</code> asserts exactly this, with a tolerance of $0.01$.</li>
+    <li><strong>At low rate <em>and</em> large fold change it visibly fails.</strong> At $\lambda_2 = 0.2$ against $\lambda_1 = 1.0$: $d' = 0.8/\sqrt{0.6} = 1.033$, so $\Phi(d'/2) = 0.697$, while the exact answer is $0.725$. The formula is <em>pessimistic</em> by about $0.03$. The test <code>test_gaussian_approximation_degrades_at_low_rate</code> asserts that the gap exceeds $0.02$ — a test that would fail if someone "fixed" the exact routine into agreement.</li>
+    <li><strong>At low rate and <em>small</em> fold change it survives.</strong> Across the whole fold-1.4 sweep, including $\lambda_2 = 0.2$ where the expected count is a fifth of a molecule, the largest discrepancy is about $0.004$. This is more than the textbook rule of thumb ($\lambda \gtrsim 10$) would have led you to expect, and it is a result worth reporting.</li>
+  </ul>
+  <p>So the honest statement is not "the Gaussian approximation needs $\lambda \gtrsim 10$". It is: <strong>the approximation degrades when the counts are small <em>and</em> the two rates differ by a large factor</strong>, because that is when pooling the two variances (Step 2) stops being defensible and the skewness of the Poisson stops cancelling between the two hypotheses.</p>
+</div>
+
+<p>One more feature of the comparison is worth naming, because a student who has not been warned will think their code is broken. The difference between the two curves does not decay smoothly: it wobbles, changing sign several times as $\lambda$ increases. That is not numerical noise. The exact answer is a sum of discrete lumps, and the optimal threshold can only sit between whole numbers, so as $\lambda$ grows continuously the exact accuracy moves in tiny steps while $\Phi(d'/2)$ glides. The wobble is discreteness, and it is real.</p>
+
+<div class="box pitfall">
+  <span class="box-tag">"My exact answer is worse than chance"</span>
+  <p>If <code>bayes_error_exact</code> ever returns more than $0.5$, you have summed the maximum instead of the minimum, or forgotten the factor of $\tfrac12$. The error of the optimal rule can never exceed $1/2$ — you could always ignore the data and flip a coin. Check the identity $\varepsilon^\star = \tfrac12$ when $\lambda_1 = \lambda_2$ first; that single case catches most sign and factor errors, and <code>test_bayes_error_exact_bounds</code> checks it for you.</p>
+</div>
+
+<h2>6 &nbsp;Sweeping the threshold: ROC curves and AUC</h2>
+
+<p>Everything so far has fixed one threshold and reported one accuracy. But a threshold is a choice, and different applications make it differently. If you are screening for a rare tumour cell you would rather flag a few extra normal cells than miss the one that matters; if you are building a reference atlas you might want the opposite. Reporting a single accuracy hides that choice. The <strong>ROC curve</strong> shows all of them at once.</p>
+
+<div class="box definition">
+  <span class="box-tag">Definition · ROC and AUC</span>
+  <p>Call type 1 the "positive" class. At a given threshold $t$ define
+  $$\mathrm{TPR}(t) = P(\text{call positive} \mid \text{type 1}), \qquad
+    \mathrm{FPR}(t) = P(\text{call positive} \mid \text{type 2}).$$
+  The <strong>ROC curve</strong> (receiver operating characteristic — the name is from 1940s radar) is the set of points $(\mathrm{FPR}(t), \mathrm{TPR}(t))$ as $t$ sweeps from $+\infty$ down to $-\infty$. It starts at $(0,0)$ (threshold so high nothing is called positive) and ends at $(1,1)$ (everything called positive).</p>
+  <p>The <strong>AUC</strong> is the area under that curve. A useless score gives the diagonal and $\mathrm{AUC} = 0.5$; a perfect score gives the corner and $\mathrm{AUC} = 1$.</p>
+</div>
+
+<p>The AUC has an interpretation that is far more useful than "area under a curve", and it is worth memorising in words:</p>
+
+<div class="box theorem">
+  <span class="box-tag">What AUC means <span class="claim cited">cited</span> (Hanley &amp; McNeil 1982; you prove the Gaussian case in exercise 4.5)</span>
+  <p>$\mathrm{AUC}$ is <strong>the probability that a randomly chosen positive scores higher than a randomly chosen negative</strong>, with ties counted as half:
+  $$\mathrm{AUC} = P(X_1 \gt X_2) + \tfrac{1}{2}P(X_1 = X_2), \qquad X_1 \sim \text{type 1},\ X_2 \sim \text{type 2}.$$
+  It is a property of the <em>ranking</em> the score induces, and it does not depend on any threshold at all.</p>
+  <p>Under the equal-variance Gaussian model of Section 3 it takes a closed form. $X_1 - X_2$ is normal with mean $\lambda_1 - \lambda_2$ and variance $2\bar\lambda$, so
+  $$\mathrm{AUC} = P(X_1 - X_2 \gt 0) = \Phi\!\left(\frac{\lambda_1-\lambda_2}{\sqrt{2\bar\lambda}}\right) = \Phi\!\left(\frac{d'}{\sqrt{2}}\right).$$
+  Note the $\sqrt{2}$: <em>two</em> noisy draws are being compared, so the noise variance doubles. Confusing $\Phi(d'/\sqrt2)$ with $\Phi(d'/2)$ is the single most common slip of the week.</p>
+</div>
+
+<p>Because that relation is invertible, a measured AUC can be turned straight back into a $d'$:</p>
+
+$$d' = \sqrt{2}\,\Phi^{-1}(\mathrm{AUC}),$$
+
+<p>which is what <code>d_prime_from_auc</code> computes, using $\Phi^{-1}(a) = \sqrt2\,\mathrm{erf}^{-1}(2a-1)$. This little function does more work in this project than its three lines suggest, and here is why.</p>
+
+<div class="box warning">
+  <span class="box-tag">Why every comparison in this project is made in $d'$, not in accuracy</span>
+  <p>Suppose one method reaches 98.0% accuracy and another 99.0%. In accuracy space that is a one-point difference and looks negligible. In $d'$ space it is $4.11$ versus $4.65$ — a 13% difference in the underlying separation, and it corresponds to a <strong>28% difference in the sequencing depth</strong> you would have to buy, since $d' \propto \sqrt{\text{depth}}$.</p>
+  <p>Accuracy saturates near 1 and squashes all large differences into an invisible sliver; $d'$ keeps growing without bound and stays linear in the thing you actually pay for. So: measure accuracy or AUC (they are what you observe), convert to $d'$ (it is what the theory predicts), and compare there. Every figure from Week 7 onwards obeys this rule.</p>
+</div>
+
+<div class="lab">
+  <div class="lab-title">Lab 2 · An ROC curve built from simulated cells</div>
+  <div class="lab-desc">2000 cells of each type are sampled from two Poisson rates, the count is used directly as the score, and the ROC is built by sweeping the threshold down through every observed count. The orange curve is the Gaussian model's prediction, $\mathrm{TPR} = \Phi(\Phi^{-1}(\mathrm{FPR}) + d')$. The staircase is coarse for a reason: counts are integers, so hundreds of cells share each score, and a threshold cannot cut between two cells that scored the same.</div>
+  <canvas id="lab2" height="360"></canvas>
+  <div class="controls" id="lab2ctl"></div>
+  <div class="readout" id="lab2out"></div>
+</div>
+
+<div class="box pitfall">
+  <span class="box-tag">Ties: the bug that manufactures a perfect classifier out of nothing</span>
+  <p>Consider a classifier that assigns <em>every</em> cell the same score — say it is broken and always outputs 0. It contains no information, so its AUC must be exactly $0.5$.</p>
+  <p>Now build the ROC naively: sort the cells by score, walk down the sorted list, and step up for each positive and right for each negative. Sorting a list of identical scores leaves them in whatever order they arrived. If your data file happens to list all the type-1 cells first, the walk goes straight up to $(0,1)$ and then straight across: <strong>AUC $= 1$</strong>. Concatenate the file the other way round and you get <strong>AUC $= 0$</strong>. A completely uninformative classifier, reported as flawless, purely because of row order.</p>
+  <p>The fix is to consume all tied scores <em>at once</em>: a threshold either takes the entire group or none of it, so the ROC has one point per <em>distinct</em> score, not one per cell. That is what the <code>last_of_tie</code> step in <code>roc_curve</code> is doing, and why the scaffold insists on <code>kind="mergesort"</code> (a stable sort) — so that at least the failure is reproducible while you debug it.</p>
+  <p>The readout in Lab 2 shows both numbers: the tie-aware AUC, and what you would report if you broke ties by input order (which is what this site's small <code>CD.roc</code> helper does, since it walks the samples one at a time). At $\lambda = (1.5, 1.0)$ the honest AUC is about $0.62$ and the order-broken one about $0.75$. Integer counts tie <em>constantly</em>, so this is not an edge case in this project — it is the normal case.</p>
+</div>
+
+<h2>7 &nbsp;Your Python laboratory</h2>
+
+<div class="box python">
+  <span class="box-tag">This week in the celldetect project</span>
+  <p>Everything this week lives in <code>python/celldetect/detection.py</code>. Implement, in this order:</p>
+  <ul>
+    <li><code>normal_cdf(z)</code> — $\Phi$, via <code>scipy.special.erf</code>, one line. Check $\Phi(0) = 0.5$ and $\Phi(1.96) \approx 0.975$ by hand before running anything.</li>
+    <li><code>accuracy_from_d_prime(dp)</code> — the headline formula, $\Phi(d'/2)$, also one line. Both endpoints are in the docstring; verify them.</li>
+    <li><code>bayes_error_exact(lam1, lam2, max_k=None)</code> — the exact sum $\tfrac12\sum_k \min(P_1,P_2)$, built on <code>counting.poisson_logpmf</code> from Week 2. The default truncation is <code>int(big + 10*sqrt(big) + 20)</code>; the docstring explains why the constant floor of 20 is needed for small rates.</li>
+    <li><code>roc_curve(scores, labels)</code> — returns <code>(fpr, tpr)</code>. This is the one with real content in it: the descending stable sort, the cumulative sums, and the tie collapse. Raise <code>ValueError</code> if either class is missing.</li>
+    <li><code>roc_auc(scores, labels)</code> — the trapezoid rule over that curve. Note the NumPy 2 rename: <code>np.trapezoid</code>, with <code>np.trapz</code> on older versions.</li>
+    <li><code>d_prime_from_auc(auc)</code> — invert $\mathrm{AUC} = \Phi(d'/\sqrt2)$ using <code>scipy.special.erfinv</code>, clipping the input away from 0 and 1 first.</li>
+  </ul>
+  <p>Then run the whole file's tests:</p>
+  <p><code>pytest tests/test_detection.py</code></p>
+  <p>Six of them are about this week specifically: <code>test_normal_cdf_known_values</code>, <code>test_accuracy_from_d_prime_endpoints_and_monotonicity</code>, <code>test_accuracy_from_d_prime_matches_exact_bayes_at_high_rate</code>, <code>test_gaussian_approximation_degrades_at_low_rate</code>, <code>test_roc_curve_perfect_and_chance</code>, <code>test_roc_curve_starts_at_origin_and_is_monotone</code>, and <code>test_auc_recovers_d_prime</code>. Read each one before you write the function it tests: the test is a specification.</p>
+  <p>Then produce the figures:</p>
+  <p><code>python experiments/week04_accuracy_roc.py</code></p>
+  <p>with <strong>SEED 104</strong>, which writes <code>figures/week04_accuracy_curve.png</code> (the Gaussian formula against the exact sum, plus the difference on its own axis) and <code>figures/week04_roc.png</code> (four ROC curves at four rate pairs, with the AUC and the recovered $d'$ printed). The script also prints the largest discrepancy over the sweep; copy that number into <code>progress/week04.md</code>, because Section 5's claim rests on it.</p>
+  <p>Reference implementations are in <code>python/solutions/</code>. Read them after a real attempt, not instead of one.</p>
+</div>
+
+<div class="box pitfall">
+  <span class="box-tag">The two that catch everyone in Week 4</span>
+  <ul>
+    <li><strong>$\Phi(d'/2)$ versus $\Phi(d'/\sqrt2)$.</strong> Accuracy uses $2$; AUC uses $\sqrt2$. They are close enough that a mix-up survives eyeballing and dies in <code>test_auc_recovers_d_prime</code>. Remember the reason: accuracy compares one draw to a fixed threshold, AUC compares one draw to <em>another draw</em>, and two independent noises add in variance.</li>
+    <li><strong>Building the ROC with <code>np.argsort(scores)</code> and forgetting the minus sign.</strong> A ROC swept in the wrong direction gives $\mathrm{AUC} = 1 - \mathrm{AUC}$, so an $0.85$ becomes $0.15$ — obviously wrong — but an $0.51$ becomes $0.49$, which looks like bad luck rather than a bug. Test on data where you already know the answer.</li>
+  </ul>
+</div>
+
+<h2>8 &nbsp;Exercises</h2>
+<p class="muted">Stars mark difficulty: ★ routine · ★★ requires an idea · ★★★ challenge. Write full sentences; every claim needs a reason. Solutions are provided — attempt first, then compare.</p>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 4.1</span><span class="stars">★</span></div>
+  <div class="ex-body">In Week 1 you met two cell types with $\lambda_1 = 10.8$ and $\lambda_2 = 9$ at depth 3000, giving $d' \approx 0.572$. (a) What accuracy does $\Phi(d'/2)$ predict? (b) You are allowed to sequence 16 times deeper. What is the new $d'$, and the new accuracy? (c) How many errors per hundred cells did those fifteen extra sequencing runs remove?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) $\Phi(0.286) \approx 0.613$. About 61% — barely better than a coin, from one gene.</p>
+      <p>(b) $d' \propto \sqrt{\text{depth}}$, so 16 times the depth gives $4 \times 0.572 = 2.29$. Then $\Phi(1.144) \approx 0.874$.</p>
+      <p>(c) From 39 errors per hundred cells down to about 13: twenty-six errors removed, for sixteen times the money.</p>
+      <p class="muted">Notice the shape of the return. The first doubling of depth is worth a lot; by the time you are at 87% the next doubling buys a couple of points. That diminishing return is not an artefact of $\Phi$ — it is what a square-root law feeding a saturating function always looks like, and it is the single most useful thing this project can tell an experimenter.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 4.2</span><span class="stars">★</span></div>
+  <div class="ex-body">Derive the identity $\Phi(z) = \tfrac12\left(1 + \mathrm{erf}(z/\sqrt2)\right)$ from the two definitions
+  $\Phi(z) = \int_{-\infty}^{z}\frac{1}{\sqrt{2\pi}}e^{-u^2/2}du$ and $\mathrm{erf}(x) = \frac{2}{\sqrt\pi}\int_0^x e^{-s^2}ds$. Then verify it numerically at $z = 0$ and $z = 1$.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>Split the integral at 0 and use the fact that the standard normal density is symmetric, so the left half contributes $\tfrac12$:
+      $$\Phi(z) = \frac12 + \int_0^z \frac{1}{\sqrt{2\pi}}e^{-u^2/2}\,du.$$
+      In the remaining integral substitute $u = s\sqrt2$, so $du = \sqrt2\,ds$ and $u^2/2 = s^2$, and the upper limit becomes $z/\sqrt2$:
+      $$\int_0^z \frac{1}{\sqrt{2\pi}}e^{-u^2/2}du = \int_0^{z/\sqrt2} \frac{\sqrt2}{\sqrt{2\pi}}e^{-s^2}ds = \frac{1}{\sqrt\pi}\int_0^{z/\sqrt2}e^{-s^2}ds = \frac{1}{2}\,\mathrm{erf}\!\left(\frac{z}{\sqrt2}\right).$$
+      Adding the halves gives the identity. <span class="qed">∎</span></p>
+      <p>Check: $\mathrm{erf}(0) = 0$ so $\Phi(0) = 1/2$. And $\mathrm{erf}(1/\sqrt2) = \mathrm{erf}(0.7071) = 0.6827$, so $\Phi(1) = \tfrac12(1.6827) = 0.8413$ — the familiar "68% of a normal lies within one standard deviation", since $\Phi(1) - \Phi(-1) = 0.6827$.</p>
+      <p class="muted">This is exactly the body of <code>normal_cdf</code>, and doing the substitution by hand is what stops the $\sqrt2$ from becoming a magic constant you copy from a webpage. The same factor reappears — for a completely different reason — in $\mathrm{AUC} = \Phi(d'/\sqrt2)$, and being able to tell the two apart is worth the four lines.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 4.3</span><span class="stars">★★</span></div>
+  <div class="ex-body">The exact optimal threshold is $k^\star = (\lambda_1-\lambda_2)/\log(\lambda_1/\lambda_2)$ and the Gaussian derivation puts it at $\bar\lambda = (\lambda_1+\lambda_2)/2$. (a) Compute both for $(\lambda_1, \lambda_2) = (12, 8)$ and for $(\lambda_1, \lambda_2) = (6, 1)$, and in each case say whether the two rules actually differ on integer counts. (b) Write $\lambda_1 = \bar\lambda(1+\epsilon)$, $\lambda_2 = \bar\lambda(1-\epsilon)$ and expand $k^\star$ in $\epsilon$ to show the two agree to first order. (c) Which is always smaller, and what does that mean for the rule?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) $(12,8)$: $k^\star = 4/\log 1.5 = 4/0.4055 = 9.865$ against a midpoint of $10.0$ — a gap of $0.135$. Both rules round to the same integer rule, "call type 1 if $x \ge 10$", so on actual data they are <em>identical</em>.</p>
+      <p>$(6,1)$: $k^\star = 5/\log 6 = 5/1.7918 = 2.791$ against a midpoint of $3.5$. Now they differ: the exact rule calls type 1 from $x = 3$ upwards, the midpoint rule only from $x = 4$. And $x = 3$ is not a rare event — under $\lambda_2 = 1$ it has probability $0.061$, under $\lambda_1 = 6$ probability $0.089$ — so choosing the wrong threshold costs measurable accuracy. A fold change of 6 at a rate of 1 is exactly the regime where Section 5 says the Gaussian picture stops being trustworthy.</p>
+      <p>(b) With $\lambda_{1,2} = \bar\lambda(1\pm\epsilon)$,
+      $$k^\star = \frac{2\bar\lambda\epsilon}{\log\frac{1+\epsilon}{1-\epsilon}}.$$
+      Now $\log\frac{1+\epsilon}{1-\epsilon} = 2(\epsilon + \epsilon^3/3 + \cdots)$, so
+      $$k^\star = \frac{2\bar\lambda\epsilon}{2\epsilon\left(1 + \epsilon^2/3 + \cdots\right)} = \bar\lambda\left(1 - \frac{\epsilon^2}{3} + \cdots\right).$$
+      The two thresholds agree to first order — indeed the correction is only <em>second</em> order in $\epsilon$, which is why the Gaussian rule is so hard to beat at small fold change.</p>
+      <p>(c) $k^\star \lt \bar\lambda$ always (the logarithmic mean is below the arithmetic mean, for any distinct positive numbers). So the exact rule is slightly more willing to call type 1 than the midpoint rule is. That asymmetry is the Poisson's right skew showing up: the low-rate distribution has more mass pushed up towards the threshold than a symmetric bell would, so the cut has to move down to compensate.</p>
+      <p class="muted">Part (b) is the honest answer to "why does the Gaussian derivation work at all when $\lambda = 3$?" It is not that the Poisson looks normal at $\lambda = 3$ — it does not. It is that the two errors you are making, one under each hypothesis, are nearly the same error and largely cancel in the difference. Cancellation of errors is a recurring theme; Week 11's overdispersion result is where it stops happening.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 4.4</span><span class="stars">★★</span></div>
+  <div class="ex-body">By hand, compute the exact accuracy for $\lambda_1 = 1.0$, $\lambda_2 = 0.2$. Tabulate $P_1(k)$ and $P_2(k)$ for $k = 0,1,2,3,4$, take the minimum in each row, and sum. Compare with $\Phi(d'/2)$. Which is bigger, and can you say in words why?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>With $e^{-1} = 0.36788$ and $e^{-0.2} = 0.81873$:</p>
+      <table class="simple">
+        <tr><th>$k$</th><th>$P_1(k)$, $\lambda_1 = 1.0$</th><th>$P_2(k)$, $\lambda_2 = 0.2$</th><th>$\min$</th></tr>
+        <tr><td>0</td><td>0.36788</td><td>0.81873</td><td>0.36788</td></tr>
+        <tr><td>1</td><td>0.36788</td><td>0.16375</td><td>0.16375</td></tr>
+        <tr><td>2</td><td>0.18394</td><td>0.01637</td><td>0.01637</td></tr>
+        <tr><td>3</td><td>0.06131</td><td>0.00109</td><td>0.00109</td></tr>
+        <tr><td>4</td><td>0.01533</td><td>0.00005</td><td>0.00005</td></tr>
+      </table>
+      <p>The remaining terms are below $10^{-5}$ and can be dropped. The sum of the minima is $0.54914$, so
+      $$\varepsilon^\star = \tfrac12(0.54914) = 0.27457, \qquad \text{accuracy}^\star = 0.7254.$$</p>
+      <p>The Gaussian formula: $d' = 0.8/\sqrt{0.6} = 1.0328$, so $\Phi(0.5164) = 0.6972$.</p>
+      <p>The exact answer is <strong>higher</strong> by $0.028$: the true classifier does better than the formula predicts. In words — the optimal rule here is "call type 1 if you see <em>any</em> molecule at all" ($k^\star = 0.8/\log 5 = 0.497$, so the threshold is $x \ge 1$), and that rule exploits something the Gaussian picture cannot see: the enormous, discrete lump of probability that both distributions place on exactly zero. A continuous bell curve has no lumps, so it cannot represent the fact that the decision is really "zero or not zero", and it undersells the achievable accuracy.</p>
+      <p class="muted">This is the number quoted in Section 5 and asserted by <code>test_gaussian_approximation_degrades_at_low_rate</code>. It matters beyond Week 4: single-cell data is <em>mostly zeros</em>, so the regime where the Gaussian formula is pessimistic is not an exotic corner, it is where a lot of real genes live. Week 9 returns to this with dropout, and your report should say it plainly.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 4.5</span><span class="stars">★★</span></div>
+  <div class="ex-body">Under the equal-variance Gaussian model, prove $\mathrm{AUC} = \Phi(d'/\sqrt2)$ directly from the definition "$\mathrm{AUC}$ is the probability a random positive outscores a random negative". Then evaluate both $\Phi(d'/2)$ and $\Phi(d'/\sqrt2)$ at $d' = 2$ and say which is larger, with a one-sentence reason that does not mention algebra.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>Let $X_1 \sim \mathcal{N}(\lambda_1, \bar\lambda)$ and $X_2 \sim \mathcal{N}(\lambda_2, \bar\lambda)$ independently. The difference of independent normals is normal, with the means subtracting and the <em>variances adding</em>:
+      $$X_1 - X_2 \sim \mathcal{N}\big(\lambda_1 - \lambda_2,\ 2\bar\lambda\big).$$
+      Therefore
+      $$\mathrm{AUC} = P(X_1 \gt X_2) = P(X_1 - X_2 \gt 0) = \Phi\!\left(\frac{\lambda_1-\lambda_2}{\sqrt{2\bar\lambda}}\right) = \Phi\!\left(\frac{d'}{\sqrt2}\right),$$
+      using $P(\mathcal{N}(\mu,\sigma^2) \gt 0) = \Phi(\mu/\sigma)$ and $d' = (\lambda_1-\lambda_2)/\sqrt{\bar\lambda}$. (In the continuous model $P(X_1 = X_2) = 0$, so the tie term is absent.) <span class="qed">∎</span></p>
+      <p>At $d' = 2$: $\Phi(1) = 0.841$ is the accuracy, and $\Phi(2/1.414) = \Phi(1.414) = 0.921$ is the AUC. The AUC is larger. Why, without algebra: accuracy is judged against a fixed line that must be crossed, but AUC only asks the classifier to <em>rank</em> two cells correctly, and ranking is an easier job than absolute placement — a positive that scores badly can still beat a negative that scores worse.</p>
+      <p class="muted">Because AUC is systematically the friendlier number, papers quote it. Whenever you read an AUC in the literature, convert it: $d' = \sqrt2\,\Phi^{-1}(\mathrm{AUC})$, and then $\Phi(d'/2)$ tells you the accuracy that AUC actually corresponds to. An AUC of 0.90 sounds excellent and means $d' = 1.81$ and 82% accuracy.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 4.6</span><span class="stars">★★★</span></div>
+  <div class="ex-body">A classifier assigns the same score $s_0$ to all $n$ cells, of which $P$ are positive and $N$ negative. (a) What must its AUC be, on first principles? (b) Show that the naive "one step per cell in sorted order" construction gives AUC $=1$ if the positives happen to come first in the input and $0$ if they come last, and $\approx 0.5$ if the input order is random. (c) Show that collapsing ties — one ROC vertex per distinct score — gives exactly $0.5$ regardless of order. (d) Generalise: prove that the tie-collapsed AUC equals $P(X_1 \gt X_2) + \tfrac12 P(X_1 = X_2)$ for any pair of discrete score distributions.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) The score carries no information about the label, so no threshold can do better than chance and every threshold does exactly as well as every other. The ROC must be the diagonal and the AUC exactly $0.5$.</p>
+      <p>(b) Walking the sorted list one cell at a time, each positive moves the pen up by $1/P$ and each negative moves it right by $1/N$. If all $P$ positives are consumed first, the path goes from $(0,0)$ straight up to $(0,1)$ and then straight across to $(1,1)$: the area beneath is the full unit square, $\mathrm{AUC} = 1$. Reversed, the path goes right first and then up, enclosing nothing: $\mathrm{AUC} = 0$. For a random interleaving the path is a random walk hugging the diagonal, giving $\approx 0.5$ with fluctuations of order $1/\sqrt{n}$ — which is arguably worse than being reliably wrong, because it looks plausible.</p>
+      <p>(c) With ties collapsed there is exactly one distinct score, so the curve has exactly two vertices, $(0,0)$ and $(1,1)$, and the trapezoid rule between them gives the area of the triangle: $\tfrac12 \cdot 1 \cdot 1 = 0.5$. Order cannot enter, because the construction never looks at individual cells, only at groups sharing a score.</p>
+      <p>(d) Let the distinct scores be $s_1 \gt s_2 \gt \cdots \gt s_m$, with $a_j = P(X_1 = s_j)$ and $b_j = P(X_2 = s_j)$. After consuming groups $1..j$ the curve is at $x_j = \sum_{i \le j} b_i$, $y_j = \sum_{i\le j} a_i$. The trapezoid rule gives
+      $$\mathrm{AUC} = \sum_{j} (x_j - x_{j-1})\,\frac{y_j + y_{j-1}}{2} = \sum_j b_j\left(\sum_{i \lt j} a_i + \frac{a_j}{2}\right),$$
+      since $y_j = y_{j-1} + a_j$. The first term sums $b_j a_i$ over all pairs with $i \lt j$, i.e. over all pairs where the positive's score is <em>strictly higher</em> (scores are in decreasing order), giving $P(X_1 \gt X_2)$. The second term is $\tfrac12\sum_j a_j b_j = \tfrac12 P(X_1 = X_2)$. <span class="qed">∎</span></p>
+      <p class="muted">Part (d) explains why the trapezoid rule (and not the step-function rule) is the right integrator for an ROC: the diagonal segment across a tie group is precisely the "half credit for a tie" that the probabilistic definition demands. This is the derivation behind <code>roc_curve</code>'s <code>last_of_tie</code> line and <code>roc_auc</code>'s use of <code>np.trapezoid</code>, and it is worth a paragraph in your report, because integer counts tie constantly and any AUC you quote from real data depends on it.</p>
+    </div>
+  </details>
+</div>
+
+<h2>9 &nbsp;Research notebook</h2>
+
+<p>This week's entries, dated and in ink:</p>
+
+<ul>
+  <li>The four-step derivation of $\Phi(d'/2)$, written from memory, ending with the six-item assumption list. Then check it against Section 3 and note in the margin whatever you dropped — that is the part you do not really understand yet.</li>
+  <li>The $\Phi$ table from Section 3, copied out, plus the $d'$ column. You will use it every week from here to Week 15.</li>
+  <li>Exercise 4.4's hand computation in full, including the little table. It is the first time in this project that your pencil and your computer are computing the same quantity two different ways.</li>
+  <li>One paragraph, in your own words, answering: "why does this project compare things in $d'$ rather than in accuracy?" Your Week 15 audience will ask this.</li>
+  <li>Add to the <strong>"assumptions I am making"</strong> list: <em>the counts are large enough for the Gaussian approximation</em>, and <em>the two variances are close enough to pool</em>. Note next to each the measurement from Section 5 that bounds how badly it hurts.</li>
+</ul>
+
+<p>Scan to <code>notebook/week04/</code>, and fill in <code>progress/week04.md</code> from <code>progress/TEMPLATE.md</code>, including the seed (104) and the largest Gaussian-versus-exact discrepancy the experiment printed.</p>
+
+<div class="box verify">
+  <span class="box-tag">Verification this week (with mentor)</span>
+  <ul>
+    <li>At the whiteboard, unprompted: the two bell curves at $\pm d'/2$, the threshold at 0, and the conclusion $\Phi(d'/2)$ — including <em>why</em> the threshold is at 0 and not somewhere else.</li>
+    <li>You state $\Phi(0)$, $\Phi(1)$ and $\Phi(1.96)$ from memory, and give the accuracy at $d' = 2$ without a calculator.</li>
+    <li>You explain why the exact error is $\tfrac12\sum_k\min(P_1,P_2)$ — specifically, why the <em>minimum</em> and why the $\tfrac12$.</li>
+    <li>You show <code>figures/week04_accuracy_curve.png</code> and say, pointing at it, where the Gaussian approximation fails and where it does not, with numbers.</li>
+    <li>You explain the ROC tie problem well enough that your mentor could reproduce the failure on purpose.</li>
+    <li><code>pytest tests/test_detection.py</code> runs, and every test that does not depend on Week 5's functions is green.</li>
+  </ul>
+</div>
+
+<h2>10 &nbsp;Going deeper</h2>
+<ul>
+  <li>Green &amp; Swets, <em>Signal Detection Theory and Psychophysics</em> (1966), chapter 1. <span class="muted">The book that invented $d'$ and the ROC, written for psychologists rather than mathematicians. Read the first chapter only; it is the clearest statement of what "detection" means that anyone has written.</span></li>
+  <li>Wickens, <em>Elementary Signal Detection Theory</em> (2002), chapters 2–3. <span class="muted">The modern textbook version, with the equal-variance model spelled out and the unequal-variance case done properly — which is exactly the assumption you pooled away in Step 2.</span></li>
+  <li>Fawcett (2006), <em>An introduction to ROC analysis</em>, <em>Pattern Recognition Letters</em> 27(8). <span class="muted">Twenty pages, free online, and section 4 is the definitive treatment of ties and of why AUC equals the ranking probability. Read it before you write <code>roc_curve</code>.</span></li>
+  <li>Hanley &amp; McNeil (1982), <em>The meaning and use of the area under a ROC curve</em>, <em>Radiology</em> 143. <span class="muted">The original source for the ranking interpretation, in a medical-imaging context where the cost of a false negative is a missed tumour. Two pages of it will change how you read the word "accuracy" in a paper.</span></li>
+  <li>Course extras: <a href="../extras/notation.html">notation card</a> · <a href="../extras/glossary.html">glossary</a> · <a href="../extras/problem-bank.html">problem bank</a> (the $\Phi$ and ROC drills) · <a href="../extras/unstuck.html">how to get unstuck</a></li>
+</ul>
+
+</div>
+
+<footer class="site">How Much Data Does It Take to Tell Two Cell Types Apart? · Week 4 · <a href="../index.html">Course home</a></footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  /* ---------------- Lab 1: two Poissons and a movable threshold ---------- */
+  (function () {
+    const RATES = [0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200];
+    const FOLDS = [1.2, 1.4, 2.0, 3.0, 5.0];
+    let ri = 5, fi = 1, z = 0;
+    const NSIM = 4000;
+    let zs = null;
+
+    function pmf(lam, hi) {                       // p[k] by the recurrence
+      const p = [Math.exp(-lam)];
+      for (let k = 1; k <= hi; k++) p.push(p[k - 1] * lam / k);
+      return p;
+    }
+
+    function run() {
+      const l2 = RATES[ri], l1 = FOLDS[fi] * l2;
+      const lbar = 0.5 * (l1 + l2), sd = Math.sqrt(lbar);
+      const hi = Math.max(8, Math.ceil(l1 + 5 * Math.sqrt(l1) + 4));
+      const t = Math.max(0, Math.min(hi + 1, Math.round(lbar + z * sd)));
+      const p1 = pmf(l1, hi), p2 = pmf(l2, hi);
+
+      let errT = 0, errStar = 0;
+      for (let k = 0; k <= hi; k++) {
+        errT += 0.5 * (k >= t ? p2[k] : p1[k]);
+        errStar += 0.5 * Math.min(p1[k], p2[k]);
+      }
+      const r = CD.rng(104000 + 91 * ri + fi);    // seeded: same picture every load
+      let ok = 0;
+      for (let i = 0; i < NSIM; i++) {
+        if (CD.poisson(l1, r) >= t) ok++;
+        if (CD.poisson(l2, r) < t) ok++;
+      }
+      const dp = CD.dPrime(l1, l2);
+      const ymax = 1.15 * Math.max(Math.max.apply(null, p1), Math.max.apply(null, p2));
+
+      const P = CD.plot("lab1", { xmin: -0.5, xmax: hi + 0.5, ymin: 0, ymax: ymax,
+                                  xlabel: "count x for this one gene",
+                                  ylabel: "probability" });
+      P.clear(); P.axes();
+      const bar = (k, h, fill) => {
+        const x0 = P.X(k - 0.5), x1 = P.X(k + 0.5), y = P.Y(h);
+        P.ctx.fillStyle = fill; P.ctx.fillRect(x0, y, Math.max(1, x1 - x0), P.Y(0) - y);
+      };
+      for (let k = 0; k <= hi; k++) {
+        bar(k, p1[k], "rgba(37,99,235,0.40)");    // type 1, blue
+        bar(k, p2[k], "rgba(124,58,237,0.40)");   // type 2, purple
+        if (k < t) bar(k, p1[k], "rgba(185,28,28,0.45)");   // missed type 1
+        else bar(k, p2[k], "rgba(185,28,28,0.45)");         // false type 1
+      }
+      P.vline(t - 0.5, "call type 1 from here →", { color: CD.C.navy, width: 2 });
+      P.label(hi * 0.62, ymax * 0.93, "type 1: λ₁ = " + l1.toFixed(2), { color: CD.C.blue });
+      P.label(hi * 0.62, ymax * 0.85, "type 2: λ₂ = " + l2.toFixed(2), { color: CD.C.purple });
+
+      CD.table("lab1out",
+        ["quantity", "value"],
+        [["d' = |λ₁−λ₂|/√λ̄", dp.toFixed(3)],
+         ["threshold used (integer count)", "x ≥ " + t],
+         ["accuracy at this threshold (exact sum)", (1 - errT).toFixed(4)],
+         ["measured on " + NSIM + " + " + NSIM + " simulated cells", (ok / (2 * NSIM)).toFixed(4)],
+         ["best possible (exact, ½Σ min)", (1 - errStar).toFixed(4)],
+         ["Gaussian formula Φ(d'/2)", CD.accuracyFromDPrime(dp).toFixed(4)]]);
+    }
+
+    CD.slider("lab1ctl", { label: "λ₂ (weaker type)", min: 0, max: RATES.length - 1,
+                           step: 1, value: ri, fmt: i => RATES[i] }, i => { ri = i; run(); });
+    CD.slider("lab1ctl", { label: "fold change λ₁/λ₂", min: 0, max: FOLDS.length - 1,
+                           step: 1, value: fi, fmt: i => FOLDS[i].toFixed(1) }, i => { fi = i; run(); });
+    zs = CD.slider("lab1ctl", { label: "threshold, in √λ̄ from the midpoint", min: -3, max: 3,
+                                step: 0.05, value: 0, fmt: v => (+v).toFixed(2) }, v => { z = v; run(); });
+    CD.button("lab1ctl", "Snap to the exact optimum", () => {
+      const l2 = RATES[ri], l1 = FOLDS[fi] * l2, lbar = 0.5 * (l1 + l2);
+      const kstar = (l1 - l2) / Math.log(l1 / l2);
+      zs.set(((Math.ceil(kstar) - lbar) / Math.sqrt(lbar)).toFixed(2));
+    }, true);
+  })();
+
+  /* ---------------- Lab 2: ROC from sampled counts, and ties ------------- */
+  (function () {
+    const RATES = [0.5, 1, 2, 5, 10, 20];
+    const FOLDS = [1.2, 1.5, 2.0, 3.0];
+    let ri = 3, fi = 1;
+    const N = 2000;
+
+    function phiInv(p) {                          // bisection on CD.Phi
+      let lo = -9, hi = 9;
+      for (let i = 0; i < 60; i++) { const m = 0.5 * (lo + hi); if (CD.Phi(m) < p) lo = m; else hi = m; }
+      return 0.5 * (lo + hi);
+    }
+
+    function run() {
+      const l2 = RATES[ri], l1 = FOLDS[fi] * l2;
+      const r = CD.rng(4104 + 31 * ri + fi);
+      const scores = [], labels = [];
+      for (let i = 0; i < N; i++) { scores.push(CD.poisson(l1, r)); labels.push(1); }
+      for (let i = 0; i < N; i++) { scores.push(CD.poisson(l2, r)); labels.push(0); }
+
+      /* Tie-aware ROC: one vertex per DISTINCT score, trapezoid area. */
+      const tally = new Map();
+      scores.forEach((s, i) => {
+        const e = tally.get(s) || [0, 0];
+        e[labels[i]]++; tally.set(s, e);
+      });
+      const keys = Array.from(tally.keys()).sort((a, b) => b - a);
+      let tp = 0, fp = 0, auc = 0, px = 0, py = 0;
+      const pts = [[0, 0]];
+      keys.forEach(k => {
+        const e = tally.get(k);
+        fp += e[0]; tp += e[1];
+        const x = fp / N, y = tp / N;
+        auc += (x - px) * (y + py) / 2;
+        pts.push([x, y]); px = x; py = y;
+      });
+      const naive = CD.roc(scores, labels).auc;   // ties broken by input order
+      const dTrue = CD.dPrime(l1, l2), dRec = Math.SQRT2 * phiInv(auc);
+
+      const P = CD.plot("lab2", { xmin: 0, xmax: 1, ymin: 0, ymax: 1,
+                                  xlabel: "false positive rate (type 2 called type 1)",
+                                  ylabel: "true positive rate" });
+      P.clear(); P.axes();
+      P.line([[0, 0], [1, 1]], { color: CD.C.gray, dash: [5, 4] });
+      P.funcPlot(x => CD.Phi(phiInv(Math.min(Math.max(x, 1e-6), 1 - 1e-6)) + dTrue),
+                 { color: CD.C.orange, width: 2.5 });
+      P.line(pts, { color: CD.C.blue, width: 2.5 });
+      P.scatter(pts, { color: CD.C.blue, r: 2.5 });
+      P.label(0.42, 0.22, "orange: Gaussian model", { color: CD.C.orange });
+      P.label(0.42, 0.13, "blue: " + (2 * N) + " simulated cells", { color: CD.C.blue });
+
+      CD.table("lab2out",
+        ["quantity", "value"],
+        [["λ₁, λ₂", l1.toFixed(2) + ", " + l2.toFixed(2)],
+         ["true d' from the rates", dTrue.toFixed(3)],
+         ["AUC, ties shared (honest)", auc.toFixed(4)],
+         ["Φ(d'/√2), what theory predicts", CD.Phi(dTrue / Math.SQRT2).toFixed(4)],
+         ["d' recovered = √2 Φ⁻¹(AUC)", dRec.toFixed(3)],
+         ["AUC with ties broken by input order", naive.toFixed(4)],
+         ["accuracy predicted, Φ(d'/2)", CD.accuracyFromDPrime(dTrue).toFixed(4)]]);
+    }
+
+    CD.slider("lab2ctl", { label: "λ₂ (weaker type)", min: 0, max: RATES.length - 1,
+                           step: 1, value: ri, fmt: i => RATES[i] }, i => { ri = i; run(); });
+    CD.slider("lab2ctl", { label: "fold change λ₁/λ₂", min: 0, max: FOLDS.length - 1,
+                           step: 1, value: fi, fmt: i => FOLDS[i].toFixed(1) }, i => { fi = i; run(); });
+    CD.button("lab2ctl", "Resample", () => { run(); }, true);
+  })();
+});
+</script>
+</body>
+</html>

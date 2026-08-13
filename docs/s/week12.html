@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 12 — The Beads, and Three Lines of Evidence</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="week11.html">← Week 11</a><a href="week13.html">Week 13 →</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Week 12</span>
+      <span class="badge mile">MILESTONE M5 · CENTREPIECE</span>
+      <span class="badge aim3">Aim 3 · Physical analog</span>
+      <span class="badge win">git tag <code>evidence-complete</code></span>
+    </div>
+    <h1 class="chapter-title">The Beads, and Three Lines of Evidence</h1>
+    <div class="chapter-sub">Validate before you plot · convert accuracy to $d'$ before you fit · the dropout collapse · and every line of evidence in the project on one pair of log-log axes</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<h2>Objectives</h2>
+<ul class="objectives">
+  <li>Validate the bead tally before producing any figure, and state what each of the four checks in <code>validate_tally</code> is protecting against.</li>
+  <li>Put a Wilson interval on every measured accuracy and explain, with a number, why 40 trials per point makes those intervals wide.</li>
+  <li>Explain why fitting a power law to accuracy is meaningless, and convert measured accuracy to $d'$ by inverting $\Phi(d'/2)$ before fitting.</li>
+  <li>Fit $\log d'$ against $\log n$, report the exponent with an interval, and compare it against the predicted $0.5$.</li>
+  <li>Handle points at or below chance correctly: drop them, and report how many were dropped.</li>
+  <li>Show the dropout arm collapsing onto the plain arm when plotted against effective $n$, and state the first-order caveat.</li>
+  <li>Produce the three-lines-of-evidence figure with all four fitted exponents, and explain out loud why the vertical offsets between the lines mean nothing.</li>
+  <li>Pass milestone M5 and tag <code>evidence-complete</code>, or state precisely why not.</li>
+</ul>
+
+<h2>1 &nbsp;Where the project stands</h2>
+
+<p>Three arms, three ways of being wrong, and this is the week they meet.</p>
+
+<p>Aim 1 closed in Week 5 with a derivation: $d' \propto \sqrt{\text{depth}\times k}$ and accuracy $= \Phi(d'/2)$, with no free parameters. Aim 2's simulation half closed in Week 9, when the simulator reproduced the theory across a depth sweep and a dropout collapse; its real-data half closed last week, when the theory met overdispersion and acquired a ceiling. Aim 3 has been sitting on a table in a pile of tally sheets since Week 6, when you designed it, and you have been drawing beads through Weeks 11 and 12.</p>
+
+<p>Today you analyse those sheets, and then you put all of it on one figure. That figure is the centrepiece of the poster, the centrepiece of the report, and the thing you will be pointing at in Week 15 when someone asks what you did.</p>
+
+<div class="box bead">
+  <span class="box-tag">The experiment, restated</span>
+  <p>Two jars of beads. A helper draws $n$ beads from a pre-randomized jar, with replacement, and shows them to you; you count the reds and say which jar. Repeat, at $n \in \{10, 25, 50, 100, 200\}$, roughly 40 trials per point, in two arms: plain, and with a dropout rule that discards 30% of the drawn beads before you look.</p>
+  <p>The prediction, from Week 6, is the same square-root law with the binomial variance in place of the Poisson one:</p>
+  $$d'(n) = \sqrt n\,\frac{|p_A - p_B|}{\sqrt{\bar p(1-\bar p)}}, \qquad \text{accuracy} = \Phi(d'/2).$$
+  <p>Nothing is fitted. The prediction was written down before a single bead was drawn, which is what makes today a test rather than a description.</p>
+</div>
+
+<h2>2 &nbsp;Validate first. Every time. Before any plot.</h2>
+
+<p>The tally sheets are the only data in this project that cannot be regenerated. If a figure is wrong you rerun a script; if a tally is wrong you have lost an afternoon of bead-drawing that you are not going to redo. So the order of operations is not negotiable: <strong>load, validate, read the problems, fix or document, and only then plot.</strong></p>
+
+<p>You wrote <code>validate_tally</code> in Week 6, before any data existed. That timing was the point, and it is worth restating why: <em>a validator written after you have seen the data tends to be a validator that happens to accept the data you got.</em> Yours was written blind, so it is an honest test.</p>
+
+<div class="box definition">
+  <span class="box-tag">The four checks, and what each is protecting against</span>
+  <ol>
+    <li><strong><code>correct</code> disagrees with <code>true_jar == guess</code>.</strong> The <code>correct</code> column is deliberately redundant — it is a <strong>checksum</strong>. A hand-written tally sheet transcribed into a CSV at nine in the evening will contain typing errors, and a typo in <code>guess</code> that is not matched by a typo in <code>correct</code> shows up here instead of silently shifting your accuracy. This is the check that fires most often in practice.</li>
+    <li><strong>A jar label outside $\{A, B\}$.</strong> Usually a stray character or an empty cell from a row you did not finish. Caught first, because every later check assumes the labels are meaningful.</li>
+    <li><strong>Duplicate <code>(run, trial)</code> pairs.</strong> A copy-paste slip while typing up the sheet, which double-counts one trial and drops another. The fingerprint is a duplicated row in the middle of a block.</li>
+    <li><strong>A run whose <code>true_jar</code> never changes.</strong> The quiet catastrophe. If the helper stopped randomizing — used the same jar for a whole block, or handed you the sheet uncovered — the experiment is destroyed and nothing else in the data will tell you. A run of 40 identical labels is not bad luck; the chance of it under fair randomization is $2^{-39}$.</li>
+  </ol>
+</div>
+
+<p><code>week12_beads.py</code> runs the validator before it draws anything, and prints either <code>tally validates clean.</code> or a numbered list of problems with CSV line numbers. Read that output every time, including the times you are certain it is fine.</p>
+
+<div class="box pitfall">
+  <span class="box-tag">What to do when the validator fires</span>
+  <p><strong>Do not edit the committed CSV to make the message go away.</strong> The rule from <code>data/beads/README.md</code> is rule 4, and it exists because the alternative is how a null result quietly becomes a positive one.</p>
+  <p>Instead: (i) go back to the photographed paper sheet in <code>notebook/beads/</code>; (ii) if the paper is unambiguous, correct the transcription and record the correction in <code>progress/week12.md</code>, naming the line and the change; (iii) if the paper is ambiguous, keep the row and note it as an unresolved discrepancy; (iv) if a whole run is compromised — the unrandomized case — exclude that run by name in the analysis, say so in the report, and state how many trials that cost you. Every one of those four is defensible in front of a reviewer. Silently editing the file is not.</p>
+</div>
+
+<h2>3 &nbsp;Error bars on every point, and they will be wide</h2>
+
+<p>Each point on the accuracy plot is $k$ correct out of $t$ trials, with $t \approx 40$. That is a proportion from a small sample, and it needs an interval. The interval this project uses everywhere is the <strong>Wilson score interval</strong>, which Week 13 derives properly; today you use it, and <code>stats.wilson_interval(k, n, z=1.96)</code> is on the list of functions to have working by Friday.</p>
+
+<div class="box example">
+  <span class="box-tag">How wide is wide? Work one point</span>
+  <p>Suppose at $n = 100$ you get 28 correct out of 40, an accuracy of $0.700$. With $z = 1.96$, $z^2 = 3.8416$:</p>
+  $$\text{denominator} = 1 + \frac{3.8416}{40} = 1.09604, \qquad \text{centre} = \frac{0.700 + 3.8416/80}{1.09604} = \frac{0.74802}{1.09604} = 0.68248,$$
+  $$\text{half-width} = \frac{1.96\sqrt{\frac{0.7\times0.3}{40} + \frac{3.8416}{6400}}}{1.09604} = \frac{1.96\times0.076487}{1.09604} = 0.13678.$$
+  <p>So the interval is $[0.546,\ 0.819]$. <strong>Your measured 70% is consistent with anything from 55% to 82%.</strong> The theory says $0.703$ at that point, which is comfortably inside — and so is almost everything else.</p>
+</div>
+
+<p>That is what 40 trials buys, and you knew it in Week 6: the design calculation said 350 trials per point would be needed to pin an accuracy to $\pm0.05$, and 350 per point was not physically possible. <strong>The figure must show this.</strong> Plot the error bars, make them visible, and do not apologize for them. A figure with honest wide intervals is a scientific document; the same figure with the intervals omitted is a decoration.</p>
+
+<h2>4 &nbsp;The conversion that makes the whole comparison possible</h2>
+
+<p>Now the central methodological idea of the week, and the one that separates a report that works from one that does not.</p>
+
+<p>You want to test the exponent. The natural move is to fit a power law: put $\log(\text{accuracy})$ on one axis, $\log n$ on the other, fit a straight line, read the slope, compare it to $0.5$. <strong>Do not do this.</strong> It is wrong, and it is wrong in a way that produces a number, which is the dangerous kind of wrong.</p>
+
+<div class="box warning">
+  <span class="box-tag">Why fitting a power law to accuracy is meaningless</span>
+  <p><strong>Accuracy saturates at 1.</strong> A power law $y = c\,n^{\alpha}$ with $\alpha > 0$ grows without bound; accuracy cannot exceed 1, and it approaches 1 asymptotically. So no power law describes an accuracy curve, and the slope you fit is not an estimate of anything — it is a number that depends on where along the saturating curve your points happen to sit.</p>
+  <p>Concretely, with the planned jars ($p_A = 0.30$, $p_B = 0.35$) the <em>exact theoretical</em> accuracies at $n = 10, 25, 50, 100, 200$ are $0.5670$, $0.6052$, $0.6471$, $0.7032$, $0.7748$. Fit $\log(\text{accuracy})$ against $\log n$ through those five <em>perfect</em> values and the slope comes out at</p>
+  $$\alpha_{\text{acc}} = 0.104.$$
+  <p>Not $0.5$. Not close to $0.5$. And the theory used to generate those points was exactly $d' \propto \sqrt n$ — so a fit that returns $0.104$ when the truth is $0.5$ is not measuring the truth.</p>
+  <p>Worse: it is not even a stable wrong answer. Change the jars to $30\%$ vs $40\%$, leaving the underlying law completely untouched, and the theoretical accuracies become $0.630$, $0.700$, $0.771$, $0.853$, $0.931$, and the same fit returns</p>
+  $$\alpha_{\text{acc}} = 0.132.$$
+  <p><strong>The fitted "exponent" changed because you changed the beads.</strong> A quantity that moves when the law does not is not a measurement of the law.</p>
+</div>
+
+<p>The fix is to undo the saturation. Accuracy is a squashed version of $d'$, and you know the squashing function exactly, so invert it.</p>
+
+<div class="box theorem">
+  <span class="box-tag">Accuracy back to $d'$</span>
+  <p>Week 4 established $\text{accuracy} = \Phi(d'/2)$ for the optimal rule with equal priors. $\Phi$ is strictly increasing, so it has an inverse, and</p>
+  $$\boxed{\;d' = 2\,\Phi^{-1}(\text{accuracy}).\;}$$
+  <p>In code this is <code>_accuracy_to_dprime</code> in <code>week12_beads.py</code>, which uses the identity $\Phi^{-1}(p) = \sqrt2\,\mathrm{erf}^{-1}(2p - 1)$ and therefore
+  $d' = 2\sqrt2\,\mathrm{erf}^{-1}(2p-1)$, with <code>scipy.special.erfinv</code> doing the work.</p>
+  <p>Then, and only then, fit $\log d'$ against $\log n$. Because $d' = c\sqrt n$ genuinely <em>is</em> a power law with no ceiling, that fit has a slope which means something, and the prediction is that it equals $\tfrac12$.</p>
+</div>
+
+<p>Say the whole argument in one sentence, because you will need it in the talk: <strong>"Accuracy saturates and $d'$ does not, so I convert every measured accuracy back to $d'$ before fitting the exponent; that is what makes the exponent comparable across experiments with completely different units of data."</strong> The second half of that sentence is what Section 7's figure depends on.</p>
+
+<div class="box pitfall">
+  <span class="box-tag">Points at or below chance, and the silent drop</span>
+  <p>$\Phi^{-1}(0.5) = 0$ and $\Phi^{-1}(p) &lt; 0$ for $p &lt; 0.5$. So a point where you scored at or below chance converts to $d' \le 0$ — and there is no such thing as $\log$ of a non-positive number. It cannot go on the log-log plot.</p>
+  <p>This <em>will</em> happen. At $n = 10$ the true accuracy is about $0.567$, and the standard error on 40 trials is $\sqrt{0.567\times0.433/40} = 0.078$, so scoring at or below $0.5$ requires only a $0.86$-sigma downward fluctuation — <strong>which happens roughly one time in five</strong>. In a two-arm experiment with five points each, expect to lose a point sometimes.</p>
+  <p>What to do: <strong>drop those points, and report how many you dropped and which ones.</strong> The code already does the first half — <code>_accuracy_to_dprime</code> returns <code>nan</code>, the caller masks with <code>np.isfinite</code>, and <code>fit_power_law</code> raises a <code>ValueError</code> rather than silently returning a NaN if fewer than two points survive. The second half is yours: the script prints <code>(N point(s) at or below chance dropped)</code> next to the fitted exponent, and that number belongs in the figure caption.</p>
+  <p><strong>A silent drop is a lie.</strong> Not a small one, either: the dropped points are systematically the low-$n$ ones, which are the left-hand end of the fit, so dropping them without saying so biases the fitted slope and hides the fact that you did it. One clause in the caption — "one point at $n = 10$ in the dropout arm fell at or below chance and is excluded" — costs nothing and is the difference between an honest figure and a dishonest one.</p>
+</div>
+
+<div class="lab">
+  <div class="lab-title">Lab 1 · The whole bead pipeline, in the browser</div>
+  <div class="lab-desc">This runs your actual design: simulated draws at $n \in \{10, 25, 50, 100, 200\}$ with a helper who randomizes properly and a guesser who uses the optimal threshold. It tallies, puts a Wilson interval on every point, converts to $d'$, drops non-positive points, fits the exponent, and bootstraps an interval on the fit. <strong>Press "run again" five times and watch the fitted slope bounce.</strong> That bouncing is not a defect of the lab; it is the honest sampling variability of the experiment you are about to analyse for real.</div>
+  <canvas id="w12lab1" height="340"></canvas>
+  <div class="controls" id="w12lab1ctl"></div>
+  <div class="readout" id="w12lab1out"></div>
+</div>
+
+<p>Run it a dozen times at 40 trials per point with the 30/35 jars and note the range of slopes you see. Then push the trials slider to 160 and do it again. The distribution tightens like $1/\sqrt{\text{trials}}$, exactly as everything else in this project does, and the number of dropped points falls too. This lab is the cheapest possible way to calibrate your expectations before you look at your real numbers — and looking at it <em>before</em> the real fit protects you from the very human tendency to be delighted by 0.51 and disappointed by 0.38 when both are the same result.</p>
+
+<h2>5 &nbsp;The dropout arm, and the second collapse</h2>
+
+<p>Half your trials were run with a discard rule: draw $n$ beads, throw away each one with probability $q = 0.30$, then look at what is left. That arm exists to test, physically, the theorem you proved in Week 9.</p>
+
+<div class="box theorem">
+  <span class="box-tag">Dropout is a relabelling of the $n$ axis</span>
+  <p>Each drawn bead survives independently with probability $1-q$, so the number of survivors is $\mathrm{Binomial}(n, 1-q)$, with mean $n(1-q)$; and each survivor is still an unbiased draw from the jar, because the discard rule does not look at the bead's colour. To first order, dropout at rate $q$ therefore replaces $n$ by the <strong>effective draw size</strong> $n_{\rm eff} = n(1-q)$:</p>
+  $$d'(n, q) = \sqrt{n(1-q)}\,\frac{|p_A-p_B|}{\sqrt{\bar p (1-\bar p)}}.$$
+  <p><strong>The prediction, which is what the figure tests:</strong> plot both arms against nominal $n$ and they are two separate curves; plot them against $n(1-q)$ and <em>they must lie on top of each other</em>. Same collapse as Week 9's dropout figure, on a different substrate, with no software involved. <code>test_bead_d_prime_dropout_is_reduced_n</code> asserts the identity $d'(100, q{=}0.5) = d'(50, 0)$ to twelve decimal places.</p>
+</div>
+
+<p>Note carefully what "to first order" is doing there, because it is exercise 12.3 and because an alert reviewer will ask. The number of survivors is <em>itself random</em>: at $n = 200$ and $q = 0.3$ you expect 140 survivors with a standard deviation of $\sqrt{200\times0.3\times0.7} = 5.9$, so about 4% relative. Replacing the random survivor count by its mean is an approximation, and whether the extra variability matters at your $n$ is a question you can answer rather than wave at.</p>
+
+<h2>6 &nbsp;The figure of the project</h2>
+
+<p>Here is what Week 12 is really for. Four lines of evidence about the same claim, from four completely different sources, on one pair of log-log axes, in $d'$ space:</p>
+
+<table class="simple">
+  <tr><th>Line</th><th>Colour</th><th>Its "amount of data" axis</th><th>Where it comes from</th></tr>
+  <tr><td>Theory</td><td>orange</td><td>$n$ or depth $D$</td><td>Weeks 3–5, derived, exact</td></tr>
+  <tr><td>Simulation</td><td>blue</td><td>depth $D$, molecules per cell</td><td>Weeks 7–9, measured on synthetic cells</td></tr>
+  <tr><td>Real data</td><td>teal</td><td>reads kept $\times$ library size</td><td>Weeks 10–11, measured on PBMC 3k</td></tr>
+  <tr><td>Beads</td><td>magenta</td><td>beads drawn $\times (1-q)$</td><td>Week 12, measured on a table</td></tr>
+</table>
+
+<p>Each line gets a fitted exponent and a confidence interval on that exponent. The claim of the entire project is that those four numbers agree, and agree with $0.5$ — except where Week 11 says they should not, which is the real-data arm past its knee, and <em>that disagreement is a result too</em>.</p>
+
+<div class="box warning">
+  <span class="box-tag">The vertical offsets are meaningless. Say so three times.</span>
+  <p>The four lines sit at different heights on the plot, and <strong>those heights cannot be compared</strong>, because the horizontal axis means something different for each one. A "unit of data" is one bead for the magenta line and one captured molecule for the blue one. The intercept of a log-log fit is $\log c$ where $d' = c\,x^{\alpha}$, and $c$ carries the units; changing beads to dozens-of-beads shifts the magenta line vertically without changing anything real.</p>
+  <p><strong>Only the slopes are comparable.</strong> The slope is dimensionless: it says "multiply the data by 10 and $d'$ multiplies by $10^{\alpha}$", and that statement survives any change of unit.</p>
+  <p>This must be stated <strong>in the figure caption</strong>, <strong>on the poster</strong>, and <strong>out loud in the talk</strong>, before anyone asks. Not because it is a weakness — it is not, it is a correct and unavoidable property of the comparison — but because it is the first thing a sharp reviewer will notice, and <em>the person who points it out gets to frame it</em>. If you say it first, it is a methodological note. If they say it first, it is a hole they found. Same fact, opposite consequence, and the difference costs you one sentence.</p>
+  <p>Suggested caption wording: "All four arms are plotted in $d'$ space on log-log axes. The horizontal axis is each arm's own measure of data volume (molecules, reads, beads), so the vertical offsets between the lines carry only unit conversions and are not comparable; only the fitted slopes, which are dimensionless, are being compared."</p>
+</div>
+
+<div class="lab">
+  <div class="lab-title">Lab 2 · Four lines of evidence, built live</div>
+  <div class="lab-desc">Simulated stand-ins for each arm, all converted into $d'$ and plotted on the same log-log axes with their fitted exponents printed. Orange is exact theory; blue simulates Poisson cells; teal simulates overdispersed cells (gamma–Poisson, $\varphi = 3$, chosen so that the knee falls inside the plotted range) as a stand-in for real data; magenta simulates bead draws. Watch the slopes: three of them should land near $0.5$, and one of them should not, for the reason Week 11 gave.</div>
+  <canvas id="w12lab2" height="360"></canvas>
+  <div class="controls" id="w12lab2ctl"></div>
+  <div class="readout" id="w12lab2out"></div>
+</div>
+
+<p>Notice the shape of what the lab shows. The teal line is not parallel to the others: it starts with the same slope and bends, because past the knee $d'$ saturates. On log-log axes a saturating quantity has a slope tending to zero, so <strong>fitting a single exponent to a curve that bends gives you an exponent that depends on where you fitted it</strong>. That is not a flaw in the analysis; it is the Week 11 result appearing in Week 12's coordinates, and it is exactly the kind of cross-week consistency that makes a report feel like one argument rather than eight.</p>
+
+<h2>7 &nbsp;What each line of evidence can and cannot be wrong about</h2>
+
+<p>This section is the intellectual heart of the project and it takes ten minutes to learn and pays for the whole year. Four arms, four different failure modes, and — crucially — <strong>the failure modes do not overlap</strong>. That is why four mediocre pieces of evidence are worth more than one good one.</p>
+
+<table class="simple">
+  <tr><th>Arm</th><th>Can be wrong about</th><th>Cannot be wrong about</th></tr>
+  <tr><td><strong>Theory</strong></td>
+      <td>The world. Every assumption — Poisson counts, identical cells within a type, independent genes, gene-blind dropout — is a claim about reality that could be false, and one of them demonstrably is.</td>
+      <td>Itself. Given its assumptions, the algebra is either right or it is not, and a second person can check it in an afternoon.</td></tr>
+  <tr><td><strong>Simulation</strong></td>
+      <td>The theory. A simulator is a second implementation of your own beliefs, and it can disagree with the formula because one of them has a bug. That is what it is <em>for</em>.</td>
+      <td>The world, in either direction — it never touched the world. A simulator that agrees with your theory proves your arithmetic, not your biology.</td></tr>
+  <tr><td><strong>Real data</strong></td>
+      <td>The labels (Week 10: they are cluster annotations, not measurements), the preprocessing, the donor, the protocol, the choice of two cell types.</td>
+      <td>Whether cells are real. Whatever else is uncertain, these counts came off a machine that sequenced actual human blood.</td></tr>
+  <tr><td><strong>Beads</strong></td>
+      <td>Nothing except the experimenter. No software, no biology, no annotation, no model of capture efficiency. If the beads disagree with the theory, either the sampling mathematics is wrong or somebody miscounted.</td>
+      <td>Almost everything else — which is also its limitation: it contains no biology at all, so it is evidence about the sampling law and about nothing else.</td></tr>
+</table>
+
+<div class="box bead">
+  <span class="box-tag">Why the beads are worth the tedium</span>
+  <p>Six to ten hours of counting plastic beads, for 400 trials and error bars you can drive a bus through. Here is the argument for having done it, and you should be able to give it in thirty seconds.</p>
+  <p>The simulator and the theory share an author. If you misunderstood the sampling mathematics, you misunderstood it in both places, and they will agree beautifully while both being wrong. There is no internal check that can catch this: it is the software-engineering equivalent of proofreading your own writing.</p>
+  <p><strong>The beads cannot have that bug.</strong> They are physical. Nobody wrote them. If the square-root law shows up in a jar of beads on a kitchen table, then the law is a property of random sampling and not a property of your Python — and that conclusion is unavailable from any amount of additional simulation, at any level of care.</p>
+  <p>The sentence to have ready, from Week 6 and worth repeating verbatim: <em>"The bead experiment tests the sampling law in isolation, with no software and no biological assumptions. It agrees with the prediction to within its error bars, which rules out an error in the mathematics and localises any disagreement with real data to the biology."</em></p>
+</div>
+
+<h2>8 &nbsp;What if your exponent is 0.3? Or 0.7?</h2>
+
+<p>It might be. Let us be completely concrete about what your design can and cannot resolve, so that you meet the number with the right expectations.</p>
+
+<p>Lab 1 answers this empirically: run it repeatedly at 40 trials per point and record the slopes. With the $30\%$/$35\%$ jars you will find the fitted exponent scattering with a standard deviation of roughly $0.25$ — the middle of the distribution sits near $0.5$, but individual runs anywhere from about $0.1$ to about $0.9$ are entirely ordinary. <span class="claim observed">observed</span> With the $30\%$/$40\%$ jars recommended in Week 6 the scatter is noticeably tighter, because the effect is bigger relative to the same noise.</p>
+
+<div class="box warning">
+  <span class="box-tag">Report the interval. Do not round it to 0.5.</span>
+  <p>If your fit returns $0.34$ with a bootstrap interval of $[0.05, 0.71]$, the honest sentence is:</p>
+  <p style="margin-left:1em"><em>"The bead experiment gives a fitted exponent of $0.34$ with a 95% bootstrap interval of $[0.05, 0.71]$, consistent with the predicted $0.5$. The interval is wide because the design provides only ~40 trials per point; the Week 6 power calculation anticipated this and the fallback options are discussed there."</em></p>
+  <p>Three things that sentence does. It gives the number you got, not the number you wanted. It gives the interval, so a reader can judge for themselves. And it says <em>why</em> the interval is wide, with a forward reference to the fact that you predicted the width in advance — which converts "my experiment was underpowered" into "my experiment was correctly characterized before I ran it".</p>
+  <p><strong>What not to write:</strong> "the exponent is approximately 0.5, confirming the theory". If the interval includes $0.1$ and $0.9$ it also includes $0.1$ and $0.9$, and saying "approximately 0.5" is choosing the part of your own interval you liked. <strong>What also not to write:</strong> "the exponent is 0.34, contradicting the theory". It does not. A number one standard error from the prediction contradicts nothing.</p>
+  <p>The mature formulation is <em>consistency</em>, in both directions: your data is consistent with $0.5$, and it is also consistent with a range of other values, and the honest thing is to say both. If you want a narrower claim, that requires more trials, and the Week 6 table tells you exactly how many.</p>
+</div>
+
+<p>One more framing worth carrying into Week 15. The bead arm was never the arm that would pin the exponent precisely — the simulation arm does that, with a hundred thousand cells and error bars you cannot see. The bead arm exists to <em>rule out a whole class of error</em>: the possibility that the sampling mathematics itself is wrong. For that purpose a wide interval centred in the right place is sufficient, and it was known to be sufficient in Week 6. Design your claim to match what your evidence can support, and this arm supports a strong claim of the right kind.</p>
+
+<h2>9 &nbsp;Your Python laboratory</h2>
+
+<div class="box python">
+  <span class="box-tag">This week in the celldetect project</span>
+  <p><code>python/celldetect/beads.py</code> — two functions, plus one you wrote in Week 6:</p>
+  <ul>
+    <li><code>accuracy_by_n(records, dropout=0.0)</code> — group trials by draw size and return <code>{n: (n_correct, n_trials)}</code>, sorted by <code>n</code>. Count <em>only</em> trials at the requested dropout level, and compare the floats with a tolerance (<code>abs(a - b) &gt; 1e-9</code>) rather than <code>==</code>. Pooling the two arms would flatten the exact effect the dropout arm exists to measure; <code>test_accuracy_by_n_separates_dropout_arms</code> is there to catch it.</li>
+    <li><code>fit_power_law(ns, values)</code> — least squares of $\log(\text{value})$ on $\log n$, returning <code>(slope, intercept)</code>. Raise <code>ValueError</code> unless at least two pairs are strictly positive and finite. That guard is not defensive programming for its own sake: it is the thing that turns "one point came out below chance" from a silent NaN into a loud stop.</li>
+    <li><code>validate_tally(records)</code> from Week 6 — make sure it is still green.</li>
+  </ul>
+  <p><code>python/celldetect/stats.py</code> — <code>wilson_interval(k, n, z=1.96)</code>. Week 13 derives it; you need it working today. The self-check in its docstring is the one to run first: $(k, n) = (0, 20)$ must give $\text{lo} = 0$ and $\text{hi}$ well above $0.1$, because zero successes in twenty trials does not mean the probability is zero.</p>
+  <p><strong>Tests:</strong> <code>pytest tests/test_beads.py</code></p>
+  <p>Fourteen tests, and by the end of this week all of them are yours. Then, because this is a milestone: <code>pytest tests/</code> — everything, Weeks 1 to 12, in one run.</p>
+  <p><strong>Experiment:</strong> <code>python experiments/week12_beads.py</code>, <strong>SEED 112</strong>. It writes <code>figures/week12_beads.png</code> (both arms, Wilson intervals, both theory curves) and <code>figures/week12_three_ways.png</code> (everything in $d'$ space on log-log axes with the fitted exponents), and prints the per-point tallies, the theory value at each point, and the fitted exponent with the count of dropped points.</p>
+  <p><strong>Where it gets its data:</strong> every <code>*.csv</code> in <code>python/data/beads/</code>, skipping any row whose <code>run</code> column starts with <code>RUNTEMPLATE</code>. If no filled-in tallies are found, it <em>simulates</em> the draws so the pipeline can be built and tested, sets <code>USED_STAND_IN = True</code>, and stamps <strong>SIMULATED BEADS — not a result</strong> across both figures. Same rule as Weeks 10 and 11: a stamped figure never enters the report, and <code>week14_report_figures.py</code> enforces it.</p>
+</div>
+
+<div class="box pitfall">
+  <span class="box-tag">The constants at the top of the script are 0.30 and 0.35</span>
+  <p><code>week12_beads.py</code> opens with <code>P_A, P_B = 0.30, 0.35</code> and <code>NS = [10, 25, 50, 100, 200]</code>, <code>DROPOUT = 0.30</code>, <code>TRIALS_PER_N = 40</code> — the design as originally planned. Week 6, Section 8, <em>recommended</em> $30\%$ vs $40\%$ instead, on power grounds.</p>
+  <p><strong>If you ran different jars, you must edit those constants,</strong> because the orange theory curve is drawn from them and the printed "theory" column is computed from them. Nothing will crash; the theory line will simply be the wrong theory line, sitting below your data, and it will look like a result. Edit the constants, record in <code>progress/week12.md</code> that you did and what your actual jar fractions were, and — this is the part people forget — check that the number matches the jars you physically filled, not the jars you meant to fill. Count the beads if you are not certain.</p>
+</div>
+
+<h2>10 &nbsp;Exercises</h2>
+<p class="muted">Stars mark difficulty: ★ routine · ★★ requires an idea · ★★★ challenge. Write full sentences; every claim needs a reason. Solutions are provided — attempt first, then compare.</p>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 12.1</span><span class="stars">★</span></div>
+  <div class="ex-body">At $n = 50$ you record 30 correct out of 40. (a) Give the accuracy and its Wilson interval. (b) Convert the accuracy to $d'$. (c) Convert both ends of the Wilson interval to $d'$ and comment on the width. (d) The theory predicts $d' = 0.755$ at $n = 50$ for the $30/35$ jars. Is your measurement consistent with it?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) $p = 30/40 = 0.750$. With $z^2 = 3.8416$: denominator $1.09604$; centre $= (0.750 + 0.04802)/1.09604 = 0.72809$; half-width $= 1.96\sqrt{0.75\times0.25/40 + 3.8416/6400}/1.09604 = 1.96\times0.070858/1.09604 = 0.12670$. Interval $[0.601,\ 0.855]$.</p>
+      <p>(b) $d' = 2\Phi^{-1}(0.750) = 2\times0.6745 = 1.349$.</p>
+      <p>(c) $2\Phi^{-1}(0.601) = 2\times0.2559 = 0.512$; $2\Phi^{-1}(0.855) = 2\times1.0603 = 2.121$. So $d' \in [0.51,\ 2.12]$ — a factor of more than four between the ends. The conversion does not add uncertainty; it reveals it, because $\Phi$ is flat near its middle and so small changes in accuracy correspond to large changes in $d'$.</p>
+      <p>(d) Yes, comfortably: $0.755$ sits inside $[0.51, 2.12]$, near the lower end. Your point estimate is above the prediction and your interval contains it, which is exactly the situation in which the correct word is "consistent" and the incorrect word is "confirms".</p>
+      <p class="muted">Part (c) is the one to sit with. It is tempting to think that converting to $d'$ is a way of getting a sharper number. It is not — it is a way of getting a <em>meaningful</em> number, and meaningful numbers from 40 trials are wide. The reason to convert is the fit in Section 4, not precision.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 12.2</span><span class="stars">★</span></div>
+  <div class="ex-body">Your tally has 400 rows. <code>validate_tally</code> returns three messages: one <code>correct=</code> disagreement on line 87, one duplicate <code>(run, trial)</code> on line 203, and "jar not being randomized" for <code>run04</code>. For each, say what most likely happened, what you do about it, and what you write in the report.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p><strong>Line 87, <code>correct</code> disagreement.</strong> Most likely a transcription slip while typing the sheet: either <code>guess</code> or <code>correct</code> was mistyped. Go to the photograph of the paper sheet, read the row, and correct whichever column is wrong. Report: nothing in the main text; a line in <code>progress/week12.md</code> recording the correction, with the date and the line number.</p>
+      <p><strong>Line 203, duplicate trial number.</strong> Almost certainly a copy-paste while typing, meaning one trial is duplicated and another is missing. Check the paper sheet for that block: count the tick marks and compare with the number of rows in the CSV. If the paper has 40 rows and the CSV has 40 with one duplicate, then one trial's data was overwritten and is gone — delete the duplicate and note that the block has 39 usable trials. Report: state the trial count you actually analysed, which is now 399, not 400.</p>
+      <p><strong><code>run04</code> not randomized.</strong> This one is serious. Either the pre-randomized template was not used, or the helper drew from one jar throughout, or the <code>true_jar</code> column was filled in afterwards from memory. In every one of those cases the run is not interpretable and must be excluded — accuracy within a single-jar run measures nothing, because a guesser who always says "A" scores 100%. Exclude <code>run04</code> by name in the analysis, and report: "Run 04 (80 trials) was excluded because the true-jar sequence was constant, indicating a failure of randomization; the reported analysis uses 320 trials."</p>
+      <p class="muted">Notice that two of the three go in the progress log and one goes in the report. The rule: anything that changes the number of trials the analysis is based on is a fact about your result and belongs where the result is. Anything that is a correction to a transcription is a fact about your process and belongs in the log — but it belongs somewhere, always.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 12.3</span><span class="stars">★★</span></div>
+  <div class="ex-body">The dropout formula replaces $n$ by $n(1-q)$, which treats the number of survivors as fixed at its mean. It is random. (a) Give the mean and variance of the survivor count $M$ at $n = 200$, $q = 0.3$. (b) $d'$ is proportional to $\sqrt{M}$; use a first-order expansion to estimate $E[\sqrt M]$ and compare it to $\sqrt{E[M]}$. (c) Does the approximation matter at $n = 200$? At $n = 10$?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) $M \sim \mathrm{Binomial}(200, 0.7)$, so $E[M] = 140$ and $\mathrm{Var}(M) = 200\times0.7\times0.3 = 42$, i.e. $\mathrm{sd}(M) = 6.48$, about 4.6% of the mean.</p>
+      <p>(b) Expand $g(M) = \sqrt M$ about $\mu = E[M]$: $g(M) \approx \sqrt\mu + \frac{M-\mu}{2\sqrt\mu} - \frac{(M-\mu)^2}{8\mu^{3/2}}$. Taking expectations, the linear term vanishes and
+      $$E[\sqrt M] \approx \sqrt\mu\left(1 - \frac{\mathrm{Var}(M)}{8\mu^2}\right).$$
+      At $n = 200$: $\mathrm{Var}/(8\mu^2) = 42/(8\times19600) = 0.000268$. So $E[\sqrt M]$ is below $\sqrt{140}$ by <strong>0.027%</strong>.</p>
+      <p>(c) At $n = 200$, no — a 0.03% bias in $d'$ is four orders of magnitude smaller than the ~25% sampling noise on the measured $d'$ from 40 trials. At $n = 10$: $\mu = 7$, $\mathrm{Var} = 2.1$, and the correction is $2.1/(8\times49) = 0.0054$, i.e. 0.54%. Still negligible against the error bars, though ten times larger, and it is a <em>downward</em> bias — the approximation slightly overstates $d'$, and it does so most at small $n$, which is the end of the fit where the low points already sit.</p>
+      <p class="muted">The satisfying part of this exercise is that the answer is "no, it does not matter", <em>with a number</em>. That is worth much more than an unexamined "it's approximately fine". You now have a one-line defence against a real question, and you can state the direction and size of the bias if pressed. Jensen's inequality guarantees the sign ($\sqrt{\cdot}$ is concave, so $E[\sqrt M] &lt; \sqrt{E[M]}$) before you compute anything.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 12.4</span><span class="stars">★★</span></div>
+  <div class="ex-body">A classmate plots accuracy against $n$ on log-log axes, fits a line, gets a slope of $0.11$, and concludes the square-root law is refuted. Write the reply. It must (a) explain the error, (b) predict what they would get with different jars, and (c) tell them exactly what to do instead.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) "Accuracy is bounded above by 1, so it cannot follow a power law with a positive exponent — the curve must flatten as it approaches the ceiling. Fitting a power law to it returns a slope that describes how close your points are to saturation, not the exponent of the underlying law. In fact I can show your $0.11$ is the <em>correct</em> answer for a perfect experiment: take the exact theoretical accuracies for $30/35$ jars at your five draw sizes, $0.5670, 0.6052, 0.6471, 0.7032, 0.7748$, fit $\log$ accuracy against $\log n$, and you get $0.104$. Your measurement agrees with the theory; your fit is measuring the wrong thing."</p>
+      <p>(b) "Change nothing about the law and use $30/40$ jars instead. The theoretical accuracies become $0.630, 0.700, 0.771, 0.853, 0.931$, and the same fit returns $0.132$. The 'exponent' moved because the beads moved. A quantity that depends on your jar composition is not an estimate of a universal exponent."</p>
+      <p>(c) "Convert each measured accuracy back to $d'$ with $d' = 2\Phi^{-1}(\text{accuracy})$, drop any point at or below chance and say how many you dropped, then fit $\log d'$ against $\log n$. $d'$ has no ceiling, so the fit is meaningful, and the prediction is a slope of exactly $0.5$. Bootstrap over trials for an interval on the slope."</p>
+      <p class="muted">This exercise is here because the mistake is genuinely tempting — accuracy is the quantity everyone cares about, so it feels like the thing to fit. The general lesson is bigger than beads: <strong>before fitting a functional form, check that the quantity you are fitting could in principle follow that form.</strong> Bounded quantities need a transformation first, which is the same reason logistic regression models the log-odds rather than the probability.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 12.5</span><span class="stars">★★</span></div>
+  <div class="ex-body">The protocol insists on drawing <em>with replacement</em>. Suppose you drew $n = 200$ beads from a jar of 500 without replacing them. (a) What distribution does the red count follow? (b) Give its variance and compare it to the binomial. (c) By what factor would $d'$ change? (d) Would that have shown up as an apparent violation of the $\sqrt n$ law?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) Hypergeometric: $N = 500$ beads of which $K = pN$ are red, drawing $n = 200$ without replacement.</p>
+      <p>(b) The hypergeometric variance is the binomial variance times the <strong>finite population correction</strong>:
+      $$\mathrm{Var} = np(1-p)\cdot\frac{N-n}{N-1} = np(1-p)\times\frac{300}{499} = 0.601\,np(1-p).$$
+      The variance is 40% <em>smaller</em>, because sampling without replacement from a finite jar cannot stray as far from the jar's true composition.</p>
+      <p>(c) $d'$ is inversely proportional to the standard deviation, so it would be larger by $1/\sqrt{0.601} = 1.290$ — nearly 30% higher than the binomial prediction at $n = 200$.</p>
+      <p>(d) <strong>Yes, and in a specific and diagnosable way.</strong> The correction factor $(N-n)/(N-1)$ depends on $n$: at $n = 10$ it is $0.982$ (a 1% effect), at $n = 200$ it is $0.601$ (a 29% effect). So the measured $d'$ would be inflated more at large $n$ than at small $n$, which tilts the log-log fit <em>upward</em> — you would measure an exponent above $0.5$ and conclude, wrongly, that the data beats the square-root law.</p>
+      <p class="muted">This is the best possible argument for protocol discipline, because it shows that a plausible shortcut ("it's a big jar, why bother putting them back?") produces not noise but a <em>systematic bias in the very quantity you are measuring</em>, in a direction that would look like an exciting result. If your bead exponent comes out well above 0.5, this is the first thing to check — and the fix is to go and count how many beads are actually in the jar.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 12.6</span><span class="stars">★★★</span></div>
+  <div class="ex-body">Design and justify a bootstrap for the fitted exponent. (a) What is the resampling unit, and why not the five $(n, d')$ points? (b) Write the procedure. (c) Explain why the percentile interval on the slope is narrower than you would guess from the per-point intervals in exercise 12.1. (d) Name one thing this bootstrap cannot account for.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) <strong>The resampling unit is the individual trial, within each $n$.</strong> Resampling the five points would treat each point as an exchangeable draw from a population of points, which is wrong twice over: the points are at fixed, chosen values of $n$ (they are not a random sample of draw sizes), and with only five of them a resample would frequently contain two or three distinct $x$ values and give a wildly unstable fit. Resampling trials respects the actual source of randomness, which is the outcome of each trial.</p>
+      <p>(b) For $b = 1, \dots, B$ (with $B$ around 2,000): for each draw size $n$ with $k_n$ correct out of $t_n$, draw $k_n^* \sim \mathrm{Binomial}(t_n,\ k_n/t_n)$ — this is exactly resampling the $t_n$ trials with replacement; form $\hat p_n^* = k_n^*/t_n$; convert to $d'^*_n = 2\Phi^{-1}(\hat p^*_n)$, dropping non-positive values; if at least two survive, fit $\log d'^*$ on $\log n$ and store the slope. Report the 2.5th and 97.5th percentiles of the stored slopes. (Record also the fraction of bootstrap replicates in which a point had to be dropped — if that fraction is large, the interval is being computed from fits with varying numbers of points, which is worth saying.)</p>
+      <p>(c) Because the slope uses all five points and a slope is much better determined than any individual intercept-plus-slope combination. Errors that move all five points together — the whole curve up or down — change the intercept and leave the slope alone. Only the <em>differential</em> error across points, which is a smaller quantity, feeds into the slope. Formally, the variance of a least-squares slope is $\sigma^2/S_{xx}$, and $S_{xx} = \sum(\log n_i - \overline{\log n})^2 \approx 5.46$ for the five planned draw sizes — a factor of five in the denominator, and that is before the averaging over points.</p>
+      <p>(d) Anything that is not trial-to-trial randomness. Specifically: <strong>a systematic error affecting every trial equally</strong> — jars filled to the wrong fractions, a guesser whose threshold is not optimal, sampling without replacement (exercise 12.5), the helper's randomization being imperfect. The bootstrap resamples what varied; it is silent about what was constant and wrong. This is exactly the same caveat as the one in <code>stats.bootstrap_ci</code>'s docstring about donors, and it is worth stating in the report in both places.</p>
+      <p class="muted">Part (d) is the one that matters most and is the one people leave out. A confidence interval quantifies the uncertainty you modelled; it says nothing about the uncertainty you did not. Being explicit about the boundary of what your interval covers is one of the clearest markers of a report written by someone who understands their own analysis.</p>
+    </div>
+  </details>
+</div>
+
+<h2>11 &nbsp;Research notebook</h2>
+
+<p>The milestone week's entries, and they double as the evidence file for M5:</p>
+
+<ul>
+  <li>The <strong>validator output</strong>, pasted verbatim — either "tally validates clean." or the full list of problems, with a line for each saying what you did about it.</li>
+  <li>The <strong>total trial count</strong> actually analysed, in each arm, after any exclusions. If it is not $2\times5\times40 = 400$, say why.</li>
+  <li>The <strong>number of points dropped for being at or below chance</strong>, by arm and by $n$.</li>
+  <li>The <strong>fitted exponents with intervals</strong>, both arms, plus the four exponents from the three-ways figure.</li>
+  <li>The <strong>"offsets are meaningless" sentence</strong>, written in your own words, in the exact form you intend to say it in the talk. Say it out loud once.</li>
+  <li>The <strong>four-row table of Section 7</strong>, reproduced from memory. This is the table you will be asked about in Week 15 and it is the intellectual summary of the entire project.</li>
+  <li>Exercises 12.3 and 12.5 in full.</li>
+  <li>Photographs of the paper tally sheets, if they are not already in <code>notebook/beads/</code>.</li>
+</ul>
+
+<p>Fill in <code>progress/week12.md</code>, commit the figures and the CSVs, and then tag.</p>
+
+<div class="box verify">
+  <span class="box-tag">MILESTONE M5 · verification (with mentor) · tag <code>evidence-complete</code></span>
+  <ul>
+    <li><strong>The tally validates clean</strong> — you run <code>python experiments/week12_beads.py</code> in front of your mentor and it prints <code>tally validates clean.</code>, or it prints problems and you explain each one and what you did about it.</li>
+    <li><strong>You state the trial count and the dropped points</strong> as numbers: how many trials in each arm, how many excluded and why, how many points fell at or below chance and were removed from the fit.</li>
+    <li><strong>You explain, without notes, why accuracy must be converted to $d'$ before fitting</strong>, and quote the $0.104$-versus-$0.132$ demonstration to show that the accuracy fit is not measuring the law.</li>
+    <li><strong><code>figures/week12_three_ways.png</code> exists, is committed, and is NOT stamped</strong> SIMULATED BEADS. This is the gate for M5.</li>
+    <li><strong>You explain why the vertical offsets in that figure are meaningless</strong> and why only the slopes are comparable — unprompted, in the first thirty seconds of showing the figure.</li>
+    <li><strong>You report every exponent with an interval</strong> and use the word "consistent" correctly, in both directions, without rounding anything to $0.5$.</li>
+    <li><strong>You give the four-row account of Section 7</strong> — what each line of evidence can and cannot be wrong about — and say in one sentence why the beads were worth the hours.</li>
+    <li><strong><code>pytest tests/</code> fully green</strong>, Weeks 1 to 12, one run. Then <code>git tag evidence-complete</code> and push.</li>
+  </ul>
+  <p class="muted">If the gate does not pass — the beads are not finished, or the three-ways figure is stamped — tag nothing, write the reason in <code>progress/week12.md</code>, and consult the fallback ladder (F1–F4) in <code>plans/</code>. Week 13 is a buffer week and is the designed place to absorb exactly this slip. That is what buffers are for, and using one as intended is not a failure.</p>
+</div>
+
+<h2>12 &nbsp;Going deeper</h2>
+<ul>
+  <li>Wilson (1927), <em>Probable inference, the law of succession, and statistical inference</em>, <em>JASA</em> 22. <span class="muted">The original two-page paper behind the interval you used today. You do not need it before Week 13, but it is short, readable, and startlingly modern. <span class="claim cited">cited</span></span></li>
+  <li>Brown, Cai &amp; DasGupta (2001), <em>Interval estimation for a binomial proportion</em>, <em>Statistical Science</em> 16. <span class="muted">Why the textbook interval $p \pm z\sqrt{p(1-p)/n}$ is bad, with pictures of its coverage oscillating wildly as $n$ changes. Read the first six pages. It is the best argument you will find for why the choice of interval is a real decision. <span class="claim cited">cited</span></span></li>
+  <li>Green &amp; Swets (1966), <em>Signal Detection Theory and Psychophysics</em>, chapter 1. <span class="muted">Where $d'$ comes from and why psychophysicists convert proportions correct into $d'$ before doing anything else — the identical move you made in Section 4, for the identical reason, sixty years earlier. <span class="claim cited">cited</span></span></li>
+  <li>Efron &amp; Tibshirani, <em>An Introduction to the Bootstrap</em> (1993), chapters 6 and 13. <span class="muted">The percentile bootstrap, and a careful discussion of what the resampling unit should be — exercise 12.6(a) is their argument. Preparation for Week 13.</span></li>
+  <li>Feynman (1974), <em>Cargo Cult Science</em>, the Caltech commencement address. <span class="muted">Ten minutes, and it is the essay behind Section 7. "The first principle is that you must not fool yourself, and you are the easiest person to fool." Read it the evening before you write the report.</span></li>
+  <li>Course extras: <a href="../extras/bead-protocol.html">the bead protocol</a> · <a href="../extras/big-picture.html">the big picture</a> · <a href="../extras/notation.html">notation card</a> · <a href="../extras/glossary.html">glossary</a> · <a href="../extras/problem-bank.html">problem bank</a></li>
+</ul>
+
+</div>
+
+<footer class="site">How Much Data Does It Take to Tell Two Cell Types Apart? · Week 12 · <a href="../index.html">Course home</a></footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  /* Inverse standard normal CDF by bisection on CD.Phi. Plenty accurate for a plot. */
+  function probit(p) {
+    if (p <= 0.5000001 && p >= 0.4999999) return 0;
+    let lo = -6, hi = 6;
+    for (let i = 0; i < 60; i++) {
+      const mid = 0.5 * (lo + hi);
+      if (CD.Phi(mid) < p) lo = mid; else hi = mid;
+    }
+    return 0.5 * (lo + hi);
+  }
+
+  /* Least-squares slope and intercept of y on x. */
+  function lsq(xs, ys) {
+    const n = xs.length;
+    let mx = 0, my = 0;
+    for (let i = 0; i < n; i++) { mx += xs[i] / n; my += ys[i] / n; }
+    let sxy = 0, sxx = 0;
+    for (let i = 0; i < n; i++) { sxy += (xs[i] - mx) * (ys[i] - my); sxx += (xs[i] - mx) * (xs[i] - mx); }
+    return [sxy / sxx, my - (sxy / sxx) * mx];
+  }
+
+  /* ---------------- Lab 1: the whole bead pipeline ----------------------- */
+  (function () {
+    const NS = [10, 25, 50, 100, 200];
+    const P_A = 0.30;
+    const TRIALS = [20, 40, 80, 160];
+    let ti = 1, pB = 0.35, seed = 1120, B = 600;
+
+    function theoryD(n, q) {
+      const pbar = 0.5 * (P_A + pB);
+      return Math.sqrt(n * (1 - (q || 0))) * Math.abs(P_A - pB) / Math.sqrt(pbar * (1 - pbar));
+    }
+
+    function run() {
+      const t = TRIALS[ti], r = CD.rng(seed);
+      const ks = [], pts = [], bars = [];
+      NS.forEach(n => {
+        let k = 0;
+        for (let j = 0; j < t; j++) {
+          const isA = r() < 0.5;
+          const red = CD.binomial(n, isA ? P_A : pB, r);
+          const guessB = red > n * 0.5 * (P_A + pB);
+          if (guessB !== isA) k++;
+        }
+        ks.push(k);
+        const acc = k / t, w = CD.wilson(k, t, 1.96);
+        pts.push([Math.log10(n), acc]);
+        bars.push([Math.log10(n), acc, w[0], w[1]]);
+      });
+
+      /* accuracy -> d', drop the non-positive ones, fit */
+      function fitFrom(counts) {
+        const xs = [], ys = [];
+        let dropped = 0;
+        NS.forEach((n, i) => {
+          const a = counts[i] / t;
+          const d = 2 * probit(Math.min(Math.max(a, 1e-6), 1 - 1e-6));
+          if (d > 0) { xs.push(Math.log(n)); ys.push(Math.log(d)); } else dropped++;
+        });
+        return xs.length >= 2 ? [lsq(xs, ys)[0], dropped] : [NaN, dropped];
+      }
+      const [slope, dropped] = fitFrom(ks);
+      const boots = [];
+      const rb = CD.rng(seed + 5);
+      for (let b = 0; b < B; b++) {
+        const star = ks.map((k, i) => CD.binomial(t, k / t, rb));
+        const s = fitFrom(star)[0];
+        if (isFinite(s)) boots.push(s);
+      }
+      boots.sort((a, b2) => a - b2);
+      const lo = boots.length ? boots[Math.floor(0.025 * boots.length)] : NaN;
+      const hi = boots.length ? boots[Math.floor(0.975 * boots.length)] : NaN;
+
+      const P = CD.plot("w12lab1", { xmin: 0.85, xmax: 2.45, ymin: 0.35, ymax: 1.0,
+                                     xlabel: "beads drawn per trial, n  (log scale)",
+                                     ylabel: "proportion correct",
+                                     xfmt: v => Math.round(Math.pow(10, v)) });
+      P.clear(); P.axes();
+      P.line([[0.85, 0.5], [2.45, 0.5]], { color: CD.C.gray, width: 1.5, dash: [6, 4] });
+      P.funcPlot(v => CD.accuracyFromDPrime(theoryD(Math.pow(10, v), 0)),
+                 { color: CD.C.orange, width: 2.5 });
+      P.errorbars(bars, { color: CD.C.magenta, r: 4.5 });
+      P.label(0.9, 0.965, "orange: theory, no free parameters    magenta: simulated run, Wilson 95% bars",
+              { color: CD.C.navy });
+
+      CD.table("w12lab1out",
+        ["n", "correct / trials", "accuracy", "Wilson 95%", "d' = 2Phi^-1(acc)", "theory d'"],
+        NS.map((n, i) => {
+          const w = CD.wilson(ks[i], t, 1.96), a = ks[i] / t;
+          const d = 2 * probit(Math.min(Math.max(a, 1e-6), 1 - 1e-6));
+          return [n, ks[i] + " / " + t, a.toFixed(3),
+                  "[" + w[0].toFixed(3) + ", " + w[1].toFixed(3) + "]",
+                  d > 0 ? d.toFixed(3) : "at or below chance — dropped",
+                  theoryD(n, 0).toFixed(3)];
+        }).concat([["fit", "—", "—", "—",
+                    "<b>exponent = " + (isFinite(slope) ? slope.toFixed(3) : "n/a") + "</b>",
+                    "bootstrap 95% [" + (isFinite(lo) ? lo.toFixed(2) : "?") + ", " +
+                    (isFinite(hi) ? hi.toFixed(2) : "?") + "]  ·  " + dropped + " dropped  ·  theory 0.5"]]));
+    }
+
+    CD.slider("w12lab1ctl", { label: "trials per draw size", min: 0, max: TRIALS.length - 1,
+                              step: 1, value: ti, fmt: i => TRIALS[i] }, i => { ti = i; run(); });
+    CD.slider("w12lab1ctl", { label: "jar B red fraction (jar A is 30%)", min: 0.32, max: 0.50,
+                              step: 0.01, value: pB, fmt: v => (100 * v).toFixed(0) + "%" },
+              v => { pB = v; run(); });
+    CD.button("w12lab1ctl", "Run again", () => { seed += 17; run(); });
+  })();
+
+  /* ---------------- Lab 2: four lines of evidence ------------------------ */
+  (function () {
+    function gammaSample(shape, r) {
+      if (shape < 1) return gammaSample(shape + 1, r) * Math.pow(Math.max(r(), 1e-12), 1 / shape);
+      const d = shape - 1 / 3, c = 1 / Math.sqrt(9 * d);
+      for (;;) {
+        const x = CD.randn(r);
+        let v = 1 + c * x;
+        if (v <= 0) continue;
+        v = v * v * v;
+        const u = r();
+        if (u < 1 - 0.0331 * x * x * x * x) return d * v;
+        if (Math.log(u) < 0.5 * x * x + d * (1 - v + Math.log(v))) return d * v;
+      }
+    }
+
+    const DEPTHS = [200, 400, 800, 1600, 4000];
+    const BEAD_NS = [10, 25, 50, 100, 200];
+    const K = 6, FOLD = 1.4, MASS = 0.03, PHI = 0.5;
+    const P_A = 0.30, P_B = 0.35;
+    const SIZES = [400, 800, 1600];
+    let si = 1, seed = 1200;
+
+    const pr = CD.markerProfiles(K, FOLD, MASS);
+
+    function accToD(a) {
+      const d = 2 * probit(Math.min(Math.max(a, 1e-6), 1 - 1e-6));
+      return d > 0 ? d : NaN;
+    }
+
+    function cellArm(overdispersed, nper, sd) {
+      const out = [];
+      DEPTHS.forEach(D => {
+        const r = CD.rng(sd + D);
+        const l1 = pr[0].map(p => D * p), l2 = pr[1].map(p => D * p);
+        let ok = 0;
+        for (let i = 0; i < nper; i++) {
+          for (let c = 0; c < 2; c++) {
+            const lam = c ? l2 : l1, x = [];
+            for (let g = 0; g < K; g++) {
+              const m = lam[g];
+              const rate = overdispersed ? gammaSample(1 / PHI, r) * (PHI * m) : m;
+              x.push(CD.poisson(rate, r));
+            }
+            const s = CD.nbLogRatio(x, l1, l2);
+            if ((c === 0 && s > 0) || (c === 1 && s <= 0)) ok++;
+          }
+        }
+        out.push([D, accToD(ok / (2 * nper))]);
+      });
+      return out;
+    }
+
+    function beadArm(nper, sd) {
+      const r = CD.rng(sd + 99);
+      return BEAD_NS.map(n => {
+        let k = 0;
+        for (let j = 0; j < nper; j++) {
+          const isA = r() < 0.5;
+          const red = CD.binomial(n, isA ? P_A : P_B, r);
+          if ((red > n * 0.5 * (P_A + P_B)) !== isA) k++;
+        }
+        return [n, accToD(k / nper)];
+      });
+    }
+
+    function fit(pts) {
+      const xs = [], ys = [];
+      pts.forEach(p => { if (isFinite(p[1]) && p[1] > 0) { xs.push(Math.log(p[0])); ys.push(Math.log(p[1])); } });
+      return xs.length >= 2 ? lsq(xs, ys)[0] : NaN;
+    }
+    function draw(P, pts, colour, r) {
+      const good = pts.filter(p => isFinite(p[1]) && p[1] > 0)
+                      .map(p => [Math.log10(p[0]), Math.log10(p[1])]);
+      P.line(good, { color: colour, width: 2 });
+      P.scatter(good, { color: colour, r: r });
+      return good;
+    }
+
+    function run() {
+      const nper = SIZES[si];
+      const sim = cellArm(false, nper, seed);
+      const real = cellArm(true, nper, seed + 7);
+      const beads = beadArm(nper, seed + 13);
+      const pbar = 0.5 * (P_A + P_B);
+      const cTh = Math.abs(P_A - P_B) / Math.sqrt(pbar * (1 - pbar));
+
+      const P = CD.plot("w12lab2", { xmin: 0.8, xmax: 3.8, ymin: -0.85, ymax: 1.25,
+                                     xlabel: "log10 of the amount of data  (each arm in its OWN units)",
+                                     ylabel: "log10 of d'",
+                                     xfmt: v => "1e" + (+v).toFixed(1),
+                                     yfmt: v => Math.pow(10, v).toPrecision(2) });
+      P.clear(); P.axes();
+      P.funcPlot(v => Math.log10(cTh * Math.sqrt(Math.pow(10, v))), { color: CD.C.orange, width: 2.5 });
+      draw(P, sim, CD.C.blue, 4);
+      draw(P, real, CD.C.teal, 4);
+      draw(P, beads, CD.C.magenta, 4);
+      P.label(0.85, 1.18, "orange theory   blue simulation   teal 'real' (overdispersed)   magenta beads",
+              { color: CD.C.navy });
+      P.label(0.85, 1.06, "vertical offsets are unit conversions and mean nothing — compare the slopes",
+              { color: CD.C.gray });
+
+      CD.table("w12lab2out",
+        ["line of evidence", "what its x axis counts", "fitted exponent", "predicted"],
+        [["theory (orange)", "beads or molecules", "0.500", "0.5 exactly, by construction"],
+         ["simulation (blue)", "molecules per cell", fit(sim).toFixed(3), "0.5"],
+         ["'real data' (teal)", "molecules per cell, overdispersed", fit(real).toFixed(3),
+          "below 0.5 past the knee (Week 11)"],
+         ["beads (magenta)", "beads drawn", fit(beads).toFixed(3), "0.5"]]);
+    }
+
+    CD.slider("w12lab2ctl", { label: "cells or trials per point", min: 0, max: SIZES.length - 1,
+                              step: 1, value: si, fmt: i => SIZES[i] }, i => { si = i; run(); });
+    CD.button("w12lab2ctl", "Run again", () => { seed += 23; run(); });
+  })();
+});
+</script>
+</body>
+</html>

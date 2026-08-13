@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 14 — Writing the Report</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="week13.html">← Week 13</a><a href="week15.html">Week 15 →</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Week 14</span>
+      <span class="badge mile">MILESTONE M7</span>
+      <span class="badge win">git tag <code>report-draft</code></span>
+    </div>
+    <h1 class="chapter-title">Writing the Report</h1>
+    <div class="chapter-sub">Six to eight self-contained pages · the derivation chain and what to cut · the figure freeze · and the limitations section that earns everything else</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<h2>Objectives</h2>
+<ul class="objectives">
+  <li>State who the report is for, and what "self-contained" costs you in each section.</li>
+  <li>Lay out the report section by section against a word budget, and keep the total inside 6–8 pages.</li>
+  <li>Write the theory section as a single chain — Poisson → variance $=$ mean → $d'$ → $\sqrt{\text{depth}}$ → quadrature → $\sqrt{k}$ → $\Phi(d'/2)$ — with one sentence of motivation and one line of algebra per step, and cut everything that is not on the chain.</li>
+  <li>Write a limitations section that covers the full checklist, unprompted, before any reader finds an item you missed.</li>
+  <li>Freeze the figures: regenerate F1–F6 from one command, with captions and seeds, and verify that a fresh run reproduces exactly what the report cites.</li>
+  <li>Write a caption that stands alone: what is shown, what was varied, what the error bars are, what $n$ was, and what seed produced it.</li>
+  <li>State a negative result in a way that reads as a finding rather than an apology.</li>
+  <li>Check every claim in the draft against its status in the Week 13 ledger and repair any that drifted.</li>
+</ul>
+
+<h2>1 &nbsp;The target, and who it is for</h2>
+
+<p>Six to eight pages. Self-contained. Readable by someone who has not taken this course.</p>
+
+<p>That last constraint is the one that does the work, so make it concrete: picture a first-year undergraduate in physics or biology, or a science-fair judge with a chemistry PhD and eleven minutes. They know what a mean and a standard deviation are. They have not heard of $d'$, they do not know what a UMI is, and they will not look anything up. Everything your report needs, your report must supply.</p>
+
+<p>Self-contained does not mean long. It means that every symbol is defined where it first appears, every dataset is named with its size, and every claim is either supported inside the document or attributed to something outside it. A reader should never have to hold an unexplained term in their head and hope it gets explained later — and if they do, they stop reading, and they were not being unfair.</p>
+
+<div class="box definition">
+  <span class="box-tag">What this report is claiming</span>
+  <p>Written out once, so that every section can be tested against it:</p>
+  <p><em>Cell-type classification from single-cell RNA counts is a detection problem. Under Poisson
+  counting the separation index obeys $d' \propto \sqrt{\text{depth}\times k}$ and the optimal
+  accuracy is $\Phi(d'/2)$, with no free parameters. Simulation, downsampled 10x PBMC data, and a
+  physical bead-drawing experiment each test that prediction. It holds in simulation, it holds in
+  the beads, and on real data it fails in a specific and measurable way: counts are overdispersed,
+  so $d'$ saturates and deeper sequencing eventually stops buying accuracy.</em></p>
+  <p>If a paragraph you are writing does not serve that claim, its assumptions, its tests or its
+  failure, it is not in this report. Put it in an appendix or in the notebook.</p>
+</div>
+
+<div class="box win">
+  <span class="box-tag">The thing to hold on to this week</span>
+  A good report is not a transcript of what you did. It is the shortest honest path from a
+  question to an answer and the limits of that answer, arranged so a stranger can check it. The
+  work you did in the order you did it is a diary; almost nobody wants to read a diary. What they
+  want is the argument, and the argument only became clear in Week 11.
+</div>
+
+<h2>2 &nbsp;The structure, with a word budget</h2>
+
+<p>Budget before you write. A report that is written first and cut afterwards loses the wrong material, because by then you are attached to the paragraphs that cost you the most effort — and those are usually the ones documenting a detour.</p>
+
+<p>The conversion used throughout this chapter: <strong>a full page of text is about 600 words</strong> at 11pt single-spaced, a figure with its caption takes about <strong>a third of a page</strong>, and the references take about <strong>0.4 of a page</strong>. Those numbers are not laws; they are what makes the arithmetic checkable.</p>
+
+<table class="simple">
+  <tr><th>Section</th><th>Space</th><th>Words</th><th>Figures</th><th>What it must do</th></tr>
+  <tr><td>Abstract</td><td>0.25 pg</td><td>150</td><td>—</td>
+      <td>Question, method, headline number, the limit. Written last.</td></tr>
+  <tr><td>Introduction and question</td><td>1 pg</td><td>450</td><td>F1</td>
+      <td>Why counting is sampling; why classification is detection; the exact question.</td></tr>
+  <tr><td>Theory</td><td>1.5 pg</td><td>600</td><td>F2</td>
+      <td>The chain, seven steps, one line of algebra each. Assumptions listed at the end.</td></tr>
+  <tr><td>Methods</td><td>1 pg</td><td>450</td><td>—</td>
+      <td>Simulator, PBMC protocol, bead protocol, seeds. Enough to re-run you.</td></tr>
+  <tr><td>Results</td><td>2 pg</td><td>750</td><td>F3–F6</td>
+      <td>Three lines of evidence, then the divergence. Numbers with intervals.</td></tr>
+  <tr><td>Limitations</td><td>0.75 pg</td><td>350</td><td>—</td>
+      <td>The checklist in Section 7, complete, unprompted.</td></tr>
+  <tr><td>Conclusion</td><td>0.25 pg</td><td>120</td><td>—</td>
+      <td>What is now known that was not, in three sentences. No new material.</td></tr>
+  <tr><td>References</td><td>0.4 pg</td><td>—</td><td>—</td>
+      <td>8–15 entries, every one of them actually read.</td></tr>
+  <tr><td><strong>Total</strong></td><td><strong>≈7.2 pg</strong></td><td><strong>2,870</strong></td><td>6</td><td></td></tr>
+</table>
+
+<p class="muted">The Space column allocates each section its share of the page including whatever
+figure sits in it. Lab 1 below reaches the total the other way — words divided by 600, plus a
+fixed allowance of 0.33 pages per figure and 0.4 for references — and gets 7.16 pages. Two routes,
+the same budget, which is the check that the plan is arithmetically possible before you write a
+word of it.</p>
+
+<p>Note what the budget implies. The Results section gets 750 words to cover four figures, which is under 200 words per figure — one paragraph each. If that feels impossible, it is because you are planning to narrate the figures instead of stating what they show. And Limitations gets 350 words, which is more than the Conclusion and half of Results: that ratio is deliberate and Section 7 argues for it.</p>
+
+<div class="lab">
+  <div class="lab-title">Lab 1 · Word-budget planner</div>
+  <div class="lab-desc">Move the sliders to your planned section lengths. The bar shows each section's share of the page count, with the 6–8 page target band marked. Two warnings can fire: a total outside the target, and Results exceeding Theory plus Methods combined. The conversion is the one above — 600 words per page of text, 0.33 pages per figure, 0.4 pages of references — so every number here is one you can check by hand.</div>
+  <canvas id="w14lab1" height="260"></canvas>
+  <div class="controls" id="w14lab1ctl"></div>
+  <div class="readout" id="w14lab1out"></div>
+</div>
+
+<div class="box pitfall">
+  <span class="box-tag">Why the Results-versus-Theory warning exists</span>
+  A report whose results outweigh its theory and methods combined is a report a reader cannot
+  check. They can see what you found; they cannot see what you predicted before you found it, or
+  how you found it, so they have no way to tell a confirmed prediction from a described
+  observation. In this project that would be fatal, because the entire contribution is that the
+  prediction was made <em>first</em>, from Poisson statistics, with no parameters fitted to the
+  data. Space spent on the derivation is what turns your results from measurements into a test.
+</div>
+
+<h2>3 &nbsp;How to write the theory section</h2>
+
+<p>This is where most student reports go wrong, in both directions at once: too much algebra and too little argument. The theory section has exactly one job, which is to get the reader from "counting is random" to "accuracy $= \Phi(d'/2)$ with $d' \propto \sqrt{Dk}$" without losing them and without asking them to take anything on faith.</p>
+
+<p>There is a single chain, and it has seven links.</p>
+
+<div class="box theorem">
+  <span class="box-tag">The chain — one sentence of motivation, one line of algebra, each</span>
+  <ol>
+    <li><strong>Counts are Poisson.</strong> <em>Motivation:</em> a sequencer draws $D$ molecules at
+    random from a cell whose gene $g$ makes up a fraction $p_g$ of transcripts, so the count is
+    binomial with $D$ large and $p_g$ small. <em>Algebra:</em>
+    $x_g \sim \mathrm{Binomial}(D, p_g) \approx \mathrm{Poisson}(\lambda_g)$, $\lambda_g = Dp_g$.</li>
+
+    <li><strong>Variance $=$ mean.</strong> <em>Motivation:</em> for a Poisson variable the spread is
+    not a free parameter — fix the mean and the noise is decided. <em>Algebra:</em>
+    $E[x] = \mathrm{Var}(x) = \lambda$, so $\mathrm{sd}(x) = \sqrt{\lambda}$.</li>
+
+    <li><strong>Define $d'$.</strong> <em>Motivation:</em> what matters for telling two types apart
+    is the gap between their means measured in units of the noise. <em>Algebra:</em>
+    $d' = |\lambda_1 - \lambda_2| / \sqrt{\bar\lambda}$ with $\bar\lambda = (\lambda_1+\lambda_2)/2$.</li>
+
+    <li><strong>$d' \propto \sqrt{D}$.</strong> <em>Motivation:</em> depth scales both means, so the
+    gap grows linearly while the noise grows as a square root. <em>Algebra:</em>
+    $d' = D|p_1 - p_2| / \sqrt{D\bar p} = \sqrt{D}\,|p_1-p_2|/\sqrt{\bar p}$.</li>
+
+    <li><strong>Evidence adds in quadrature.</strong> <em>Motivation:</em> the optimal rule is the
+    log-likelihood ratio, which for independent genes is a sum, and for independent terms variances
+    add. <em>Algebra:</em> $(d'_{\text{total}})^2 = \sum_g (d'_g)^2$.</li>
+
+    <li><strong>$d' \propto \sqrt{k}$.</strong> <em>Motivation:</em> $k$ equally informative genes
+    each contribute the same squared term. <em>Algebra:</em>
+    $d'_{\text{total}} = \sqrt{k}\,d'_{\text{gene}}$, hence $d' \propto \sqrt{Dk}$.</li>
+
+    <li><strong>Accuracy $= \Phi(d'/2)$.</strong> <em>Motivation:</em> under the Gaussian
+    approximation with equal priors the optimal threshold sits midway between two distributions
+    separated by $d'$ standard deviations. <em>Algebra:</em>
+    $\text{accuracy} = \Phi(d'/2)$, with no free parameters.</li>
+  </ol>
+</div>
+
+<p>Seven links, seven sentences, seven displayed lines: roughly 450 words, which leaves 150 for the assumption list and the transition. That is your 1.5 pages including F2.</p>
+
+<div class="box warning">
+  <span class="box-tag">What to cut, specifically</span>
+  <ul>
+    <li><strong>The derivation of $E[X] = \lambda$ from the pmf.</strong> State it. It is standard,
+    it is in every probability text, and your reader either knows it or will accept it. Week 2's
+    two pages of algebra belong in the notebook.</li>
+    <li><strong>The binomial-to-Poisson limit in detail.</strong> One clause — "with $D$ in the
+    thousands and $p_g$ below $10^{-3}$, the binomial and Poisson agree to well within the noise" —
+    replaces a page.</li>
+    <li><strong>The full log-likelihood-ratio derivation.</strong> Give the result
+    $\mathrm{LLR}(x) = \sum_g[x_g\log(\lambda_{1g}/\lambda_{2g}) - (\lambda_{1g}-\lambda_{2g})]$,
+    note that it is linear in the counts and that the $\log(x_g!)$ terms cancel, and move on. The
+    reader needs to know the rule is linear; they do not need to watch it become linear.</li>
+    <li><strong>ROC curves and AUC.</strong> Interesting, real, and not on the chain. One sentence
+    in Methods if a classifier was scored that way, otherwise nothing.</li>
+    <li><strong>Every classifier that is not naive Bayes.</strong> Logistic regression and kNN were
+    Week 8's way of checking that the classifier was not the bottleneck. That is a Methods sentence
+    and possibly a number in Results, not a theory subsection.</li>
+    <li><strong>Anything you learned that the argument does not need.</strong> This is the hard one.
+    Delete it anyway, and put it in the talk, where a good tangent is an asset.</li>
+  </ul>
+</div>
+
+<p>End the section with the assumption list, in one short paragraph and in plain words: counts are Poisson; genes are independent given the cell type; all cells of a type are identical; the two types are equally likely; the Gaussian approximation to the log-likelihood ratio is adequate. Five items. Each one is attacked later in the report, and listing them here is what makes the Limitations section read as a continuation rather than as a confession.</p>
+
+<h2>4 &nbsp;Methods, and Results built around F1–F6</h2>
+
+<h3>Methods: enough to re-run you</h3>
+
+<p>The test for the Methods section is not "is it complete" — nothing is complete. It is: <strong>could a competent stranger with your repository reproduce your numbers?</strong> Four paragraphs, roughly 110 words each.</p>
+
+<ul>
+  <li><strong>Simulator.</strong> The generative model in one sentence (a type is a probability
+  vector over genes; a cell is Poisson counts at rate $D p_g$; dropout deletes molecules
+  independently). The marker-mass convention, stated explicitly — see Section 7, this one bites.
+  Cells per type per point. The function names, so the reader can find them.</li>
+  <li><strong>PBMC protocol.</strong> Dataset and version (10x PBMC 3k), how many cells and genes
+  survive filtering, which two types, where the labels came from and that they are annotations
+  rather than ground truth, the marker count (32) and how markers were selected using training
+  data only, and the downsampling procedure with its keep-fractions.</li>
+  <li><strong>Bead protocol.</strong> Jar compositions (30/70 and 35/65), draw sizes, trials per
+  draw size (40), the dropout rule, who drew and who tallied, and how a trial was scored. The
+  detail that matters most: the decision rule was fixed in Week 6, before any beads were drawn.</li>
+  <li><strong>Seeds and software.</strong> Every seed (101, 105, 107, 109, 111, 112, 113, 115), the
+  one command that regenerates every figure, the Python and NumPy versions, and the repository
+  commit or tag. Point at <code>figures/report/SEEDS.json</code> rather than listing seeds twice.</li>
+</ul>
+
+<h3>Results: four figures, four paragraphs, no narration</h3>
+
+<p>The report's figures are already chosen: F1–F6, produced by the freeze script in Section 6. F1 sits in the Introduction (the phenomenon) and F2 in Theory (the prediction). Results carries F3 to F6, and the shape of the section is fixed by them.</p>
+
+<table class="simple">
+  <tr><th>Fig</th><th>What it shows</th><th>Source script</th><th>Seed</th></tr>
+  <tr><td>F1</td><td>The phenomenon: variance tracks mean across two orders of magnitude</td><td><code>week01_counting_noise.py</code></td><td>101</td></tr>
+  <tr><td>F2</td><td>Aim 1: measured optimal accuracy against $\Phi(d'/2)$ over depth and $k$</td><td><code>week05_sqrt_k.py</code></td><td>105</td></tr>
+  <tr><td>F3</td><td>Aim 2a: simulated cells against the prediction, three marker-set sizes</td><td><code>week07_simulator.py</code></td><td>107</td></tr>
+  <tr><td>F4</td><td>Aim 2b: PBMC downsampling, Poisson prediction versus negative binomial</td><td><code>week11_overdispersion.py</code></td><td>111</td></tr>
+  <tr><td>F5</td><td>Aim 3: bead accuracy against draw size, both arms, Wilson intervals</td><td><code>week12_beads.py</code></td><td>112</td></tr>
+  <tr><td>F6</td><td>Measured minus predicted across six regimes, with intervals</td><td><code>week13_error_bars.py</code></td><td>113</td></tr>
+</table>
+
+<p>One paragraph per figure, each with the same three moves: <em>what was measured</em>, <em>what the prediction was</em>, <em>by how much they differ, with an interval</em>. Then a fourth paragraph tying F3, F4 and F5 together as three independent tests of one law, and F6 as the map of where it stops.</p>
+
+<p>Do not narrate. "We first ran the simulation at depth 250, then at 500, and observed that accuracy increased" is a description of a loop. "Across depths 250–16,000 the measured accuracy tracks $\Phi(d'/2)$ with a maximum absolute deviation of 0.02 (F3)" is a result. The second sentence is shorter and says more, and it can be checked.</p>
+
+<h2>5 &nbsp;Writing a caption</h2>
+
+<div class="box definition">
+  <span class="box-tag">The standard a caption has to meet</span>
+  A reader who reads <strong>nothing else</strong> — who lands on your figure while flipping
+  through — must be able to say what is being shown, what was varied, what the error bars mean,
+  how many trials produced each point, and what seed generated it. Captions are read far more
+  often than body text. In a poster session they may be all that is read.
+</div>
+
+<p>A caption is not a title. "Accuracy versus depth" is a title, and it is already on the axes. The caption is where the figure becomes evidence rather than decoration.</p>
+
+<div class="box example">
+  <span class="box-tag">The same figure, captioned twice</span>
+  <p><strong>Weak.</strong> <em>"Figure 5. Results of the bead experiment. The data agrees well with
+  the theoretical prediction."</em></p>
+  <p>What is on the axes? How many trials? What are the bars? Which curve is which arm? What does
+  "well" mean? And "agrees well" is a claim, made in a caption, with nothing supporting it.</p>
+  <p><strong>Strong.</strong> <em>"Figure 5. Bead-drawing accuracy against draw size $n$, for the
+  plain arm (magenta) and the 30% dropout arm (teal). Points are the fraction of correct jar
+  identifications over 40 trials per draw size; error bars are 95% Wilson intervals. Curves are the
+  prediction computed in Week 6 before any beads were drawn, with no fitted parameters. Analysis
+  seed 112."</em></p>
+  <p>Sixty words. It names the axes, the arms, the colours, the trial count, the interval type, the
+  provenance of the curve, and the seed — and the clause "before any beads were drawn" does more
+  for the reader's trust than a paragraph of discussion could.</p>
+</div>
+
+<div class="lab">
+  <div class="lab-title">Lab 2 · Caption checker</div>
+  <div class="lab-desc">Paste or type a caption. The checklist below lights up as the text mentions what was varied, the error bars, the sample size, the seed, and the visual encoding. <strong>This is crude string matching, not a judge</strong> — it looks for keywords and cannot tell whether what you wrote is true or even sensible. A caption can pass all five checks and still be bad. Use it as a pre-flight reminder of what you tend to forget, and nothing more.</div>
+  <textarea id="w14cap" rows="5" style="width:100%;font-family:var(--sans);font-size:15px;padding:10px;border:1px solid #d8dde5;border-radius:8px;line-height:1.5" placeholder="Figure 5. Bead-drawing accuracy against draw size n, for..."></textarea>
+  <div class="controls" id="w14lab2ctl"></div>
+  <div class="readout" id="w14lab2out"></div>
+</div>
+
+<h2>6 &nbsp;The figure freeze</h2>
+
+<p>At some point the figures have to stop moving. Otherwise the number in your Results paragraph came from a run you no longer have, the PNG in the document came from a different one, and neither matches what the script produces today. This is not hypothetical; it is the normal fate of a project that regenerates figures by hand.</p>
+
+<div class="box python">
+  <span class="box-tag">The freeze script</span>
+  <p><code>python experiments/week14_report_figures.py</code> regenerates the report's figures into
+  <code>figures/report/</code>. It works from a table at the top of the file:</p>
+  <ul>
+    <li><code>PLAN</code> — a list of <code>(destination name, module, index)</code> triples. It
+    imports each week's experiment module, calls its <code>main()</code>, and copies the figure at
+    the given index out of the returned path list. So <code>("F5_beads", week12_beads, 0)</code>
+    means "F5 is the first figure <code>week12_beads.main()</code> returns".</li>
+    <li><code>CAPTIONS</code> — a dictionary from destination name to caption text. Edit the
+    captions <em>here</em>, not in your word processor, so that the caption and the figure are
+    regenerated by the same command.</li>
+  </ul>
+  <p>It writes <code>CAPTIONS.md</code> (each caption with its source script, seed and status) and
+  <code>SEEDS.json</code> (machine-readable provenance for every panel). Cite
+  <code>SEEDS.json</code> in Methods instead of listing seeds by hand.</p>
+  <p>To regenerate everything in the project, not just the report set:
+  <code>python experiments/make_all_figures.py</code> (minutes), or
+  <code>--smoke</code> for a tiny run that checks the pipeline works and produces figures you must
+  never cite. <code>--only week12_beads week13_error_bars</code> restricts the list.</p>
+</div>
+
+<div class="box warning">
+  <span class="box-tag">The refusal rule</span>
+  <p>Two of the experiment scripts can fall back to stand-in data: <code>week11_overdispersion.py</code>
+  runs on a surrogate matrix if the PBMC cache is missing, and <code>week12_beads.py</code>
+  simulates draws if no filled-in tally sheets exist. Each sets a module-level flag
+  <code>USED_STAND_IN = True</code> when it does, and stamps the figure.</p>
+  <p>The freeze script reads that flag and <strong>refuses to copy the figure</strong>. It does not
+  warn; it does not copy with a stamp; it leaves the slot empty, lists the figure under
+  <strong>Figures refused</strong> in <code>CAPTIONS.md</code>, and tells you what to do
+  (<code>fetch_pbmc3k.py</code>, or fill in <code>data/beads/*.csv</code>).</p>
+  <p>The rule is worth stating as a principle: <em>the pipeline must make the dishonest thing
+  harder than the honest one</em>. A figure that says SURROGATE in faint red across the middle is
+  easy to overlook at 1 a.m. the night before a deadline. A figure that is not there is not.</p>
+</div>
+
+<div class="box example">
+  <span class="box-tag">The freeze test, and why byte-identical is the standard</span>
+  <p>Delete the directory, regenerate, and compare:</p>
+  <pre><code>rm -rf python/figures/report
+cd python &amp;&amp; python experiments/week14_report_figures.py
+md5sum figures/report/*.png &gt; /tmp/freeze1.txt
+rm -rf figures/report
+python experiments/week14_report_figures.py
+md5sum figures/report/*.png &gt; /tmp/freeze2.txt
+diff /tmp/freeze1.txt /tmp/freeze2.txt   # must be empty</code></pre>
+  <p><strong>Why byte-identical and not "looks the same".</strong> Because "looks the same" is not
+  a test anyone can run, and because a difference in the bytes is a difference in the pixels, and a
+  difference in the pixels means something in the pipeline was not seeded. The check is cheap,
+  automatic and total: one <code>diff</code> covers every number in every panel at once. Anything
+  weaker requires a human to squint at two images and decide, and humans reliably decide that two
+  figures look the same.</p>
+  <p>It also buys something specific: it lets you answer "where did this number come from?" with a
+  command rather than with a memory. That question will be asked in Week 15, and it is the question
+  a mentor most wants to hear answered well.</p>
+  <p class="muted"><strong>The honest caveat.</strong> Byte-identity holds within one environment.
+  matplotlib writes its own version string into the PNG header, so upgrading matplotlib changes the
+  bytes without changing the science. Record the Python, NumPy and matplotlib versions in Methods,
+  and run the freeze test twice on <em>your</em> machine on the same day. If the hashes differ
+  there, something is genuinely unseeded — an unseeded generator, a set or dictionary being iterated
+  where order matters, or an unsorted <code>glob</code> over the bead CSVs — and you have found a
+  real bug in your own reproducibility.</p>
+</div>
+
+<h2>7 &nbsp;The limitations section is the one that earns the rest</h2>
+
+<p>Most students treat Limitations as a tax: a paragraph of hedging at the end, written in the passive voice, listing things that "could be improved in future work". That paragraph is worth nothing, and every experienced reader skips it.</p>
+
+<p>Turn it around. <strong>A reader trusts a paper in proportion to what its authors admit.</strong> This is not a moral claim, it is a practical one. Your reader cannot check your code. They cannot re-run your beads. The only evidence they have about your judgement is what you say about your own work — and specifically, whether you found the weaknesses before they did. An author who names five real problems has demonstrated that they looked; the rest of the report inherits that credit. An author who names none has demonstrated only that they did not look, or looked and did not say.</p>
+
+<p>So write it early — this week, first, before Results — and write it in the first person, in full sentences, with numbers.</p>
+
+<div class="box verify">
+  <span class="box-tag">The limitations checklist — every item must appear</span>
+  <ul>
+    <li><strong>Labels are annotations, not ground truth.</strong> PBMC cell types come from
+    clustering and marker-based annotation of the same data you are classifying. "Accuracy" is
+    agreement with a labelling that was itself produced by an algorithm, and it is not obvious in
+    which direction that biases the number. Say what your labels came from and that they can be
+    wrong.</li>
+    <li><strong>One donor.</strong> Use the Week 13 sentence: intervals on real-data quantities are
+    bootstraps over cells within one donor; they quantify cell sampling, not biological variation
+    between people; with $n = 1$ donor the latter cannot be estimated at all.</li>
+    <li><strong>Genes are assumed independent.</strong> They are not — co-regulated genes rise and
+    fall together. Independence is what licensed adding $d'$ in quadrature (chain step 5), so
+    positive correlation means the effective number of independent genes is below $k$ and the
+    $\sqrt{k}$ law overstates what markers buy. State the direction of the error even if you cannot
+    quantify it.</li>
+    <li><strong>The marker-mass convention.</strong> In <code>marker_profiles</code> the two types
+    put an <em>average</em> of <code>marker_mass</code> on the marker set, split equally, with type
+    1 exceeding type 2 by the fold change. Whether you hold the pooled mass fixed as $k$ grows
+    (so per-gene signal falls as $1/k$) or hold per-gene signal fixed (so total mass grows with
+    $k$) changes what a $\sqrt{k}$ curve even means. Say which convention each figure used —
+    F2/F3 and F6 do not use the same one — and why.</li>
+    <li><strong>The Gaussian approximation fails at low depth.</strong> $\Phi(d'/2)$ comes from
+    treating the log-likelihood ratio as normal. At very low depth the counts are mostly zeros, the
+    ratio is lumpy and the approximation breaks. Week 9 measured this. Note that the
+    $\sqrt{\text{depth}}$ law itself is <em>not</em> what fails there — a distinction worth one
+    sentence, because it is the difference between a broken theory and a known-range theory.</li>
+    <li><strong>$\varphi$ treated as fixed under thinning.</strong> The negative-binomial prediction
+    scales the rates by the keep-fraction and holds the per-gene dispersion $\varphi$ constant. That
+    is exactly right only in a limit; under real thinning the measured $\varphi$ moves. Say that the
+    NB curve is therefore approximate, and in which direction.</li>
+    <li><strong>The bead exponent's interval.</strong> Quote it as a number with its interval and
+    say plainly what it does and does not exclude. An exponent of $0.42 \pm 0.20$ is consistent
+    with $1/2$; it is also consistent with $0.3$ and with $0.6$. It supports the prediction weakly.
+    Weak support honestly described is worth more than strong support asserted.</li>
+    <li><strong>Any point dropped from any fit.</strong> Every one. Which point, why, what the fit
+    gives with it included, and who made the decision. If a bead point was dropped because the jar
+    was refilled mid-run, say so — that is a good reason and it reads as one. A dropped point that
+    surfaces in Q&amp;A instead of in the text is the single fastest way to lose a room.</li>
+    <li><strong>Surrogate or simulated stand-ins, if any figure still uses one.</strong> If the
+    freeze script refused a figure and the report ships without it, say which claim consequently
+    has no figure behind it. If, against the rule, a stamped figure is included anywhere, it must be
+    labelled as such in the caption and in this list, in the same words.</li>
+  </ul>
+</div>
+
+<div class="box example">
+  <span class="box-tag">One limitation, written badly and then written well</span>
+  <p><strong>Bad.</strong> <em>"Some limitations exist in this study. The data was obtained from a
+  single source and gene independence was assumed, which may have affected results. Future work
+  could address these issues."</em></p>
+  <p><strong>Good.</strong> <em>"Two assumptions limit what these results support. First, the
+  real-data analysis uses one donor (10x PBMC 3k), so my intervals describe resampling of cells
+  within one blood sample and say nothing about variation between people; testing that would need
+  several donors analysed with the donor, not the cell, as the unit. Second, adding $d'$ in
+  quadrature across genes assumes the genes are conditionally independent. Marker genes are
+  co-regulated, so the effective number of independent genes is below the nominal $k$, and my
+  $\sqrt{k}$ prediction should be read as an upper bound on what additional markers buy."</em></p>
+  <p class="muted">The good version is longer, and it is the better use of the words. It names the
+  assumption, says what it affects, gives the direction of the error, and states what would settle
+  it. "May have affected results" does none of those and asks the reader to imagine the problem for
+  themselves — which they will, generously, in the worst available direction.</p>
+</div>
+
+<h2>8 &nbsp;Stating a negative result, and who decided what</h2>
+
+<p>The most interesting thing in this project is a negative result: on real data the Poisson prediction fails, because counts are overdispersed, and past a certain depth more sequencing buys almost nothing. Reports routinely bury this kind of finding under apology. Do not.</p>
+
+<div class="box example">
+  <span class="box-tag">The same finding, twice</span>
+  <p><strong>Bad.</strong> <em>"Unfortunately, our theoretical model did not work on the real
+  dataset. We were unable to confirm our hypothesis, likely due to noise in the data and the
+  limitations of our approach. With more time we would have investigated further."</em></p>
+  <p>Four failures in three sentences. "Did not work" says nothing measurable. "Unable to confirm"
+  frames a result as a personal shortfall. "Likely due to noise" is a guess offered as an
+  explanation. And "with more time" invites the reader to discount everything above it.</p>
+  <p><strong>Good.</strong> <em>"On downsampled PBMC data the measured accuracy falls below the
+  Poisson prediction at every keep-fraction, by ⟨0.0X to 0.0Y⟩, with Wilson intervals excluding
+  zero at ⟨m⟩ of 8 points. Replacing the Poisson variance with the measured negative-binomial
+  variance $\mathrm{Var} = m + \varphi m^2$ ($\varphi$ median ⟨0.0Z⟩) reduces the discrepancy to
+  ⟨0.0W⟩. The failure is therefore attributable to overdispersion rather than to the
+  $\sqrt{\text{depth}}$ scaling, which the simulation and bead arms both reproduce. The practical
+  consequence is a ceiling: past ⟨depth⟩, additional depth changes predicted accuracy by less than
+  ⟨amount⟩."</em></p>
+  <p class="muted">The bracketed values are placeholders for your own run's numbers — the shape of
+  the sentences is the lesson, not the digits. Notice what the good version does: it quantifies the
+  gap, it names the cause, it shows the cause is sufficient by fixing the model and re-measuring,
+  it isolates which part of the theory survived, and it ends with something a person designing a
+  sequencing run could act on. It reads as a finding because it is one.</p>
+</div>
+
+<div class="box pitfall">
+  <span class="box-tag">The passive voice, and "we chose 32 markers"</span>
+  <p><strong>The passive hides the agent, and the agent is usually you.</strong> "The threshold was
+  set at 0.5" — by whom, when, and knowing what? If you set it before seeing the test data, that
+  is a fact in your favour and the passive voice throws it away. If you set it after, that is
+  something the reader is entitled to know. Compare: <em>"I fixed the decision threshold at 0.5
+  before evaluating on held-out cells"</em> against <em>"a threshold of 0.5 was used"</em>. Same
+  threshold; entirely different evidential value. Write Methods in the first person and in the
+  past tense. It is shorter, and it is answerable.</p>
+  <p><strong>"We chose 32 markers" is half a sentence.</strong> Why 32? The reader's suspicion —
+  reasonable, and the one a judge will voice — is that you tried several values and reported the
+  best. Kill it with the truth: <em>"I used the top 32 markers by training-set separation. The
+  number was fixed before any test-set evaluation; I did not tune it. Results at 16 and 64 markers
+  are in the appendix and change the headline accuracy by less than ⟨amount⟩."</em> If you did not
+  run the sensitivity check, say <em>that</em> instead — "the choice was not varied" is a real
+  limitation and a cheap one to admit; a fabricated robustness claim is not recoverable.</p>
+  <p>The general rule: any number in your report that a reader could imagine having been chosen to
+  make things look good needs one clause saying when it was chosen and against what.</p>
+</div>
+
+<h2>9 &nbsp;Common report failures</h2>
+
+<div class="box warning">
+  <span class="box-tag">Four failures, and how to detect each in your own draft</span>
+  <p><strong>1. Results that are really Methods.</strong> "We then trained a logistic regression
+  with learning rate 0.5 for 1200 iterations and evaluated it on the held-out 30%." That is a
+  procedure, and procedures belong in Methods. <em>Detection:</em> go through Results and highlight
+  every sentence containing a parameter value or the word "then". If more than a fifth of the
+  section lights up, you are describing rather than reporting. <em>Fix:</em> move the sentence to
+  Methods and replace it with what it produced, plus an interval.</p>
+  <p><strong>2. A Discussion that repeats the Results.</strong> "As shown in Figure 4, accuracy
+  decreased at low keep-fractions." The reader saw Figure 4 ninety seconds ago. <em>Detection:</em>
+  if a Discussion sentence could be deleted without removing any claim not already made, it is a
+  repeat. <em>Fix:</em> the Discussion answers three questions Results does not — <em>why</em> the
+  numbers came out that way, <em>what</em> would have to be true for the alternative explanation to
+  hold, and <em>what someone should do differently</em> as a result. In a 6–8 page report, most of
+  this belongs inside the Results paragraphs and the rest in Limitations; a separate Discussion is
+  optional here and is usually where padding hides.</p>
+  <p><strong>3. Claims that drifted a level.</strong> Between the Week 9 log ("simulation matched
+  to within 0.02 at this seed" — <span class="claim observed">observed</span>) and the report ("we
+  proved that simulation matches theory" — <span class="claim proved">proved</span>) a claim moved
+  up a level, and nobody decided to move it. <em>Detection:</em> put the draft next to
+  <code>progress/week13_claims.md</code> and check every claim's status word by word. Hunt the
+  verbs: "proves", "shows", "demonstrates", "confirms", "establishes". <em>Fix:</em> demote to the
+  ledger status, or promote the ledger status and be prepared to defend the promotion at the
+  whiteboard. Never let the report be the first place a claim appears at its new level.</p>
+  <p><strong>4. The abstract that promises a different paper.</strong> Written first, from
+  ambition, and never revised. <em>Detection:</em> read the abstract last, out loud, and check
+  every noun in it against the finished Results. <em>Fix:</em> write the abstract after everything
+  else, in 150 words: question, approach, headline number with its interval, the limit. Four
+  sentences is enough.</p>
+</div>
+
+<h2>10 &nbsp;Your Python laboratory</h2>
+
+<div class="box python">
+  <span class="box-tag">This week in the celldetect project</span>
+  <p>No new library functions this week. The work is the freeze and the draft.</p>
+  <ol>
+    <li><strong>Read <code>experiments/week14_report_figures.py</code> top to bottom</strong> — it
+    is 130 lines and you should be able to explain every one. In particular: the <code>PLAN</code>
+    table (destination, module, index into that module's returned paths), the <code>CAPTIONS</code>
+    dictionary, and <code>_looks_like_stand_in</code>, which reads each module's
+    <code>USED_STAND_IN</code> flag.</li>
+    <li><strong>Run it:</strong> <code>python experiments/week14_report_figures.py</code>. Read the
+    console output. If it refuses a figure, fix the data — run
+    <code>python experiments/fetch_pbmc3k.py</code>, or enter your bead tallies into
+    <code>data/beads/*.csv</code> — and run it again. Do not edit the refusal rule.</li>
+    <li><strong>Edit the captions in <code>CAPTIONS</code></strong>, in the script, until each one
+    passes Lab 2's five checks honestly. Re-run so that <code>figures/report/CAPTIONS.md</code>
+    matches what your document says.</li>
+    <li><strong>Run the freeze test</strong> in Section 6 and record the hashes in
+    <code>progress/week14.md</code>.</li>
+    <li><strong>Full regeneration from clean:</strong>
+    <code>python experiments/make_all_figures.py</code>, and confirm it exits with 0 failures. Use
+    <code>--smoke</code> while you are iterating; never cite a smoke figure.</li>
+    <li><strong>Check the draft against the ledger:</strong> open
+    <code>progress/week13_claims.md</code> beside the draft and verify every claim's status word
+    for word.</li>
+  </ol>
+  <p><code>pytest tests/</code> must be fully green before you tag.</p>
+</div>
+
+<h2>11 &nbsp;Exercises</h2>
+<p class="muted">Stars mark difficulty: ★ routine · ★★ requires an idea · ★★★ challenge. These exercises produce text you will paste into the draft — none of them is busywork.</p>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 14.1</span><span class="stars">★</span></div>
+  <div class="ex-body">Rewrite this caption so it stands alone: <em>"Figure 3. Simulation results showing accuracy for different depths and numbers of genes, compared with the theory."</em> Assume 4,000 cells per type per point, marker-set sizes 1, 8 and 64, depths from 250 to 16,000, seed 107, no error bars drawn because the intervals are smaller than the markers.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p><em>"Figure 3. Classification accuracy of the optimal (naive-Bayes) rule on simulated cells
+      against sequencing depth, for marker-set sizes $k = 1$, 8 and 64 (colours). Points are
+      measured over 4,000 cells per type per depth; 95% Wilson intervals are narrower than the
+      plotting symbols and are omitted. Curves are the prediction $\Phi(d'/2)$ with
+      $d' = \sqrt{\sum_g (\lambda_{1g}-\lambda_{2g})^2/\bar\lambda_g}$, computed from the simulator's
+      own rate vectors with no parameters fitted to these points. Simulation seed 107."</em></p>
+      <p>Seventy words. It names what varied (depth, and $k$ by colour), the sample size (4,000 per
+      type per point), the error bars (Wilson, and <em>why they are not drawn</em> — never silently
+      omit them), the provenance of the curve, the no-free-parameters claim, and the seed.</p>
+      <p class="muted">The clause about omitted intervals is the one students leave out and the one
+      a careful reader looks for. "There are no error bars" and "the error bars are smaller than the
+      dots" look identical on paper and mean completely different things.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 14.2</span><span class="stars">★</span></div>
+  <div class="ex-body">Your draft comes in at: abstract 150, introduction 600, theory 900, methods 400, results 1,300, limitations 150, conclusion 250. (a) Total pages, using this chapter's conversion with six figures. (b) Which of the two budget warnings fire? (c) Propose specific cuts and additions totalling the right number of words, and justify each in one clause.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) Words total $150+600+900+400+1300+150+250 = 3{,}750$. Text pages $= 3750/600 = 6.25$.
+      Figures $= 6 \times 0.33 = 2.0$. References $= 0.4$. <strong>Total 8.65 pages</strong> — over
+      the 8-page limit.</p>
+      <p>(b) Both. The total exceeds 8 pages, and Results (1,300) exceeds Theory $+$ Methods
+      ($900 + 400 = 1{,}300$)... by a hair — it does not exceed, it ties. Treat a tie as a warning:
+      the balance is already wrong, and Results is the section most likely to grow.</p>
+      <p>(c) A defensible set of edits, netting $-880$ words to reach about 2,870:</p>
+      <ul>
+        <li>Introduction $600 \to 450$ ($-150$): the motivation is one paragraph, not three.</li>
+        <li>Theory $900 \to 600$ ($-300$): cut the pmf-to-expectation derivation and the full LLR
+        algebra; both are on the "what to cut" list and neither is on the chain.</li>
+        <li>Results $1{,}300 \to 750$ ($-550$): most of the excess will be narration and parameter
+        values; move the parameters to Methods.</li>
+        <li>Methods $400 \to 450$ ($+50$): it just absorbed those parameters.</li>
+        <li>Limitations $150 \to 350$ ($+200$): 150 words cannot cover nine checklist items, so
+        the section currently is not doing its job.</li>
+        <li>Conclusion $250 \to 120$ ($-130$): a conclusion of 250 words is repeating Results.</li>
+      </ul>
+      <p>New total 2,870 words $= 4.8$ text pages $+ 2.0 + 0.4 = 7.2$ pages. Both warnings clear.</p>
+      <p class="muted">Notice the direction of the two <em>increases</em>. Cutting a draft is not
+      uniform shrinkage; it moves space from the sections that grew by accident to the ones that
+      carry the argument.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 14.3</span><span class="stars">★★</span></div>
+  <div class="ex-body">Split this Results paragraph into the part that belongs in Methods and the part that belongs in Results, and rewrite both: <em>"We downsampled the PBMC count matrix to keep-fractions of 0.02, 0.05, 0.1, 0.2, 0.35, 0.5, 0.75 and 1.0 using binomial thinning, then trained a logistic regression (learning rate 0.5, 1200 iterations) on 70% of the cells and evaluated on the remaining 30%. Accuracy decreased as the keep-fraction decreased, and was lower than the Poisson theory predicted, especially at low keep-fractions."</em></div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p><strong>Methods.</strong> <em>"I downsampled the PBMC count matrix by binomial thinning at
+      eight keep-fractions from 0.02 to 1.0, trained logistic regression (learning rate 0.5, 1,200
+      iterations) on a random 70% of cells and evaluated on the held-out 30%. The split, the
+      marker set and the hyperparameters were fixed before any test-set evaluation. Seed 111."</em></p>
+      <p><strong>Results.</strong> <em>"Measured accuracy falls monotonically with keep-fraction and
+      lies below the Poisson prediction at every point, with the gap widening from ⟨…⟩ at full depth
+      to ⟨…⟩ at a keep-fraction of 0.02 (F4). Wilson 95% intervals exclude the Poisson curve at ⟨m⟩
+      of the eight points. The negative-binomial prediction using the measured per-gene dispersion
+      tracks the measurements to within ⟨…⟩ across the same range."</em></p>
+      <p>Two tests confirm the split. Every parameter value moved to Methods. Every sentence
+      remaining in Results contains a number that was <em>measured</em> rather than <em>chosen</em>,
+      and each is compared with a prediction.</p>
+      <p class="muted">"Especially at low keep-fractions" became "widening from ⟨…⟩ to ⟨…⟩". Any
+      time you catch yourself writing "especially", "substantially" or "much", you are about to
+      write an adjective where a number belongs.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 14.4</span><span class="stars">★★</span></div>
+  <div class="ex-body">For each pair, say whether the claim drifted a level between the log and the report, name the two statuses, and give a correct report sentence. (a) Log: "measured median Fano 2.4 on PBMC markers, seed 111". Report: "we showed that single-cell counts are overdispersed." (b) Log: "derived that dropout at rate $q$ equals depth $D(1-q)$; verified numerically at three values of $q$". Report: "dropout is equivalent to reduced depth (Section 2.3)." (c) Log: "bead exponent 0.42, 95% interval $[0.22, 0.62]$". Report: "the bead experiment confirms the square-root law."</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p><strong>(a) Drifted.</strong> <span class="claim observed">observed</span> → an implied
+      <span class="claim proved">proved</span>, and it also generalizes from one donor's marker
+      genes to "single-cell counts" everywhere. Correct: <em>"In this dataset the median Fano
+      factor across the selected marker genes is 2.4 (seed 111, one donor), well above the Poisson
+      value of 1; counts here are overdispersed."</em></p>
+      <p><strong>(b) Did not drift.</strong> <span class="claim proved">proved</span> in the log,
+      <span class="claim proved">proved</span> in the report, and the report's version is fine — but
+      it should carry its assumptions. Better: <em>"Dropout at rate $q$ is exactly equivalent to
+      sequencing at depth $D(1-q)$, by the thinning property of the Poisson distribution, provided
+      dropout acts independently on each molecule and does not depend on the gene or the cell
+      (Section 2.3); the equivalence was also verified numerically at $q = 0$, 0.3 and 0.6."</em></p>
+      <p><strong>(c) Drifted, badly.</strong> <span class="claim conjectured">conjectured</span> →
+      <span class="claim proved">proved</span>. "Confirms" is far too strong for an interval that
+      spans 0.22 to 0.62 and therefore excludes almost nothing. Correct: <em>"The bead experiment
+      gives a fitted exponent of 0.42 with a 95% interval of $[0.22, 0.62]$. This is consistent with
+      the predicted 1/2, but the interval is wide enough to be consistent with a range of other
+      exponents; the experiment supports the prediction weakly, and the width is set by the 40
+      trials per draw size that were feasible by hand."</em></p>
+      <p class="muted">Part (c) is the one to internalize. "Consistent with" and "confirms" are not
+      synonyms: a measurement consistent with everything confirms nothing. Saying so yourself is
+      what makes the rest of your report believable — and it is the honest answer to the Week 15
+      question "isn't $0.42 \pm 0.2$ consistent with anything?"</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 14.5</span><span class="stars">★★</span></div>
+  <div class="ex-body">Write the limitations entry for the marker-mass convention, 60–90 words, for a reader who has never seen <code>marker_profiles</code>. It must say what the convention is, which figures use which version, and why a reader should care.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p><em>"My simulator gives two cell types an average total probability <code>marker_mass</code>
+      spread over $k$ marker genes, with type 1 exceeding type 2 by a fixed fold change. Two
+      conventions appear in this report. Where the pooled mass is held fixed as $k$ grows (F2, F3),
+      per-gene signal falls as $1/k$ and the $\sqrt{k}$ law is tested against a genuine trade-off.
+      Where per-gene mass is held fixed (F6), total marker signal grows with $k$. The two answer
+      different questions, and only the first bears on whether adding markers to a real panel
+      helps."</em></p>
+      <p>Eighty-eight words. It states the convention, distinguishes the two versions, attributes
+      each to specific figures, and gives the reader the reason to care in the final clause: only
+      one of the two conventions corresponds to the decision an experimenter actually faces.</p>
+      <p class="muted">This is the limitation most likely to be missed, because it lives inside a
+      function signature rather than in the biology. It is also the one a sharp judge will find:
+      "if you split the same signal over more genes, why would anything improve?" is a natural
+      question, and Week 5 answered it — a fixed total split over more genes gains you nothing. If
+      a figure appears to show a gain, the reader deserves to know which convention produced it.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 14.6</span><span class="stars">★★★</span></div>
+  <div class="ex-body">You run the freeze test and the two sets of hashes differ for exactly one figure. List five distinct causes that could produce that, ordered by how likely they are in this repository, and give the diagnostic and the fix for each. Then say which of the five would <em>not</em> be caught by simply looking at the two images.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <ol>
+        <li><strong>An unseeded generator.</strong> A stray <code>np.random.default_rng()</code> with
+        no argument, or <code>np.random.rand</code> used directly instead of the passed
+        <code>rng</code>. <em>Diagnostic:</em> grep the module for <code>random</code> and check
+        every construction site takes a seed. <em>Fix:</em> thread the single seeded
+        <code>rng</code> through.</li>
+        <li><strong>A shared generator consumed in a different order.</strong> Every script threads
+        one <code>rng</code>; if a loop's iteration order changes, or a step is added, every
+        subsequent draw shifts. <em>Diagnostic:</em> the figure changes only after an unrelated
+        edit earlier in the script. <em>Fix:</em> derive an independent generator per stage, or
+        accept it and re-freeze deliberately.</li>
+        <li><strong>Unsorted <code>glob</code> over the bead CSVs.</strong> <code>glob.glob</code>
+        returns filesystem order, which is not guaranteed. If records are concatenated in a
+        different order, ties and floating-point summation order can change. <em>Diagnostic:</em>
+        it reproduces on your machine but not on another. <em>Fix:</em>
+        <code>sorted(glob.glob(...))</code>.</li>
+        <li><strong>Iteration over a set, or over a dict built from one.</strong> Set ordering is
+        not stable across runs for strings when hash randomization is on. <em>Diagnostic:</em>
+        legend entries or colours swap between runs. <em>Fix:</em> sort before iterating.</li>
+        <li><strong>A library version change.</strong> matplotlib writes its version into the PNG
+        header, so an upgrade changes the bytes with no visible change at all. NumPy changes can
+        also move the last digit of a reduction. <em>Diagnostic:</em> every figure's hash changes at
+        once, and the images look identical. <em>Fix:</em> pin the versions, record them in
+        Methods, and re-freeze once deliberately.</li>
+      </ol>
+      <p><strong>Not caught by looking:</strong> number 5 for certain — a header-only change is
+      invisible. Number 4 is often invisible too, if the swap only changes which of two overlapping
+      series is drawn on top. And numbers 1–3 are invisible whenever the change is smaller than a
+      pixel, which for a well-converged Monte Carlo is most of the time. That is the whole argument
+      for hashing: the failures that eyes miss are exactly the quiet ones that make a number
+      irreproducible.</p>
+      <p class="muted">Cause 2 is worth dwelling on. It means "the figure changed" does not imply
+      "the figure is wrong" — a deliberate, documented re-freeze is a normal event. What must never
+      happen is a change nobody noticed. Record the hashes in the progress log so that a change
+      always has a date attached to it.</p>
+    </div>
+  </details>
+</div>
+
+<h2>12 &nbsp;Research notebook</h2>
+
+<p>This week the notebook is a workshop, not an archive:</p>
+
+<ul>
+  <li>The one-paragraph statement of what the report claims (Section 1), in your own words, on the
+  first page. Everything else is checked against it.</li>
+  <li>The seven-link chain, written from memory, one line each. If a link needs more than one line,
+  you do not understand it well enough yet to compress it — go back to that week.</li>
+  <li>Your filled-in word budget from Lab 1, with the actual word count of each drafted section
+  written next to the plan as you go.</li>
+  <li>The limitations checklist copied out by hand, with a tick and a draft sentence against each
+  of the nine items. Items with no sentence yet are what this week is for.</li>
+  <li>The claim-drift audit from Exercise 14.4, run over your own draft: every verb of the form
+  "shows / proves / demonstrates / confirms" listed, with the ledger status next to it.</li>
+  <li>The freeze-test hashes, dated.</li>
+</ul>
+
+<p>Scan to <code>notebook/week14/</code>, fill in <code>progress/week14.md</code> (including the
+freeze hashes and the software versions), commit the draft, <code>figures/report/</code> with its
+<code>CAPTIONS.md</code> and <code>SEEDS.json</code>, and then — only if the gate below passes —
+tag:</p>
+
+<p><code>git tag -a report-draft -m "M7: 6-8 page draft complete end to end; figures frozen and reproducible"</code><br>
+<code>git push origin report-draft</code></p>
+
+<div class="box verify">
+  <span class="box-tag">MILESTONE M7 · verification (with mentor)</span>
+  <ul>
+    <li><strong>The draft exists and is complete end to end.</strong> No section headed "TODO", no
+    bracketed placeholder left unfilled, no figure referenced that does not exist. Your mentor
+    reads it start to finish without stopping. A draft with a hole in it is not a draft; it is a
+    plan for one.</li>
+    <li><strong>The figure freeze passes.</strong> Delete <code>figures/report/</code>, run
+    <code>python experiments/week14_report_figures.py</code> in front of your mentor, and show that
+    the hashes match the ones recorded in <code>progress/week14.md</code>. Say what the script
+    refused, if anything, and why.</li>
+    <li><strong>Every claim in the report matches its status in the ledger.</strong> Your mentor
+    picks three claims from the draft and asks for the corresponding row of
+    <code>progress/week13_claims.md</code>. No claim may be stated at a higher level in the report
+    than in the ledger.</li>
+    <li><strong>The limitations checklist is fully covered.</strong> Read the nine items aloud and
+    point to the sentence covering each. An uncovered item is a fail, not a note — including the
+    marker-mass convention, which is the one that gets forgotten.</li>
+    <li><strong>The captions stand alone.</strong> Cover the body text and read one caption cold.
+    Your mentor should be able to say what varied, what the bars are, what $n$ was and what seed
+    produced it.</li>
+    <li><strong>Word budget and page count are inside 6–8 pages</strong>, and Results does not
+    exceed Theory plus Methods.</li>
+    <li><strong><code>pytest tests/</code> fully green and
+    <code>make_all_figures.py</code> exits with zero failures</strong>, then the tag
+    <code>report-draft</code> exists and is pushed.</li>
+  </ul>
+  <p class="muted">If the freeze test fails, do not tag. An untagged draft with an honest note
+  about which figure would not reproduce is a better record than a tag that means "it looked the
+  same to me".</p>
+</div>
+
+<h2>13 &nbsp;Going deeper</h2>
+<ul>
+  <li>Mensh &amp; Kording (2017), <em>Ten simple rules for structuring papers</em>, PLoS Computational Biology 13(9). <span class="muted">The best short thing written on this. Rule 6 — one message per paragraph, the message in the first sentence — will fix more of your draft than anything else here. Twenty minutes. <span class="claim cited">cited</span></span></li>
+  <li>Gopen &amp; Swan (1990), <em>The Science of Scientific Writing</em>, American Scientist 78. <span class="muted">Why some technically correct sentences are unreadable: readers expect the subject early and the new information at the end. Read it with your own theory section open beside it.</span></li>
+  <li>Tufte, <em>The Visual Display of Quantitative Information</em>, chapters 1–2. <span class="muted">Skim for the data-ink idea and then go and look at F1–F6 asking what each pixel is for.</span></li>
+  <li>Feynman (1974), <em>Cargo Cult Science</em>. <span class="muted">Four pages, and the direct source of this chapter's Section 7: "the idea is to give all of the information to help others to judge the value of your contribution, not just the information that leads to judgement in one particular direction." Read it before writing Limitations.</span></li>
+  <li>The Journal of Emerging Investigators <a href="https://emerginginvestigators.org/">author guidelines</a>. <span class="muted">Concrete length and section requirements for exactly this kind of report, written for high-school authors. Read them now; Week 15 discusses submission. Requirements change, so check the current version.</span></li>
+  <li>Course extras: <a href="../extras/how-to-use.html">how to use this course</a> · <a href="../extras/notation.html">notation card</a> · <a href="../extras/ai-policy.html">using AI tools honestly</a> · <a href="../extras/resources.html">resource library</a></li>
+</ul>
+
+</div>
+
+<footer class="site">How Much Data Does It Take to Tell Two Cell Types Apart? · Week 14 · <a href="../index.html">Course home</a></footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  /* ---------------- Lab 1: word-budget planner --------------------------- */
+  (function () {
+    const SEC = [
+      { key: "abs", name: "Abstract", target: 150, color: CD.C.gray },
+      { key: "int", name: "Introduction", target: 450, color: CD.C.blue },
+      { key: "the", name: "Theory", target: 600, color: CD.C.orange },
+      { key: "met", name: "Methods", target: 450, color: CD.C.teal },
+      { key: "res", name: "Results", target: 750, color: CD.C.purple },
+      { key: "lim", name: "Limitations", target: 350, color: CD.C.magenta },
+      { key: "con", name: "Conclusion", target: 120, color: CD.C.green }
+    ];
+    const WPP = 600, FIGPAGES = 6 * 0.33, REFPAGES = 0.4;
+    const words = {};
+    SEC.forEach(s => { words[s.key] = s.target; });
+
+    function run() {
+      let total = 0;
+      SEC.forEach(s => { total += words[s.key]; });
+      const pages = total / WPP + FIGPAGES + REFPAGES;
+
+      const P = CD.plot("w14lab1", { xmin: 0, xmax: 10, ymin: 0, ymax: 3,
+                                     xlabel: "pages", ylabel: "", yfmt: () => "" });
+      P.clear(); P.axes();
+      const ctx = P.ctx;
+      let x = 0;
+      SEC.forEach(s => {                       // stacked bar, one block per section
+        const w = words[s.key] / WPP;
+        ctx.fillStyle = s.color;
+        ctx.fillRect(P.X(x), P.Y(2.3), P.X(x + w) - P.X(x), P.Y(1.3) - P.Y(2.3));
+        x += w;
+      });
+      ctx.fillStyle = "rgba(148,163,184,0.75)";  // figures + references block
+      ctx.fillRect(P.X(x), P.Y(2.3), P.X(x + FIGPAGES + REFPAGES) - P.X(x),
+                   P.Y(1.3) - P.Y(2.3));
+      P.label(x + 0.06, 1.75, "figures + refs", { color: "#334155" });
+      P.vline(6, "6 pages", { color: CD.C.green, width: 2 });
+      P.vline(8, "8 pages", { color: CD.C.red, width: 2 });
+      P.label(0.1, 2.55, "text sections, one block each (colours match the table above)",
+              { color: CD.C.navy });
+      P.label(0.1, 0.75, "total: " + pages.toFixed(2) + " pages from " + total + " words",
+              { color: CD.C.navy, font: "700 14px sans-serif" });
+
+      const warn = [];
+      if (pages > 8) warn.push("OVER the 8-page limit by " + (pages - 8).toFixed(2) + " pages");
+      if (pages < 6) warn.push("UNDER 6 pages by " + (6 - pages).toFixed(2) + " — something is missing");
+      if (words.res > words.the + words.met)
+        warn.push("Results (" + words.res + ") exceeds Theory + Methods (" +
+                  (words.the + words.met) + "): a reader cannot check you");
+      CD.table("w14lab1out", ["quantity", "value"], [
+        ["total words", total],
+        ["text pages (at " + WPP + " w/pg)", (total / WPP).toFixed(2)],
+        ["figures (6) + references", (FIGPAGES + REFPAGES).toFixed(2)],
+        ["<b>total pages</b>", "<b>" + pages.toFixed(2) + "</b>"],
+        ["warnings", warn.length ? "<b style='color:#b91c1c'>" + warn.join(" · ") + "</b>" : "none"]
+      ]);
+    }
+
+    SEC.forEach(s => {
+      CD.slider("w14lab1ctl", { label: s.name, min: 0, max: 1500, step: 25,
+                                value: s.target, fmt: v => v + "w" },
+                v => { words[s.key] = v; run(); });
+    });
+    CD.button("w14lab1ctl", "Reset to the budget", () => {
+      SEC.forEach(s => { words[s.key] = s.target; });
+      document.querySelectorAll("#w14lab1ctl input[type=range]").forEach((el, i) => {
+        el.value = SEC[i].target;
+        el.parentNode.querySelector(".val").textContent = SEC[i].target + "w";
+      });
+      run();
+    }, true);
+  })();
+
+  /* ---------------- Lab 2: caption checker ------------------------------- */
+  (function () {
+    const box = document.getElementById("w14cap");
+    const CHECKS = [
+      { name: "says what was varied",
+        re: /\b(vs\.?|versus|against|across|as a function of|varying|varied|swept|sweep|for each|range of)\b/i,
+        hint: "use 'against', 'across' or 'as a function of'" },
+      { name: "names the error bars",
+        re: /(error bar|wilson|bootstrap|confidence|95\s*%|interval|±)/i,
+        hint: "say which interval, or say why none is drawn" },
+      { name: "gives the sample size",
+        re: /(\bn\s*=\s*\d|\d[\d,]*\s*(cells|trials|draws|replicates|resamples|permutations|genes))/i,
+        hint: "'over 40 trials per point', 'n = 4,000 cells per type'" },
+      { name: "gives the seed",
+        re: /seed[^.]{0,15}\d/i,
+        hint: "'seed 112' — the reader must be able to regenerate it" },
+      { name: "explains the visual encoding",
+        re: /(points?|lines?|curves?|dashed|solid|shaded|colou?rs?|symbols?|markers?|panels?)\b/i,
+        hint: "which colour is which arm; what the curve is" }
+    ];
+
+    function run() {
+      const t = box.value || "";
+      const nwords = t.trim() ? t.trim().split(/\s+/).length : 0;
+      const rows = CHECKS.map(c => {
+        const ok = c.re.test(t);
+        return [(ok ? "<b style='color:#15803d'>yes</b>" : "<b style='color:#b91c1c'>no</b>"),
+                c.name, ok ? "" : c.hint];
+      });
+      let note;
+      if (nwords === 0) note = "type a caption above";
+      else if (nwords < 20) note = "<b style='color:#b45309'>" + nwords +
+        " words — almost certainly too short to stand alone</b>";
+      else if (nwords > 120) note = "<b style='color:#b45309'>" + nwords +
+        " words — this is becoming a paragraph of Results</b>";
+      else note = nwords + " words — a reasonable length";
+      rows.push(["", "length", note]);
+      CD.table("w14lab2out", ["passes", "check", "what is missing"], rows);
+    }
+
+    const WEAK = "Figure 5. Results of the bead experiment. The data agrees well with the theoretical prediction.";
+    const STRONG = "Figure 5. Bead-drawing accuracy against draw size n, for the plain arm (magenta) " +
+      "and the 30% dropout arm (teal). Points are the fraction of correct jar identifications over " +
+      "40 trials per draw size; error bars are 95% Wilson intervals. Curves are the prediction " +
+      "computed in Week 6 before any beads were drawn, with no fitted parameters. Analysis seed 112.";
+
+    box.addEventListener("input", run);
+    CD.button("w14lab2ctl", "Load the weak caption", () => { box.value = WEAK; run(); }, true);
+    CD.button("w14lab2ctl", "Load the strong caption", () => { box.value = STRONG; run(); }, true);
+    CD.button("w14lab2ctl", "Clear", () => { box.value = ""; run(); }, true);
+    run();
+  })();
+});
+</script>
+</body>
+</html>

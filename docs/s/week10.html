@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 10 — Real Data I: PBMC 3k and Markers</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="week09.html">← Week 9</a><a href="week11.html">Week 11 →</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Week 10</span>
+      <span class="badge win">WIN: your first result on real cells</span>
+      <span class="badge aim2">Aim 2 · Real data</span>
+    </div>
+    <h1 class="chapter-title">Real Data I: PBMC 3k and Markers</h1>
+    <div class="chapter-sub">A real 10x dataset, raw and unnormalized · why the labels are not ground truth · selection leakage, measured rather than assumed · and why fold change is not $d'$</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<h2>Objectives</h2>
+<ul class="objectives">
+  <li>Describe PBMC 3k in three sentences: what the cells are, how many molecules per cell, and which two cell types this project uses.</li>
+  <li>Explain why <code>fetch_pbmc3k.py</code> caches <em>raw integer counts</em> and refuses to normalize them, and say what normalization would destroy.</li>
+  <li>State, without prompting, that the cell-type labels are cluster annotations rather than measurements, and name one thing that would be different if they were wrong.</li>
+  <li>Write down the marker-ranking rule the code uses — $|\log_2$ fold change$|$ with a pseudocount of 1, restricted to genes detected in at least <code>min_cells</code> cells — and justify each of the three pieces.</li>
+  <li>Explain selection leakage mechanically, in terms of 20,000 genes and 2,700 cells, and state the honest protocol that removes it.</li>
+  <li>Report the leaky-minus-honest gap on your own data as a number, at several marker-panel sizes.</li>
+  <li>Show, with arithmetic, that a gene can have a huge fold change and a negligible $d'$, and that the two rankings therefore disagree.</li>
+  <li>Implement <code>select_markers</code> and <code>downsample_matrix</code>, get <code>tests/test_realdata.py</code> green, and produce both Week 10 figures at SEED 110.</li>
+</ul>
+
+<h2>1 &nbsp;A real dataset, at last</h2>
+
+<p>For nine weeks every number in this project has come out of a formula you derived or a simulator you wrote. Both are yours, which is their strength and their weakness: they agree with each other because you built them from the same beliefs. This week you meet something that was not built from your beliefs at all.</p>
+
+<div class="box data">
+  <span class="box-tag">PBMC 3k, in one paragraph</span>
+  <p><strong>PBMC</strong> stands for <em>peripheral blood mononuclear cells</em>: the round-nucleus white blood cells you get from a tube of blood after the red cells and the granulocytes have been separated out. Mostly T cells and monocytes, with B cells, natural killer cells and dendritic cells in smaller numbers. The dataset is about <strong>2,700 such cells from a single healthy donor</strong>, sequenced by 10x Genomics on their v1 chemistry and released in 2016 as a demonstration dataset.</p>
+  <p>It is, without much competition, <strong>the standard teaching dataset of the field</strong>. The Seurat tutorial uses it. The scanpy tutorial uses it. Thousands of methods papers benchmark on it. That ubiquity is exactly why it is the right choice here: when you present a result on PBMC 3k, nobody in the room has to take your word for what the data is.</p>
+  <p>The number that matters for this project is the <strong>library size</strong>: the total number of molecules counted per cell. The median in PBMC 3k is a couple of thousand UMIs. Two thousand molecules, spread across roughly 20,000 genes. Everything Weeks 1 through 5 said about small samples applies here literally.</p>
+</div>
+
+<p>Two thousand molecules per cell is not a lot, and it is worth converting that into the language of Week 1 before going further. If a well-expressed marker gene is $p = 0.002$ of the transcriptome, its expected count in one cell is $\lambda = 2000 \times 0.002 = 4$, with standard deviation $\sqrt4 = 2$: a relative noise of <strong>50%</strong>. That is the raw material of every classification decision you will make this week and next.</p>
+
+<div class="box biology">
+  <span class="box-tag">"UMI count" and "molecule captured" — close enough, and the caveat</span>
+  <p>A <strong>UMI</strong> (unique molecular identifier) is a short random barcode attached to each mRNA molecule before amplification. Because amplification copies the barcode along with the molecule, you can collapse all the reads carrying the same UMI back to one original molecule, which removes most of the distortion PCR would otherwise introduce. Counting UMIs is therefore a much better approximation to "counting molecules" than counting reads is, and <strong>for this project's purposes the two phrases are interchangeable</strong>: a UMI count is a count of captured molecules.</p>
+  <p>The caveat, which belongs in your limitations section rather than in the main argument: the correspondence is not exact. Two distinct molecules of the same gene in the same cell can be assigned the same random barcode (a <em>UMI collision</em>), which undercounts; sequencing errors in the barcode can split one molecule into two apparent ones, which overcounts; and PCR is not perfectly corrected by any of this. The standard fixes are saturation corrections and barcode error-correction, and the residual error is generally small at PBMC 3k's counts per gene. <span class="claim cited">cited</span> Say the sentence "I am treating UMI counts as molecule counts, which is standard and approximately right" out loud in Week 15 before anyone asks you.</p>
+</div>
+
+<h2>2 &nbsp;Getting the data, and the one line that matters</h2>
+
+<p>The dataset is not in this repository. Thirty-five megabytes of sparse matrix does not belong in git, and the download depends on scanpy, which is a heavy dependency you should not need in order to run <code>pytest</code>. So the project splits the job in two: one script that downloads once, and a cache that everything afterwards reads.</p>
+
+<div class="box python">
+  <span class="box-tag">The download, once and only once</span>
+  <p><code>pip install -r requirements-optional.txt</code> &nbsp;(this is what brings in scanpy and anndata; the ordinary <code>requirements.txt</code> deliberately does not)</p>
+  <p><code>python experiments/fetch_pbmc3k.py</code></p>
+  <p>It downloads about 35 MB, runs the standard clustering pipeline to obtain labels, and writes <code>python/data/pbmc3k_cache.npz</code> containing four arrays: <code>X</code> (cells × genes, <code>int32</code> raw counts), <code>y</code> (integer labels), <code>genes</code> (names) and <code>types</code> (label names in order). After that, <code>celldetect.realdata.load_pbmc()</code> reads the cache and <strong>scanpy is never needed again</strong>. The reproducibility of everything downstream does not depend on a scanpy version.</p>
+  <p>The script prints the cell count, the per-type counts, the gene count after filtering, and the median library size. Copy those four numbers into <code>progress/week10.md</code> the moment you see them. They are the "materials" paragraph of your report and you will not want to re-derive them in Week 14.</p>
+</div>
+
+<p>The two cell types are <strong>CD14+ monocytes</strong> and <strong>CD4 T cells</strong>, chosen deliberately: they are the two largest and cleanest populations in PBMC 3k, and they are separated by well-known markers (<em>LYZ</em>, <em>S100A8</em>, <em>S100A9</em>, <em>CST3</em> on the monocyte side; <em>IL7R</em>, <em>CD3D</em>, <em>CD3E</em>, <em>LTB</em> on the T-cell side). Choosing an easy pair is not cheating, and you should be ready to say why: <strong>this project measures how accuracy scales with depth, not how hard one particular pair of cell types is</strong>. A hard pair would pin the accuracy curve near chance at every depth, and a trivially easy pair would pin it at 1. An easy-but-not-trivial pair keeps the curve in the range where it can move, which is where a scaling law can be measured at all.</p>
+
+<div class="box warning">
+  <span class="box-tag">The single most important line in <code>fetch_pbmc3k.py</code></span>
+  <p>The script runs the standard preprocessing — <code>normalize_total(target_sum=1e4)</code>, <code>log1p</code>, highly-variable-gene selection, scaling, PCA, neighbours, Leiden — on a <em>copy</em> of the data called <code>proc</code>, <strong>and caches the counts from the original</strong>:</p>
+  <p><code>raw_counts = adata.X.copy()&nbsp;&nbsp;# keep the RAW counts; we need integers</code></p>
+  <p><strong>Why.</strong> "Counts per 10,000, then $\log(1+x)$" is what almost every scRNA-seq pipeline does before anything else, and it is the right thing to do if your goal is clustering or visualization. It is fatal here. Normalization divides each cell's counts by that cell's library size, turning integers into real numbers whose variance no longer equals their mean; $\log(1+x)$ then compresses the scale further, and the compression is <em>strongest exactly where the counts are smallest</em>, which is where all the Poisson structure lives. After normalizing and logging, the Fano factor means nothing, $d' = |\lambda_1 - \lambda_2|/\sqrt{\bar\lambda}$ has no derivation behind it, and the negative binomial fit of Week 11 is fitting noise you manufactured.</p>
+  <p><strong>Normalization destroys the Poisson structure this entire project is about.</strong> The preprocessing is run only to obtain cluster labels; the numbers that are analysed are raw integers. If you take one habit from this chapter into any future single-cell work, take this one: know which of your matrices are counts and which are not, and never let them get mixed up.</p>
+</div>
+
+<p>There is a second reason to keep integers, less philosophical and equally practical: <code>downsample_matrix</code> thins each entry with a binomial draw, and a binomial draw needs an integer $n$. Downsampling normalized data is not a well-defined operation. The Week 11 headline figure would be impossible.</p>
+
+<div class="box pitfall">
+  <span class="box-tag">No download yet? Then you are on surrogate data — and you must not forget it</span>
+  <p>If <code>python/data/pbmc3k_cache.npz</code> does not exist, <code>week10_markers.py</code> does not crash. It prints two loud lines beginning <code>[week10] !!</code>, falls back to <code>surrogate_pbmc()</code> — a synthetic, deliberately messy stand-in — sets a module flag <code>USED_STAND_IN = True</code>, and stamps a large red <strong>SURROGATE DATA — not a result</strong> across the figure. In Week 14, <code>week14_report_figures.py</code> reads that flag and <em>refuses</em> to copy the figure into the report directory, listing it under "Figures refused".</p>
+  <p>This exists so you can build and test the whole pipeline before the download finishes. It is not a shortcut. The failure mode it is designed against is a real one and it happens to real students: you run the week on the surrogate, the shapes look right, you screenshot a figure into a slide, and three weeks later nobody remembers where that panel came from. <strong>If the stamp is on the figure, the result does not exist.</strong> Look at every figure before you commit it, and if you see the stamp, write "surrogate" next to the figure name in your progress log rather than hoping you will remember.</p>
+</div>
+
+<h2>3 &nbsp;The labels are not ground truth</h2>
+
+<p>Here is the sentence that has to be in your report, your poster and your talk, and that you should be able to say before anyone asks.</p>
+
+<div class="box warning">
+  <span class="box-tag">Where the cell-type labels actually come from</span>
+  <p>Nobody looked at these cells and identified them. There is no independent measurement of what cell type each barcode belongs to — no flow-sorting, no imaging, no second assay. The labels were produced by a <strong>computation on the same counts you are analysing</strong>: normalize, log, select 2,000 highly variable genes, scale, PCA, build a $k$-nearest-neighbour graph, run <strong>Leiden community detection</strong> to get clusters, then score each cluster on two panels of known marker genes and name it after whichever panel scores higher.</p>
+  <p>That is a <em>well-established annotation</em>. It is the same procedure every tutorial uses, the marker panels are textbook, and the two populations it produces are as uncontroversial as anything in this field. It is still <strong>not a measurement</strong>, and the distinction is not pedantry:</p>
+  <ul>
+    <li>The clustering used the counts. So a cell whose counts are unusual can be assigned to the wrong cluster <em>because</em> its counts are unusual — which is precisely the kind of cell your classifier will also get wrong. The errors are correlated, and that inflates measured accuracy.</li>
+    <li>Cells that are genuinely intermediate get forced into one cluster or the other. Real biology has continua; Leiden returns partitions.</li>
+    <li>The resolution parameter (<code>resolution=0.5</code> here) is a choice. A different value gives a different number of clusters and therefore different labels.</li>
+    <li><code>fetch_pbmc3k.py</code> discards clusters whose two marker scores are within 0.25 of each other rather than guessing — which is the honest thing to do, and which also means <strong>the cells you analyse are the confidently labelled ones</strong>. Your dataset is easier than the full dataset, by construction.</li>
+  </ul>
+  <p><strong>Everything this project concludes about real data is conditional on those labels being right.</strong> Write that clause into the report as a clause, not a footnote: "conditional on the standard Leiden-plus-marker annotation, the measured accuracy at full depth is ...". The <code>[PROVIDED]</code> code says the same thing in its docstring; the mentor check-in will ask you to say it out loud.</p>
+</div>
+
+<p>Notice how different this is from the other two lines of evidence. In simulation you know the type of every cell because you chose it. In the bead experiment you know the jar because the tally sheet was pre-randomized and recorded. Only in the real-data arm is the label itself an inference. That asymmetry is exactly the point of having three arms, and Week 12 turns it into a table.</p>
+
+<h2>4 &nbsp;Choosing markers</h2>
+
+<p>PBMC 3k has around 20,000 genes, of which perhaps 13,000 survive the "detected in at least 10 cells" filter. You are not going to build a classifier on 13,000 features from 2,700 cells, and you should not want to: the project's theory is about a panel of $k$ informative genes, and the whole $\sqrt k$ story of Week 5 presumes you have chosen which $k$.</p>
+
+<div class="box definition">
+  <span class="box-tag">The ranking rule <code>select_markers</code> uses</span>
+  <p>Given the count matrix $X$ (cells × genes) and labels $y$ with exactly two classes:</p>
+  <ol>
+    <li><strong>Detection filter.</strong> Keep only genes detected (count $> 0$) in at least <code>min_cells</code> cells; the default is 10, matching the filter <code>fetch_pbmc3k.py</code> already applied.</li>
+    <li><strong>Class means.</strong> $m^{(1)}_g$ = mean count of gene $g$ over class-1 cells, $m^{(2)}_g$ likewise.</li>
+    <li><strong>Score.</strong> $$\mathrm{score}_g = \left|\log_2 \frac{m^{(1)}_g + 1}{m^{(2)}_g + 1}\right|.$$</li>
+    <li>Return the indices of the <code>n_markers</code> highest-scoring genes.</li>
+  </ol>
+  <p>Three design decisions, each of which you should be able to defend: the absolute value (you do not care which type is higher), the pseudocount of 1, and the detection filter.</p>
+</div>
+
+<p><strong>Why the pseudocount.</strong> Without it the score is $|\log_2(m^{(1)}_g/m^{(2)}_g)|$, and a gene that is silent in one class gives $\log_2$ of zero or of infinity. Formally that is $\pm\infty$; numerically it is a warning and a <code>nan</code>; practically it means <strong>a gene that appeared once, in one cell, by accident, wins the ranking outright</strong>. With 13,000 genes and most of them near-silent, there are hundreds of such genes, and every one of them beats every real marker. The pseudocount of 1 count keeps the ratio finite and, more usefully, damps it where the counts are small: a gene at means $0.05$ and $0.005$ has a raw fold change of 10 ($\log_2 = 3.32$) but a scored value of $|\log_2(1.05/1.005)| = 0.063$, which puts it nowhere.</p>
+
+<div class="box pitfall">
+  <span class="box-tag">A pseudocount is a modelling choice, not a numerical patch</span>
+  <p>It is tempting to describe the $+1$ as "avoiding division by zero". It does that, but that is a side effect. What it really does is <strong>change the ranking</strong> — it converts fold change, at low counts, into something much closer to an absolute difference, and at high counts leaves it essentially alone. A different pseudocount gives a different marker list. If you had used $+0.1$ you would get a different set of genes and a different accuracy curve.</p>
+  <p>So say it in the report as a choice with a consequence: "markers were ranked by $|\log_2$ fold change$|$ with a pseudocount of 1 count; the pseudocount suppresses genes whose apparent fold change comes from single stray counts, and changing it changes the panel." One sentence. That is the difference between a method and a magic number.</p>
+</div>
+
+<p><strong>Why the detection filter.</strong> Same disease, second dose of medicine. <code>test_select_markers_respects_min_cells</code> in <code>tests/test_realdata.py</code> builds exactly the pathological case: a gene that is zero in every cell except one, where it is 500. Its class means differ enormously and its pseudocounted score is large; it is also worthless, because it describes one cell. The filter disqualifies it before scoring. The test asserts gene 7 is not selected — read that test, it is four lines and it is the argument in executable form.</p>
+
+<h2>5 &nbsp;Selection leakage: this week's actual lesson</h2>
+
+<p>You now have a rule that picks the best-looking genes. Here is how to fool yourself with it, and it is so easy that entire published literatures have done it.</p>
+
+<div class="box definition">
+  <span class="box-tag">Selection leakage (also: selection bias, "peeking")</span>
+  If you use the labels of a set of cells to <em>choose</em> which genes to look at, and then measure accuracy on those same cells, the accuracy you measure is too high. The test cells helped choose the features, so they are no longer a test.
+</div>
+
+<p>The mechanism is worth spelling out concretely, with the actual numbers of this dataset, because "leakage inflates accuracy" as a slogan is forgettable and the arithmetic is not.</p>
+
+<div class="box example">
+  <span class="box-tag">Why chance alone manufactures markers</span>
+  <p>Take the extreme case: suppose <em>no gene whatsoever</em> differs between the two cell types. Every gene has the same expected count in both. Now split 2,700 cells into two labelled groups and compute, for each of 13,000 genes, the difference between the two group means.</p>
+  <p>Those 13,000 differences are not zero. They are random, centred on zero, with some spread $\sigma$ set by the counting noise and the group sizes. The <em>largest</em> of 13,000 draws from a distribution centred at zero is a long way from zero — for Gaussian draws, roughly $3.8\sigma$ out. Rank the genes by $|{\rm difference}|$ and the top of the list is populated by genes whose difference is real <em>in this sample</em> and zero in the population.</p>
+  <p>Now hand those top genes to a classifier and test it on the same cells. The classifier's rule points in the direction the noise happened to point, and the test cells are the cells whose noise pointed that way. It works. It reports accuracy well above chance. Nothing is informative and the measurement says otherwise.</p>
+  <p>And the effect grows with the size of the panel, because taking more genes means averaging more independent lucky flukes that all happen to lean the same way — the same $\sqrt k$ accumulation as Week 5, running in the wrong direction. <span class="qed">∎</span></p>
+</div>
+
+<p>Do not take this on trust. Lab 1 builds precisely that dataset — 1,000 genes, none of them informative, labels assigned by coin flip — and shows you the accuracy climbing.</p>
+
+<div class="lab">
+  <div class="lab-title">Lab 1 · Manufacturing a discovery out of pure noise</div>
+  <div class="lab-desc">Every gene here is drawn from the <em>same</em> Poisson distribution in both classes. There is nothing to find. The red curve chooses its markers using all 200 cells (including the 60 test cells) and then reports test accuracy; the teal curve chooses them using the 140 training cells only. Both curves then fit the same classifier on the same training cells and score the same test cells. <strong>The only difference between the two curves is which cells were allowed to help pick the genes.</strong></div>
+  <canvas id="w10lab1" height="340"></canvas>
+  <div class="controls" id="w10lab1ctl"></div>
+  <div class="readout" id="w10lab1out"></div>
+</div>
+
+<p>The red curve starts near 0.6 with a single gene and climbs past 0.85 by the time the panel reaches 128 genes. The teal curve sits on 0.5 and stays there, wobbling by a few percent in either direction because 60 test cells is a small test set and a proportion from 60 trials has a standard error of about 0.065. Both curves are describing the same data, in which nothing is going on. Press "new dataset" a few times: the red curve is not a fluke of one seed, it is what the procedure does.</p>
+
+<div class="box warning">
+  <span class="box-tag">The honest protocol, in three lines</span>
+  <ol>
+    <li>Split the cells into a training set and a test set <strong>first</strong>, before looking at anything.</li>
+    <li>Do <em>everything that uses the labels</em> — marker selection, rate estimation, classifier fitting, threshold choice — on the training set alone.</li>
+    <li>Touch the test set exactly once, at the end, to produce one number.</li>
+  </ol>
+  <p>The rule that catches every case: <strong>any step that reads <code>y</code> is part of the model.</strong> Marker selection reads <code>y</code>. Therefore marker selection is part of the model, and fitting a model on the test data is obviously wrong. Written that way it is not a rule to memorize, it is a consequence of what "test set" means.</p>
+</div>
+
+<p>This is why <code>week10_markers.py</code> is built the way it is. It splits once, then runs both protocols side by side:</p>
+
+<table class="simple">
+  <tr><th>Arm</th><th>Markers selected on</th><th>Classifier fitted on</th><th>Evaluated on</th></tr>
+  <tr><td><strong>Leaky</strong></td><td><code>select_markers(X, y, m)</code> — every cell</td><td>training split</td><td>test split</td></tr>
+  <tr><td><strong>Honest</strong></td><td><code>select_markers(Xtr, ytr, m)</code> — training split</td><td>training split</td><td>test split</td></tr>
+</table>
+
+<p>Note carefully that the classifier is fitted on the training split in <em>both</em> arms. Only the selection changes. That is what makes the gap between the two curves attributable to selection leakage and to nothing else, and it is what turns a warning into a measurement.</p>
+
+<div class="box win">
+  <span class="box-tag">The number you report this week</span>
+  <p>The script prints a table: marker count, leaky accuracy, honest accuracy, and the difference. <strong>The inflation column is your result.</strong> Not "leakage is bad" — a number, on your data, at each panel size, with the seed recorded.</p>
+  <p>On real PBMC data with genuinely informative markers the gap will be smaller than in Lab 1, because there real signal to find and the leaky arm does not have to invent everything. That is worth saying precisely rather than apologetically: <em>the size of the inflation measures how much of the apparent performance was manufactured, and on an easy two-class problem with strong markers most of the performance is real.</em> A small gap is a result. A gap you did not measure is a hole in your methods section.</p>
+</div>
+
+<h2>6 &nbsp;Fold change is not $d'$</h2>
+
+<p>The second lesson of the week is that the ranking rule you have just been given is <em>not</em> the ranking the theory would choose, and the reason is Week 3.</p>
+
+<p>Fold change asks: <em>by what factor do the two means differ?</em> $d'$ asks: <em>how many noise widths apart are the two means?</em> Those are different questions, and at low counts they give wildly different answers, because the noise width $\sqrt{\bar\lambda}$ shrinks relative to nothing when $\bar\lambda$ shrinks.</p>
+
+<div class="box example">
+  <span class="box-tag">Worked arithmetic · a 5-fold change worth almost nothing</span>
+  <p><strong>Gene A.</strong> Mean counts $\lambda_1 = 0.02$ and $\lambda_2 = 0.10$. The fold change is $5\times$; $\log_2 5 = 2.32$, which is enormous by any differential-expression standard.</p>
+  <p>$$d'_A = \frac{|0.10 - 0.02|}{\sqrt{(0.10+0.02)/2}} = \frac{0.08}{\sqrt{0.06}} = \frac{0.08}{0.2449} = 0.327.$$</p>
+  <p>Accuracy from that one gene: $\Phi(0.327/2) = \Phi(0.163) = 56.5\%$. Six points above a coin.</p>
+  <p><strong>Gene B.</strong> Mean counts $\lambda_1 = 20$ and $\lambda_2 = 24$. The fold change is $1.2\times$; $\log_2 1.2 = 0.263$, which no differential-expression tool would call interesting.</p>
+  <p>$$d'_B = \frac{|24-20|}{\sqrt{22}} = \frac{4}{4.690} = 0.853, \qquad \Phi(0.426) = 66.5\%.$$</p>
+  <p><strong>Gene B is worth two and a half times as much $d'$ as gene A, while having one ninth of the fold change.</strong> The reason is entirely in the denominators: gene A's difference of $0.08$ counts is measured against a noise width of $0.24$ counts, while gene B's difference of $4$ counts is measured against a noise width of $4.7$. Ratios are scale-free; detection is not. <span class="qed">∎</span></p>
+  <p class="muted">Connect this back to Week 3, Section 1, where $d'$ was introduced precisely because "the means differ" is not a statement about whether you can tell two things apart, and to Week 1 exercise 1.3, where two means $1.8$ apart with widths of $3$ were the first time you saw the point.</p>
+</div>
+
+<p>Now the twist, and it is the kind of detail that makes the difference between reciting a lesson and understanding it. The rule in <code>select_markers</code> is <em>not</em> raw fold change — it is fold change with a pseudocount of 1 <strong>count</strong>. Score gene A: $|\log_2(1.10/1.02)| = 0.109$. Score gene B: $|\log_2(25/21)| = 0.252$. The pseudocounted rule <em>prefers gene B</em>, which is the right answer.</p>
+
+<p>So the pseudocount does much of the work of fixing the pathology, and it is worth understanding why: adding 1 count to both means makes the ratio behave like an absolute difference whenever the counts are below about 1, which is exactly the regime where fold change was lying. What survives is a subtler disagreement, at the <em>high</em> end:</p>
+
+<table class="simple">
+  <tr><th>Gene</th><th>$m^{(1)}$</th><th>$m^{(2)}$</th><th>scored $|\log_2\frac{m_1+1}{m_2+1}|$</th><th>$d'$</th></tr>
+  <tr><td>C</td><td>5</td><td>1</td><td><strong>1.585</strong></td><td>2.309</td></tr>
+  <tr><td>D</td><td>60</td><td>40</td><td>0.573</td><td><strong>2.828</strong></td></tr>
+</table>
+
+<p>Gene C wins on the scored fold change; gene D wins on $d'$. Both are legitimate genes at realistic expression levels, and a top-$k$ list built one way is not the top-$k$ list built the other way. This is why <code>week10_markers.py</code>'s second figure exists and why it prints a specific number: <strong>the overlap between the top 40 by fold change and the top 40 by $d'$</strong>, out of 40. Report that number. It is a one-line, concrete, honest statement of how much the choice of ranking rule matters on your data.</p>
+
+<div class="lab">
+  <div class="lab-title">Lab 2 · Two rankings of the same 700 genes</div>
+  <div class="lab-desc">Each dot is a simulated gene, with a random expression level and a random log fold change between the two types. The horizontal axis is the score <code>select_markers</code> computes; the vertical axis is the per-gene $d'$ at the current depth. Orange dots are the top 40 by fold change, blue dots the top 40 by $d'$. Move the depth slider and watch the two lists agree and disagree — and turn the pseudocount off to see what the ranking looks like without it.</div>
+  <canvas id="w10lab2" height="350"></canvas>
+  <div class="controls" id="w10lab2ctl"></div>
+  <div class="readout" id="w10lab2out"></div>
+</div>
+
+<p>Three things to notice, all of which belong in your notebook.</p>
+
+<p><strong>First, with the pseudocount on, the overlap is high at low depth and falls as depth rises</strong> — on the default panel it runs from around 38/40 at a depth of 500 to around 23/40 at 10,000. That is not an accident. At low depth the counts are well below the pseudocount, so $\log_2\frac{m_1+1}{m_2+1} \approx (m_1-m_2)/\ln 2$: the score has become an <em>absolute difference</em>, which is the numerator of $d'$, so the two rankings nearly coincide. As depth grows the pseudocount stops mattering, the score reverts to a genuine ratio, and the two rankings separate.</p>
+
+<p><strong>Second, with the pseudocount off the overlap collapses to about 12/40 and stays there at every depth</strong>, because a ratio of two rates does not depend on depth at all. Watch the median $d'$ of the fold-change panel in the readout: turning the pseudocount off roughly halves it. The orange dots migrate left and down, into the low-expression corner where large ratios are cheap and $d'$ is small.</p>
+
+<p><strong>Third, the vertical axis moves when you move the depth slider and the horizontal axis (with the pseudocount off) does not.</strong> That asymmetry <em>is</em> the difference between the two quantities: $d'$ is a statement about a particular experiment at a particular depth, and fold change is a statement about the cells.</p>
+
+<div class="box pitfall">
+  <span class="box-tag">"Why not just rank by $d'$, then?"</span>
+  <p>Good question, and you should ask it. Two honest answers.</p>
+  <p><strong>Practical:</strong> ranking by $d'$ is what the field does not do. Every differential-expression tool in single-cell biology reports fold changes, and every marker list you will ever read was built from them. Using the field's rule, and then <em>measuring</em> how much it costs you relative to $d'$, is a more interesting result than quietly using a better rule nobody else uses.</p>
+  <p><strong>Statistical:</strong> $d'$ estimated from data has the same leakage problem, only worse. It is a ratio whose denominator is itself estimated, so it is noisier than fold change at low counts and will happily rank a gene top because its estimated pooled variance came out small by luck. Neither rule is safe used on the test set; both are fine used on the training set.</p>
+  <p>If you want the strongest version of the week's work, do both: run the honest protocol with fold-change selection and with $d'$ selection, and report the two accuracy curves. That is exercise 10.4.</p>
+</div>
+
+<h2>7 &nbsp;Downsampling: the knob for next week</h2>
+
+<p>One more function this week, and it is two lines, but it is the experimental knob of the entire real-data arm.</p>
+
+<div class="box theorem">
+  <span class="box-tag">Why downsampling a real dataset is legitimate</span>
+  <p><code>downsample_matrix(X, keep_prob, rng)</code> replaces every entry $x$ by a $\mathrm{Binomial}(x, \text{keep\_prob})$ draw: each counted molecule survives independently with probability <code>keep_prob</code>.</p>
+  <p>By Week 2's thinning theorem, if $x \sim \mathrm{Poisson}(\lambda)$ then the thinned count is $\mathrm{Poisson}(\text{keep\_prob}\cdot\lambda)$ <em>exactly</em>. So downsampling a real library by a factor $q$ produces exactly the data a run at $q$ times the depth would have produced — <strong>you can sequence more shallowly after the fact, for free, with no new experiment.</strong></p>
+  <p><strong>Assumptions used.</strong> (i) The counts are Poisson to begin with. (ii) Loss is independent per molecule and does not depend on the gene.</p>
+  <p class="muted">Assumption (i) is the one Week 11 is about, and it is false. Note carefully what that does and does not break: thinning a <em>negative binomial</em> is still a legitimate physical operation and still gives you the data a shallower run would have given; what changes is that the resulting distribution is not the Poisson your theory curve assumed. The knob still works. The prediction drawn through it does not.</p>
+</div>
+
+<p>Week 9 exercise 9.2(c) already licensed this: thinnings compose, and $s_1 s_2 = s_2 s_1$. The PBMC counts have already been thinned once, by the capture process, by an unknown factor. Downsampling further just moves you along the same curve, which is why you can measure the <em>shape</em> of the depth dependence without knowing where on the depth axis you started.</p>
+
+<h2>8 &nbsp;Your Python laboratory</h2>
+
+<div class="box python">
+  <span class="box-tag">This week in the celldetect project</span>
+  <p>Open <code>python/celldetect/realdata.py</code>. Read the module docstring first — it explains the cache, the fallback and the build order. Two functions to implement:</p>
+  <ul>
+    <li><code>select_markers(X, y, n_markers, min_cells=10)</code> — the ranking rule of Section 4. Six numbered steps in the scaffold comments. Raise <code>ValueError</code> unless <code>np.unique(y)</code> has exactly two entries. Use <code>np.argsort(-lfc, kind="mergesort")</code> so that ties break deterministically by gene index; a non-stable sort makes your marker list depend on NumPy's internals, which is not reproducible in any sense you would want to defend.</li>
+    <li><code>downsample_matrix(X, keep_prob, rng)</code> — validate <code>keep_prob</code> is in $[0,1]$, then <code>rng.binomial(np.asarray(X).astype(np.int64), keep_prob)</code>. The cast matters: <code>rng.binomial</code> will not take a float array of counts.</li>
+  </ul>
+  <p>Two functions in the same file are marked <code>[PROVIDED]</code> and you should <em>read</em> rather than write them: <code>load_pbmc(path=None, allow_missing=False)</code> and <code>surrogate_pbmc(n_cells, n_genes, depth, rng)</code>. Read <code>surrogate_pbmc</code> carefully — it builds its counts as a gamma-Poisson mixture, which is next week's model, and seeing the generator before the estimator is a considerable head start.</p>
+  <p><strong>Tests:</strong> <code>pytest tests/test_realdata.py</code></p>
+  <p>Five of those tests are yours this week: the two <code>select_markers</code> tests, the two-class <code>ValueError</code>, and the two <code>downsample_matrix</code> tests. The other five belong to Week 11 and will stay red until then, which is expected — say so in your log rather than "fixing" them. Note that the whole file runs without the download: the tests use hand-built matrices and the surrogate, so the suite is green on a laptop with no network.</p>
+  <p><strong>The download, once:</strong> <code>python experiments/fetch_pbmc3k.py</code></p>
+  <p><strong>Experiment:</strong> <code>python experiments/week10_markers.py</code>, <strong>SEED 110</strong>, marker counts $1, 2, 4, \dots, 128$, a 30% test split. It writes <code>figures/week10_markers.png</code> (leaky against honest) and <code>figures/week10_ranking.png</code> (the two rankings, with the top-40 overlap in the title), and prints the inflation table and the overlap. Commit both figures and paste the table into <code>progress/week10.md</code>.</p>
+  <p>Before you run it, look at the <em>figure sizes</em> and check the stamp: <code>stamp_seed</code> writes "seed 110 · real data" or "seed 110 · SURROGATE" into the corner of every panel. That corner is the first thing to look at and the last thing to forget.</p>
+</div>
+
+<h2>9 &nbsp;Exercises</h2>
+<p class="muted">Stars mark difficulty: ★ routine · ★★ requires an idea · ★★★ challenge. Write full sentences; every claim needs a reason. Solutions are provided — attempt first, then compare.</p>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 10.1</span><span class="stars">★</span></div>
+  <div class="ex-body">A cell has a library size of 2,000 UMIs. Gene <em>CD3D</em> makes up a fraction $p = 0.0015$ of a T cell's transcriptome and $p = 0.0001$ of a monocyte's. (a) Give both expected counts. (b) Give both standard deviations. (c) Compute $d'$ for this one gene at this depth, and the accuracy $\Phi(d'/2)$. (d) Compute the $\log_2$ fold change with and without the $+1$ pseudocount, and comment.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) $\lambda_{\rm T} = 2000 \times 0.0015 = 3.0$; $\lambda_{\rm M} = 2000 \times 0.0001 = 0.2$.</p>
+      <p>(b) $\sqrt{3.0} = 1.73$ and $\sqrt{0.2} = 0.447$.</p>
+      <p>(c) $\bar\lambda = 1.6$, so $d' = |3.0 - 0.2|/\sqrt{1.6} = 2.8/1.265 = 2.214$, and the accuracy is $\Phi(1.107) = 86.6\%$.</p>
+      <p>(d) Raw: $\log_2(3.0/0.2) = \log_2 15 = 3.91$. Pseudocounted: $\log_2(4.0/1.2) = \log_2 3.333 = 1.74$. The pseudocount roughly halves the score, and it would halve it much more severely if both counts were smaller — which is the point.</p>
+      <p class="muted">86.6% from <em>one gene</em>, in <em>one cell</em>, at PBMC depth. This is why the monocyte/T-cell pair was chosen: the signal is real and large, so the accuracy curve you measure next week has room to move without being pinned at either end. Keep this number; you will compare your measured single-marker accuracy against it.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 10.2</span><span class="stars">★</span></div>
+  <div class="ex-body">A collaborator sends you a matrix and says "it's the PBMC data, already cleaned up for you". You open it and the first row reads <code>0.00, 1.386, 0.00, 2.079, 0.693, ...</code>. (a) What was done to it? (b) Name three specific things in this project you can no longer do with it. (c) What do you ask for?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) It has been normalized and log-transformed. The giveaway is that the entries are not integers, and that the non-zero values are suspicious: $0.693 = \log 2$, $1.386 = \log 3$, $2.079 = \log 8$. So these are $\log(1+x)$ of small integers, possibly after a per-cell rescaling that happened to be near 1 for this cell.</p>
+      <p>(b) Three, and each for a stated reason:</p>
+      <ul>
+        <li><strong>Compute a Fano factor.</strong> Variance-over-mean is only 1-for-Poisson on counts. On logged data the number has no reference value to be compared against, so "1.8" would mean nothing.</li>
+        <li><strong>Downsample.</strong> <code>rng.binomial(x, q)</code> needs an integer $x$. There is no meaningful way to thin $1.386$ molecules.</li>
+        <li><strong>Use $d' = |\lambda_1 - \lambda_2|/\sqrt{\bar\lambda}$.</strong> That denominator is the Poisson standard deviation, and it is only the standard deviation because variance equals mean, which is a fact about counts.</li>
+      </ul>
+      <p>(c) Ask for the <em>raw count matrix</em>, integers, before any normalization, plus the barcode and gene names so you can line it up with the labels. If they only have the processed object, ask whether the raw counts are still in <code>adata.raw</code> or <code>adata.layers['counts']</code>, which is where scanpy usually keeps them.</p>
+      <p class="muted">This exercise is not hypothetical. Receiving normalized data when you needed counts is one of the most common practical failures in single-cell analysis, and it is silent — everything still runs, and the answers are just wrong. Learning to check "are these integers?" on any matrix you are handed takes two seconds and will save you a week at some point in your life.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 10.3</span><span class="stars">★★</span></div>
+  <div class="ex-body">In Lab 1 no gene is informative, yet the leaky curve rises steadily with the size of the panel. Explain, in terms of Week 5's quadrature argument, <em>why it rises rather than staying flat</em>. Then predict what happens to the leaky curve as you increase the number of cells while keeping the number of genes fixed, and say why.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p><strong>Why it rises.</strong> Each selected gene carries a small amount of spurious "signal": a mean difference that exists in this sample only. Because the gene was selected for having that difference in the full dataset (test cells included), the difference is present in the test cells too, with the same sign as the weight the classifier learned. So each selected gene contributes a small positive $d'$ on the test set. These contributions are approximately independent across genes, so they add in quadrature exactly as Week 5's theorem says: $d'_{\rm total} \approx \sqrt{k}\, d'_{\rm spurious}$. Accuracy $\Phi(d'/2)$ therefore climbs with $\sqrt k$. The $\sqrt k$ law is not broken here — it is being obediently obeyed by a signal that does not exist.</p>
+      <p><strong>More cells.</strong> The leaky curve falls back towards 0.5. The spurious per-gene difference has magnitude of order $\sigma \propto 1/\sqrt{N}$, so $d'_{\rm spurious}$ shrinks as $1/\sqrt N$ — and, more importantly, the <em>fraction</em> of the selected difference that is shared with the test cells falls, because the test cells become a smaller and smaller influence on which genes get chosen. With 2,700 cells the inflation is smaller than with 200; with 100,000 cells it would be negligible. Leakage is a small-sample disease, and single-cell datasets of a few thousand cells are firmly in the regime where it bites.</p>
+      <p class="muted">The second half of this answer is what stops the lesson from becoming superstition. Leakage is not a moral failing that is always catastrophic; it is a bias with a size, and the size depends on the number of cells, the number of candidate genes, and how many you select. Measuring it — which is what the week's experiment does — is better than fearing it.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 10.4</span><span class="stars">★★</span></div>
+  <div class="ex-body">Rank genes two ways on your data and compare. (a) Using the training split only, produce the top 40 by <code>select_markers</code> and the top 40 by per-gene $d'$ (use <code>estimate_rates</code> then <code>detection.d_prime</code>). (b) Report the overlap. (c) Run the honest accuracy-versus-panel-size curve with each ranking and report both. (d) Which wins, and does the answer depend on the panel size?</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>(a) and (b) are done for you in the second half of <code>week10_markers.py</code>: it computes <code>rates = estimate_rates(X, y)</code>, <code>dp = d_prime(rates[0], rates[1])</code>, takes <code>np.argsort(-dp)[:40]</code>, and prints the overlap with <code>select_markers(X, y, 40)</code>. (For this exercise redo it on <code>Xtr, ytr</code> — the version in the script uses all cells because that figure is about the ranking rules themselves, not about accuracy, and no accuracy is measured from it.)</p>
+      <p>(c) Replace <code>idx_tr = select_markers(Xtr, ytr, m)</code> with the $d'$ ranking computed on the training split, and rerun the loop over <code>MARKER_COUNTS</code>.</p>
+      <p>(d) The expected pattern, which you should confirm rather than assume: <strong>$d'$ ranking wins at small $k$</strong>, because with one or two genes you want the genes that are genuinely most separable and $d'$ is the quantity that measures separability. <strong>The two converge at large $k$</strong>, because by $k = 64$ both lists contain essentially all the strong markers and are arguing about the tail. The size of the gap at $k = 1$ is a clean, quotable number.</p>
+      <p>One caveat to state: $d'$ estimated from data is noisier than the pseudocounted fold change, because its denominator is an estimate too, so at very small cell counts the $d'$ ranking can be <em>worse</em> despite being the right target. If you see that, it is a finding, not a bug — report it.</p>
+      <p class="muted">This exercise is the natural extension for a strong week and it makes a genuinely better report: it converts "fold change is not $d'$" from a lecture into a measured comparison on real cells with a number attached. If the schedule allows only one optional piece of work in Weeks 10–11, make it this one.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 10.5</span><span class="stars">★★</span></div>
+  <div class="ex-body">A reviewer says: "Your labels came from clustering the same counts you then classify. Isn't your accuracy therefore meaningless?" Write the answer you would give, in about 150 words. It must concede what is true, state precisely what the bias does to your number, and explain why the project's <em>main claim</em> survives.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p>"You are right that the labels are annotations, not measurements, and that they were derived from these counts. That does bias the accuracy upwards: a cell whose counts are atypical is likely to have been clustered wrongly and also to be classified wrongly, so the two kinds of error are correlated and cancel. The absolute accuracy I report is therefore an optimistic estimate of accuracy against true cell identity.</p>
+      <p>But the project's claim is not about the level of the accuracy. It is about how accuracy <em>scales</em> with sequencing depth, and I measure that by downsampling the same cells with the same fixed labels. The labelling bias is a constant offset across the whole depth sweep, so it shifts the curve without changing its exponent. That is why the headline result is a slope in $d'$ space, and why the simulation and bead arms — where the truth is known by construction — exist to check the same exponent."</p>
+      <p class="muted">Practise this out loud. It is the single most likely hostile question at a poster session, and the structure of the answer (concede, quantify the direction of the bias, then explain why the claim is robust to it) is the structure of every good answer to a methodological objection. Note that the last sentence is what buys you the right to make the concession cheerfully.</p>
+    </div>
+  </details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Exercise 10.6</span><span class="stars">★★★</span></div>
+  <div class="ex-body">Estimate the size of the leakage inflation from first principles. Suppose $G$ candidate genes, none informative, $N$ cells split into $N_{\rm tr}$ training and $N_{\rm te}$ test, and you select the top $k$ by absolute mean difference computed on all $N$ cells. Argue that the spurious per-gene $d'$ on the test set is of order $\sqrt{N_{\rm te}/N}$ times the typical selected difference in units of noise, and hence that the inflation grows like $\sqrt{k}$ and shrinks as the test fraction shrinks. Check the prediction in Lab 1.</div>
+  <details><summary>Show solution</summary>
+    <div class="solution">
+      <p><strong>Setup.</strong> For one gene with no true difference, let $\Delta_{\rm all}$, $\Delta_{\rm tr}$, $\Delta_{\rm te}$ be the between-class mean differences computed on all, training and test cells. Each is a difference of averages, so each is approximately normal with mean 0, and — crucially — $\Delta_{\rm all}$ is a weighted average of the other two, $\Delta_{\rm all} \approx f_{\rm tr}\Delta_{\rm tr} + f_{\rm te}\Delta_{\rm te}$ with $f = N/N_{\rm total}$ the split fractions.</p>
+      <p><strong>The correlation is the whole effect.</strong> Selecting on $\Delta_{\rm all}$ selects genes with large $|\Delta_{\rm all}|$, and because $\Delta_{\rm te}$ is one of the two ingredients of $\Delta_{\rm all}$, the selected genes have $\Delta_{\rm te}$ shifted in the same direction. Standard properties of the bivariate normal give $\mathrm{corr}(\Delta_{\rm all}, \Delta_{\rm te}) = \sqrt{f_{\rm te}}$ (the variance of $\Delta_{\rm te}$ scales as $1/N_{\rm te}$, and its weight in $\Delta_{\rm all}$ is $f_{\rm te}$; the two combine to $\sqrt{f_{\rm te}}$). So if selection pushes $\Delta_{\rm all}$ out to $c$ noise widths, the conditional mean of $\Delta_{\rm te}$ is about $c\sqrt{f_{\rm te}}$ noise widths.</p>
+      <p><strong>Accumulation.</strong> The classifier's weight for each selected gene has the sign of $\Delta_{\rm tr}$, which is also positively correlated with $\Delta_{\rm all}$. Each selected gene therefore contributes a small positive spurious $d'$, call it $\delta$, and by Week 5's quadrature the panel gives $d'_{\rm total} = \sqrt{k}\,\delta$. So the apparent accuracy is $\Phi(\sqrt k\,\delta/2)$: rising in $k$, and rising fastest at small $k$ where $\Phi$ is steepest.</p>
+      <p><strong>Two testable consequences.</strong> (i) The inflation grows like $\sqrt k$ until $\Phi$ saturates. (ii) A smaller test fraction $f_{\rm te}$ gives a smaller $\delta$ and hence less inflation, because the test cells had less influence on the selection. Both are visible in Lab 1: the red curve is roughly $\Phi(\sqrt k\,\delta/2)$ with $\delta \approx 0.4$, and shrinking the test set (try it in the code) flattens it.</p>
+      <p class="muted">The pleasing part of this argument is which theorem it uses. Selection leakage is not a new phenomenon requiring new mathematics; it is the $\sqrt k$ quadrature law of Week 5 applied to a signal that is an artefact of selection. Being able to see your own theorems working <em>against</em> you is a good sign that you own them.</p>
+    </div>
+  </details>
+</div>
+
+<h2>10 &nbsp;Research notebook</h2>
+
+<p>This week's entries:</p>
+
+<ul>
+  <li>The <strong>four numbers</strong> <code>fetch_pbmc3k.py</code> prints: cells kept, cells per type, genes after filtering, median library size. Dated, with the date of the download.</li>
+  <li>The sentence about the labels, in your own words, in the form you would say it out loud. Not copied from Section 3.</li>
+  <li>The <strong>inflation table</strong> from <code>week10_markers.py</code> — marker count, leaky, honest, difference — with SEED 110 written next to it, and one sentence saying which row you would quote in the report and why.</li>
+  <li>The <strong>top-40 overlap</strong> number between the two rankings.</li>
+  <li>Exercise 10.1's arithmetic, and Exercise 10.5's answer written out in full and then read aloud once.</li>
+  <li>An addition to your <strong>"assumptions I am making"</strong> list, started in Week 1. It gains at least three entries this week: the labels are annotations rather than measurements; the analysed cells are the confidently labelled subset and are therefore easier than the full dataset; UMI counts are treated as molecule counts.</li>
+  <li>If you ran on the surrogate: write <strong>SURROGATE</strong> in capitals next to every figure name for this week, and a note of what still needs re-running.</li>
+</ul>
+
+<p>Scan into <code>notebook/week10/</code> and fill in <code>progress/week10.md</code>.</p>
+
+<div class="box verify">
+  <span class="box-tag">Verification this week (with mentor)</span>
+  <ul>
+    <li><strong>You state, unprompted, that the labels are not ground truth</strong> — where they come from, and one specific consequence for the interpretation of your accuracy number.</li>
+    <li><strong>You explain why the cache stores raw integers</strong> and what normalization would destroy, naming at least two things in the project that would break.</li>
+    <li><strong>You explain selection leakage mechanically</strong>, using the 13,000-genes-and-2,700-cells version of the argument, and state the honest protocol without hesitating.</li>
+    <li><strong>You quote the inflation gap as a number</strong> from your own run at SEED 110, at a stated panel size, and can point to the two lines in <code>week10_markers.py</code> that differ between the arms.</li>
+    <li><strong>You show that fold change is not $d'$ with arithmetic</strong> — the $0.02$-versus-$0.10$ example, and the pseudocounted score of the same pair — and quote your top-40 overlap.</li>
+    <li><strong><code>pytest tests/test_realdata.py</code></strong> has the five Week 10 tests green, and you can say what <code>test_select_markers_respects_min_cells</code> is protecting against.</li>
+    <li><strong>Neither committed figure carries the SURROGATE stamp</strong> — or you say plainly that they do, and when the download will happen.</li>
+  </ul>
+</div>
+
+<h2>11 &nbsp;Going deeper</h2>
+<ul>
+  <li>Zheng et al. (2017), <em>Massively parallel digital transcriptional profiling of single cells</em>, <em>Nature Communications</em> 8:14049. <span class="muted">The 10x Chromium paper and the origin of PBMC 3k. Read the UMI section and the supplementary description of the PBMC samples, and note the reported median UMIs per cell. <span class="claim cited">cited</span></span></li>
+  <li>The <a href="https://scanpy-tutorials.readthedocs.io/">scanpy PBMC 3k tutorial</a>, properly this time. <span class="muted">You clicked through it in Week 1. Now read it as a source of <em>labels</em>: find the normalization step, the Leiden step, and the marker-based cluster naming, and match each to a line in <code>fetch_pbmc3k.py</code>. ~1 hour.</span></li>
+  <li>Traag, Waltman &amp; van Eck (2019), <em>From Louvain to Leiden: guaranteeing well-connected communities</em>, <em>Scientific Reports</em> 9. <span class="muted">What the clustering algorithm behind your labels actually does. Read the introduction and the statement of the guarantee only; you need to know it is a graph-partitioning heuristic with a resolution parameter, not an oracle. <span class="claim cited">cited</span></span></li>
+  <li>Ambroise &amp; McLachlan (2002), <em>Selection bias in gene extraction on the basis of microarray gene-expression data</em>, <em>PNAS</em> 99. <span class="muted">Selection leakage, found and quantified in the previous generation of expression data. Their Figure 1 is Lab 1 of this chapter, twenty-four years earlier. Read it and notice that the lesson had to be learned by a whole field the hard way. <span class="claim cited">cited</span></span></li>
+  <li>Soneson &amp; Robinson (2018), <em>Bias, robustness and scalability in single-cell differential expression analysis</em>, <em>Nature Methods</em> 15. <span class="muted">Skim the section on what fold-change-based ranking does and does not do. Useful ammunition for exercise 10.4's discussion.</span></li>
+  <li>Course extras: <a href="../extras/big-picture.html">the big picture</a> · <a href="../extras/notation.html">notation card</a> · <a href="../extras/glossary.html">glossary</a> · <a href="../extras/biology-background.html">biology background</a> · <a href="../extras/problem-bank.html">problem bank</a> · <a href="../extras/unstuck.html">when you are stuck</a></li>
+</ul>
+
+</div>
+
+<footer class="site">How Much Data Does It Take to Tell Two Cell Types Apart? · Week 10 · <a href="../index.html">Course home</a></footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  /* ---------------- Lab 1: selection leakage on pure noise ---------------- */
+  (function () {
+    const G = 1000, N = 200, NTR = 140, LAM = 4;
+    const KS = [1, 2, 4, 8, 16, 32, 64, 128];
+    let seed = 1010, reps = 5;
+
+    function oneRep(sd) {
+      const r = CD.rng(sd);
+      const X = [], y = [];
+      for (let i = 0; i < N; i++) {
+        const row = new Float64Array(G);
+        for (let g = 0; g < G; g++) row[g] = CD.poisson(LAM, r);
+        X.push(row); y.push(i < N / 2 ? 1 : 0);
+      }
+      const ord = [];
+      for (let i = 0; i < N; i++) ord.push(i);
+      for (let i = N - 1; i > 0; i--) {            // Fisher-Yates, seeded
+        const j = Math.floor(r() * (i + 1));
+        const t = ord[i]; ord[i] = ord[j]; ord[j] = t;
+      }
+      const tr = ord.slice(0, NTR), te = ord.slice(NTR);
+
+      function meanDiff(idx) {                     // class1 mean - class0 mean, per gene
+        const s1 = new Float64Array(G), s0 = new Float64Array(G);
+        let n1 = 0, n0 = 0;
+        idx.forEach(i => {
+          const s = y[i] ? s1 : s0, xi = X[i];
+          for (let g = 0; g < G; g++) s[g] += xi[g];
+          if (y[i]) n1++; else n0++;
+        });
+        const d = new Float64Array(G);
+        for (let g = 0; g < G; g++) d[g] = s1[g] / n1 - s0[g] / n0;
+        return d;
+      }
+      const dAll = meanDiff(ord), dTr = meanDiff(tr);
+      const rank = d => { const o = []; for (let g = 0; g < G; g++) o.push(g);
+                          return o.sort((a, b) => Math.abs(d[b]) - Math.abs(d[a])); };
+      const rAll = rank(dAll), rTr = rank(dTr);
+
+      function score(sel) {                        // weights ALWAYS from the training split
+        const w = sel.map(g => dTr[g]);
+        const f = i => { let s = 0; for (let j = 0; j < sel.length; j++) s += w[j] * X[i][sel[j]]; return s; };
+        let m1 = 0, m0 = 0, n1 = 0, n0 = 0;
+        tr.forEach(i => { const v = f(i); if (y[i]) { m1 += v; n1++; } else { m0 += v; n0++; } });
+        const thr = 0.5 * (m1 / n1 + m0 / n0);
+        let ok = 0;
+        te.forEach(i => { if ((f(i) > thr ? 1 : 0) === y[i]) ok++; });
+        return ok / te.length;
+      }
+      return KS.map(k => [score(rAll.slice(0, k)), score(rTr.slice(0, k))]);
+    }
+
+    function run() {
+      const leaky = new Array(KS.length).fill(0), honest = new Array(KS.length).fill(0);
+      for (let rep = 0; rep < reps; rep++) {
+        const out = oneRep(seed + 977 * rep);
+        for (let i = 0; i < KS.length; i++) { leaky[i] += out[i][0] / reps; honest[i] += out[i][1] / reps; }
+      }
+      const P = CD.plot("w10lab1", { xmin: -0.15, xmax: 7.15, ymin: 0.4, ymax: 1.0,
+                                     xlabel: "number of genes in the panel, k  (log2 scale)",
+                                     ylabel: "accuracy on held-out cells",
+                                     xfmt: t => Math.round(Math.pow(2, t)) });
+      P.clear(); P.axes([0, 1, 2, 3, 4, 5, 6, 7]);
+      P.line([[-0.15, 0.5], [7.15, 0.5]], { color: CD.C.gray, width: 1.5, dash: [6, 4] });
+      const lp = leaky.map((v, i) => [i, v]), hp = honest.map((v, i) => [i, v]);
+      P.line(lp, { color: CD.C.red, width: 2.5 }); P.scatter(lp, { color: CD.C.red, r: 4 });
+      P.line(hp, { color: CD.C.teal, width: 2.5 }); P.scatter(hp, { color: CD.C.teal, r: 4 });
+      P.label(0.05, 0.965, "red: markers chosen using ALL cells   teal: chosen on the training split only",
+              { color: CD.C.navy });
+      P.label(0.05, 0.52, "chance = 0.5   (no gene here carries any signal)", { color: CD.C.gray });
+      CD.table("w10lab1out", ["k genes", "leaky accuracy", "honest accuracy", "inflation"],
+        KS.map((k, i) => [k, leaky[i].toFixed(3), honest[i].toFixed(3),
+                          (leaky[i] - honest[i] >= 0 ? "+" : "") + (leaky[i] - honest[i]).toFixed(3)]));
+    }
+
+    CD.slider("w10lab1ctl", { label: "datasets averaged", min: 1, max: 8, step: 1, value: reps },
+              v => { reps = v; run(); });
+    CD.button("w10lab1ctl", "New dataset", () => { seed += 13; run(); }, true);
+  })();
+
+  /* ---------------- Lab 2: fold-change ranking vs d' ranking -------------- */
+  (function () {
+    const NG = 700, TOP = 40;
+    const DEPTHS = [200, 500, 1000, 2000, 5000, 10000, 20000];
+    let di = 3, pseudo = true;
+
+    const r0 = CD.rng(101010);                     // the gene panel is fixed
+    const p1 = [], p2 = [];
+    for (let g = 0; g < NG; g++) {
+      const p = Math.pow(10, -5 + 2.7 * r0());     // expression fraction, 1e-5 .. 2e-3
+      const lf = 0.55 * CD.randn(r0);              // natural-log fold change
+      p1.push(p * Math.exp(lf / 2)); p2.push(p * Math.exp(-lf / 2));
+    }
+
+    function run() {
+      const D = DEPTHS[di], pc = pseudo ? 1 : 0;
+      const fc = [], dp = [];
+      for (let g = 0; g < NG; g++) {
+        const l1 = D * p1[g], l2 = D * p2[g];
+        fc.push(Math.abs(Math.log2((l1 + pc) / (l2 + pc))));
+        dp.push(CD.dPrime(l1, l2));
+      }
+      const idx = []; for (let g = 0; g < NG; g++) idx.push(g);
+      const topFC = idx.slice().sort((a, b) => fc[b] - fc[a]).slice(0, TOP);
+      const topDP = idx.slice().sort((a, b) => dp[b] - dp[a]).slice(0, TOP);
+      const setFC = {}; topFC.forEach(g => setFC[g] = 1);
+      const overlap = topDP.filter(g => setFC[g]).length;
+
+      const xmax = Math.max(0.6, Math.ceil(10 * Math.max.apply(null, fc)) / 10);
+      const ymax = Math.max(0.4, 1.1 * Math.max.apply(null, dp));
+      const P = CD.plot("w10lab2", { xmin: 0, xmax: xmax, ymin: 0, ymax: ymax,
+                                     xlabel: pseudo ? "|log2 fold change| with pseudocount 1  (the score select_markers uses)"
+                                                    : "|log2 fold change|, NO pseudocount",
+                                     ylabel: "per-gene d' at this depth" });
+      P.clear(); P.axes();
+      P.scatter(idx.map(g => [fc[g], dp[g]]), { color: CD.C.gray, r: 2.5 });
+      P.scatter(topFC.map(g => [fc[g], dp[g]]), { color: CD.C.orange, r: 5 });
+      P.scatter(topDP.map(g => [fc[g], dp[g]]), { color: CD.C.blue, r: 3 });
+      P.label(0.02 * xmax, 0.955 * ymax, "orange: top 40 by fold change    blue: top 40 by d'",
+              { color: CD.C.navy });
+      const med = list => { const v = list.map(g => dp[g]).sort((a, b) => a - b);
+                            return v[Math.floor(v.length / 2)]; };
+      document.getElementById("w10lab2out").innerHTML =
+        "depth = " + D + " UMI/cell &nbsp;·&nbsp; pseudocount " + (pseudo ? "ON" : "OFF") +
+        " &nbsp;·&nbsp; <b>top-40 overlap = " + overlap + "/40</b>" +
+        " &nbsp;·&nbsp; median d' of the fold-change panel = " + med(topFC).toFixed(3) +
+        " &nbsp;·&nbsp; median d' of the d' panel = " + med(topDP).toFixed(3) +
+        " &nbsp;·&nbsp; best d' anywhere = " + Math.max.apply(null, dp).toFixed(2);
+    }
+
+    CD.slider("w10lab2ctl", { label: "sequencing depth", min: 0, max: DEPTHS.length - 1,
+                              step: 1, value: di, fmt: i => DEPTHS[i] }, i => { di = i; run(); });
+    CD.toggle("w10lab2ctl", "use the +1 pseudocount", true, v => { pseudo = v; run(); });
+  })();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How to use this course</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="notation.html">Notation card →</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Orientation · read before Week 1, re-read at Week 6</span>
+    </div>
+    <h1 class="chapter-title">How to use this course</h1>
+    <div class="chapter-sub">The weekly rhythm · a realistic time budget · what to do when a week runs long · and what "verification" feels like from your side of the table</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<p>This course is a research project with a textbook wrapped around it, and it only works if the weekly loop actually closes. This page describes that loop in enough detail that you never have to guess what to do next. Read it before Week 1, and skim it again around Week 6, when the habits are either forming or not.</p>
+
+<h2>1 &nbsp;The shape of a week</h2>
+
+<p>Seven steps, in this order. The order is not decoration: each step produces the input the next one needs, and doing them out of order is the most common way a week turns into ten hours with nothing committed at the end.</p>
+
+<table class="simple">
+  <tr><th>#</th><th>Step</th><th>What "done" means</th></tr>
+  <tr><td>1</td><td><strong>Read the chapter</strong> (<code>docs/s/weekNN.html</code>), playing with the labs as you meet them.</td><td>You can state the week's main result in one sentence without looking.</td></tr>
+  <tr><td>2</td><td><strong>Work the exercises in the paper notebook</strong>, before opening the solutions.</td><td>Every exercise attempted in full sentences; the ones that failed written down as failures.</td></tr>
+  <tr><td>3</td><td><strong>Implement the week's TODOs</strong> in <code>python/celldetect/</code>.</td><td>No <code>NotImplementedError</code> left in this week's functions.</td></tr>
+  <tr><td>4</td><td><strong>Get pytest green.</strong> <code>cd python &amp;&amp; pytest tests/test_&lt;module&gt;.py</code>, then the whole suite.</td><td>Green, and you can say in one sentence what each test is checking.</td></tr>
+  <tr><td>5</td><td><strong>Run the experiment.</strong> <code>python experiments/weekNN_*.py</code>, which writes into <code>figures/</code>.</td><td>The figure exists, carries its seed in the corner, and is not stamped "not a result".</td></tr>
+  <tr><td>6</td><td><strong>Commit code AND figure, with the seed recorded.</strong></td><td>One commit, message naming the week and the seed. A figure with no seed is not a result.</td></tr>
+  <tr><td>7</td><td><strong>Write the progress log</strong>: copy <code>progress/TEMPLATE.md</code> to <code>progress/weekNN.md</code>, fill it in, commit.</td><td>All seven headings filled, including "Where I'm stuck" and the "Tools used" disclosure line.</td></tr>
+</table>
+
+<p>And every two weeks, an eighth step: <strong>open a check-in issue</strong> from <code>.github/ISSUE_TEMPLATE/checkin.md</code>, fill in the links and the agenda, and meet your mentor. Section 8 says what happens there.</p>
+
+<div class="box warning">
+  <span class="box-tag">Why step 2 comes before step 3</span>
+  <p>The exercises are where the derivation becomes yours; the code is where it becomes executable.
+  If you code first, you will write something that passes the tests and never notice that you could
+  not have derived the formula you typed. The tests are deliberately not able to detect that, and
+  the mentor check-in deliberately is.</p>
+  <p>The one exception is when the code is what unsticks the derivation — computing a small case
+  numerically to see what the answer should look like is a legitimate move and is step 3 of the
+  <a href="unstuck.html">unstuck protocol</a>. The difference is whether you are using the computer
+  to <em>see</em> or to <em>avoid seeing</em>.</p>
+</div>
+
+<div class="box python">
+  <span class="box-tag">Two commands you will type a hundred times</span>
+  <p><code>cd python &amp;&amp; pytest tests/test_detection.py</code> — one module's tests. The
+  <code>conftest.py</code> at <code>python/</code> anchors pytest's rootdir there, so
+  <code>import celldetect</code> resolves to your package and not to something else.</p>
+  <p><code>pytest -k "d_prime"</code> — run only the tests whose names contain a string. Early in a
+  week, when eleven tests are red because you have not written the functions yet, narrowing to the
+  one you are working on is the difference between a signal and a wall of text.</p>
+  <p>Add <code>-x</code> to stop at the first failure and <code>-q</code> to quieten the output.
+  From the repository root the whole suite is <code>pytest python/tests/</code>, which is what the
+  check-in template asks about.</p>
+</div>
+
+<h2>2 &nbsp;What a week actually costs</h2>
+
+<p>Plan on <strong>6 to 10 hours per week</strong>. Here is where it goes in a typical, non-milestone week:</p>
+
+<table class="simple">
+  <tr><th>Activity</th><th>Typical</th><th>Range</th><th>Notes</th></tr>
+  <tr><td>Reading the chapter and playing with its labs</td><td>1.5 h</td><td>1–2 h</td><td>Not one sitting. Two sittings with a night in between is measurably better.</td></tr>
+  <tr><td>Exercises in the notebook</td><td>2.5 h</td><td>2–3.5 h</td><td>The ★★★ exercise alone can be an hour, and is optional in a hard week.</td></tr>
+  <tr><td>Implementing the TODOs and getting pytest green</td><td>2 h</td><td>1.5–3 h</td><td>The variance here is enormous. One dtype bug is forty minutes.</td></tr>
+  <tr><td>Running the experiment, checking the figure, committing</td><td>0.5 h</td><td>0.5–1 h</td><td>Longer the first time a script needs real parameters rather than <code>fast=True</code>.</td></tr>
+  <tr><td>Progress log</td><td>0.5 h</td><td>0.3–0.75 h</td><td>Do it the same day. Written on Wednesday about last Saturday, it is fiction.</td></tr>
+  <tr><td>Bead runs (Weeks 6–12 only)</td><td>1 h</td><td>0.5–1.5 h</td><td>About six to ten hours of table time in total, spread over those weeks.</td></tr>
+  <tr><td><strong>Total</strong></td><td><strong>7–8 h</strong></td><td><strong>6–10 h</strong></td><td>Milestone weeks (3, 5, 9, 11, 12, 13, 14, 15) run at the top of the range.</td></tr>
+</table>
+
+<p>Two structural facts about that budget. First, roughly half of it is <em>writing</em> — notebook, log, eventually report. That is not overhead added to the research; in a research project it is a large part of what the research is. Second, the estimate assumes you stop when the time is spent. A week that runs to fifteen hours is not heroism, it is a signal, and Section 6 is about what to do with that signal.</p>
+
+<div class="box pitfall">
+  <span class="box-tag">The schedule failure that actually happens</span>
+  Not "I fell behind in Week 4". It is: you skip the progress log for three weeks because nothing
+  interesting happened, then in Week 14 you need to write a materials-and-methods paragraph and
+  cannot remember which seed produced the figure, whether the Fano factor was 1.4 or 1.6, or why
+  you switched marker panels. The log takes thirty minutes a week and saves a day in Week 14. This
+  is the single highest-return habit in the course.
+</div>
+
+<h2>3 &nbsp;How to read a chapter</h2>
+
+<p>Chapters have a fixed structure, and the most efficient path through them is not top to bottom.</p>
+
+<ol>
+  <li><strong>Objectives first</strong>, properly. There are five to seven of them, each concrete and checkable, and together they are the answer to "what am I supposed to be able to do on Friday?". They are checkboxes on the page and the state is remembered in your browser; tick them as they become true. If an objective is still unticked on Friday, that is your agenda item, not a vague feeling of unease.</li>
+  <li><strong>Then the labs</strong> — before the prose around them. Move every slider to both ends. Try to predict what will happen before you drag, and notice when you are wrong.</li>
+  <li><strong>Then the prose</strong>, from the top, including the boxes. Definitions and theorems are boxed so you can find them again in Week 14; pitfalls are boxed because somebody predicted your specific mistake.</li>
+  <li><strong>Then the exercises</strong>, in the notebook, solutions closed.</li>
+  <li><strong>Then the Python section</strong>, which names the exact functions, the exact pytest command, the exact experiment script and its seed.</li>
+</ol>
+
+<div class="box example">
+  <span class="box-tag">Why doing the labs before reading works better</span>
+  <p>A lab gives you a <em>surprise</em>: the Fano factor sits at 1 no matter where you put the
+  slider, the histogram gets absolutely wider and relatively narrower, the fitted exponent wanders
+  wildly at 40 trials per point. A surprise is a question your brain has already asked, and the
+  prose that follows is then an answer to a question rather than an unrequested fact. Reading first
+  and then confirming with the lab produces recognition, which feels like understanding and is not
+  the same thing.</p>
+  <p>There is a second reason, specific to this project. Several chapters put a <em>measurement</em>
+  in the lab (blue) and a <em>prediction</em> in the prose (orange). Meeting the measurement first
+  means you spend the derivation asking "will it really come out to that?" — which is exactly the
+  posture Week 12 needs from you, when three lines of evidence have to be compared without
+  flinching.</p>
+</div>
+
+<h3>3.1 &nbsp;The exercise star ratings</h3>
+
+<table class="simple">
+  <tr><th>Rating</th><th>Means</th><th>Expect</th><th>If you are short of time</th></tr>
+  <tr><td>★</td><td>Routine. Applies a definition or does an arithmetic substitution.</td><td>5–15 minutes. If it takes an hour, the definition has not landed — go back to it.</td><td>Do all of them. They are the cheapest possible check that you read the chapter.</td></tr>
+  <tr><td>★★</td><td>Requires an idea: a step you have to supply, a case you have to construct, an argument you have to assemble.</td><td>20–45 minutes, with a stuck stretch in the middle. That stretch is the exercise.</td><td>Do them. This is where most of the learning is.</td></tr>
+  <tr><td>★★★</td><td>Challenge. Open-ended, or requires combining two chapters, or asks you to guess a result and then test it.</td><td>45 minutes to well over an hour, and sometimes no clean answer.</td><td>The one to defer in a bad week. Note in the log that you deferred it, so it can come back in Week 6 or 13.</td></tr>
+</table>
+
+<p>Every exercise has a complete worked solution behind a <em>Show solution</em> toggle, followed by a grey paragraph saying why the exercise was worth doing and where it reappears. Read the grey paragraph even when your answer was right — it is usually a forward reference that tells you which result is load-bearing later.</p>
+
+<div class="box warning">
+  <span class="box-tag">How to use the solutions without wasting them</span>
+  A solution can be read once per exercise, and only after a real attempt: you have re-read the
+  statement, tried a small case, and can say <em>which step</em> you are stuck on. Read it, close
+  it, and then write your own version from understanding, on paper. The same policy governs
+  <code>python/solutions/</code>: it is not cheating to read it, it is cheating to present it as
+  yours at a milestone — and the check-in asks you to explain your code line by line, which code
+  you pasted does not survive.
+</div>
+
+<h2>4 &nbsp;Commits, seeds, and figures</h2>
+
+<p>Three conventions, all of them small, all of them about being able to reproduce your own work in ten weeks.</p>
+
+<ul>
+  <li><strong>Every experiment has a <code>SEED</code> constant at the top</strong> — 101 for Week 1, 102 for Week 2, up to 115 for Week 15. The seed is part of the result. It goes in the progress log and it is stamped on the figure by <code>_common.stamp_seed</code>.</li>
+  <li><strong>Figures are committed.</strong> They are deliverables, not build artefacts. <code>figures/week03_dprime_depth.png</code> is a thing you will point at in a check-in and paste into a report.</li>
+  <li><strong>Code and figure go in the same commit.</strong> If they drift apart, the figure stops being evidence about the code, and in Week 14 you will not be able to tell which version produced it.</li>
+</ul>
+
+<div class="box pitfall">
+  <span class="box-tag">The red stamp</span>
+  Before the PBMC download exists, Weeks 10–11 run on a synthetic surrogate; before your bead runs
+  exist, Week 12 simulates the draws. Both stamp the figure with a large red "not a result" and set
+  a module flag <code>USED_STAND_IN</code>, and <code>week14_report_figures.py</code> refuses to
+  copy a stamped figure into the report set. <strong>If a figure carries the stamp, the claim it
+  supports does not exist yet.</strong> Do not put one in a slide, and do not let one sit in your
+  progress log without a sentence saying it is a stand-in.
+</div>
+
+<h2>5 &nbsp;Milestones and tags</h2>
+
+<p>Eight milestones, five git tags. A milestone is a <em>verification event</em>: you demonstrate something to your mentor, live, and the outcome is recorded. A tag is a permanent marker in the repository's history saying "this state of the repository passed that verification".</p>
+
+<table class="simple">
+  <tr><th>Milestone</th><th>Week</th><th>Git tag</th><th>What it certifies</th></tr>
+  <tr><td>M1</td><td>3</td><td>—</td><td>The $d' \propto \sqrt{\text{depth}}$ derivation, defended at the whiteboard</td></tr>
+  <tr><td>M2</td><td>5</td><td><code>theory-complete</code></td><td>Aim 1 closed: the $\sqrt{k\cdot\text{depth}}$ law and the accuracy formula</td></tr>
+  <tr><td>M3</td><td>9</td><td><code>simulator-validated</code></td><td>Simulation matches theory, or the disagreement is characterized</td></tr>
+  <tr><td>M4</td><td>11</td><td>—</td><td>The real PBMC downsampling curve, produced end to end</td></tr>
+  <tr><td>M5</td><td>12</td><td><code>evidence-complete</code></td><td>All three lines of evidence on one axis</td></tr>
+  <tr><td>M6</td><td>13</td><td>—</td><td>Every claim labelled, every proportion with an interval</td></tr>
+  <tr><td>M7</td><td>14</td><td><code>report-draft</code></td><td>The 6–8 page report, figures frozen</td></tr>
+  <tr><td>M8</td><td>15</td><td><code>v1.0</code></td><td>Poster, talk, submission</td></tr>
+</table>
+
+<div class="box definition">
+  <span class="box-tag">The tag rule, and how to tag</span>
+  <p><strong>Tag only when <code>pytest python/tests/</code> is fully green and the relevant figures
+  regenerate identically from a clean checkout.</strong> Not "mostly green". Not "green except the
+  one I know about".</p>
+  <p><code>git tag -a theory-complete -m "M2: Aim 1 closed, all detection tests green"</code> then
+  <code>git push origin theory-complete</code>.</p>
+  <p>If the gate does not pass, <strong>tag nothing</strong> and write the reason in the week's
+  progress log. A tag you talked your way into is worse than no tag, because in Week 14 you will
+  trust it. The chapters say this explicitly at M3, M5 and M7, and they mean it.</p>
+</div>
+
+<h2>6 &nbsp;When a week runs long</h2>
+
+<p>It will. Assume it. The plan is built for it in three layers, and the skill is using the cheapest layer that solves the problem.</p>
+
+<h3>6.1 &nbsp;Layer one: triage inside the week</h3>
+
+<p>If Thursday arrives and you are at eight hours with the tests still red, cut in this order. The order is chosen so that what survives is what the next week actually depends on.</p>
+
+<table class="simple">
+  <tr><th>Cut first</th><th>Then</th><th>Never cut</th></tr>
+  <tr><td>The ★★★ exercise.</td><td>The "Going deeper" reading.</td><td>The progress log. It is thirty minutes and it is the record.</td></tr>
+  <tr><td>Re-running the experiment at full parameters (use <code>fast=True</code> and note it).</td><td>The optional second figure.</td><td>Getting <em>this week's</em> tests green, because next week's code imports this week's functions.</td></tr>
+  <tr><td>Polishing the notebook write-up.</td><td>One or two ★★ exercises, named in the log.</td><td>The derivation the next milestone will ask you to defend.</td></tr>
+</table>
+
+<p>Whatever you cut, <strong>write down that you cut it</strong>, in the log, in one line. An acknowledged gap is a schedule item. An unacknowledged one is a surprise in Week 12.</p>
+
+<h3>6.2 &nbsp;Layer two: the buffer weeks</h3>
+
+<p>There are fifteen weeks in the schedule and about thirteen weeks of material in it. <strong>Week 6 and Week 13 are the difference</strong>, and they exist for exactly this situation.</p>
+
+<ul>
+  <li><strong>Week 6</strong> comes right after Aim 1 closes. If Weeks 1–5 went well, it is a closed-book consolidation plus the bead design — a full and satisfying week. If they did not, it is a catch-up week, and <em>that is its intended use</em>: do the closed-book sheet and the bead-design section only, and pick up the rest in a spare hour of Week 7. Nothing downstream breaks, because no bead is drawn until Week 11.</li>
+  <li><strong>Week 13</strong> comes after all the evidence is in and before a sentence of the report is written. It is the designed place to absorb a Week 12 slip.</li>
+</ul>
+
+<p>Using a buffer as intended is not failure; it is the plan working. What is failure is spending a buffer week half-heartedly on new material while the old material stays broken, because that hides the debt instead of paying it.</p>
+
+<h3>6.3 &nbsp;Layer three: the fallback ladder</h3>
+
+<p>If a whole milestone slips — M3 in Week 9, M4 in Week 11, M5 in Week 12 — the escalation is the <strong>fallback ladder F1–F4</strong> in <code>plans/</code>. It specifies <em>in advance</em> how the project's scope contracts, so that the decision is made from a document rather than from panic in Week 13. Invoking it is a mentor decision and it belongs under "Decisions needed" on the check-in agenda.</p>
+
+<div class="box warning">
+  <span class="box-tag">The rule about borrowing time</span>
+  Do not borrow time from Week 12. It is the centrepiece — the week where the beads, the
+  simulation and the real data land on one pair of axes — and it is the one week that cannot be
+  compressed. If something has to give in Weeks 9–11, contract scope through the ladder and protect
+  Week 12. The same goes for the Week 14 figure freeze: everything upstream of it is negotiable,
+  and the freeze itself is not.
+</div>
+
+<h2>7 &nbsp;What gets written down, and where</h2>
+
+<table class="simple">
+  <tr><th>Artefact</th><th>Lives in</th><th>Cadence</th><th>Why it exists</th></tr>
+  <tr><td>Paper notebook (derivations, failures, sketches)</td><td>scans in <code>notebook/weekNN/</code></td><td>weekly, five minutes to scan</td><td>The primary research record. Failures belong here in full sentences.</td></tr>
+  <tr><td>Progress log</td><td><code>progress/weekNN.md</code></td><td>weekly</td><td>A commit says what changed; a log says what you were trying to find out and what you now believe.</td></tr>
+  <tr><td>Code and tests</td><td><code>python/celldetect/</code>, <code>python/tests/</code></td><td>weekly</td><td>A red test is the definition of "not done yet".</td></tr>
+  <tr><td>Figures</td><td><code>python/figures/</code></td><td>weekly, with the seed</td><td>Deliverables. Committed, seeded, regenerable.</td></tr>
+  <tr><td>Bead tally sheets</td><td>scan to <code>notebook/beads/runNN.jpg</code>, transcription to <code>python/data/beads/runNN.csv</code></td><td>Weeks 6–12, same day as the run</td><td>Primary data, not notes. The CSV row count must equal the tick marks on the sheet.</td></tr>
+  <tr><td>Check-in issue</td><td>GitHub, from <code>.github/ISSUE_TEMPLATE/checkin.md</code></td><td>every two weeks</td><td>The standing agenda; it links the two most recent logs.</td></tr>
+</table>
+
+<h2>8 &nbsp;What verification actually looks like, from your side</h2>
+
+<p>Every chapter ends with a <code>box verify</code> listing four to six concrete items. At the check-in your mentor works down that list. Here is what that is like in practice, because the phrase "milestone verification" sounds far more formal than the event.</p>
+
+<table class="simple">
+  <tr><th>The item says</th><th>What actually happens</th></tr>
+  <tr><td>"You state the research question in two sentences, without saying machine learning."</td><td>You say it out loud. If you hedge, you get asked again. Ninety seconds.</td></tr>
+  <tr><td>"You reproduce the $d' \propto \sqrt{D}$ derivation at the whiteboard."</td><td>Marker, blank board, no notes, about ten minutes. You are allowed to get stuck and think. You are asked "why is the denominator a square root?" and you answer without reaching for the page.</td></tr>
+  <tr><td>"<code>pytest tests/test_detection.py</code> is green and you can say what each test checks."</td><td>You run it in front of your mentor, then are asked about one test at random: what would break it?</td></tr>
+  <tr><td>"Your figure is committed with the seed recorded."</td><td>You open the file in the repository, point at the <code>SEED</code> line, and point at the stamp in the figure's corner.</td></tr>
+  <tr><td>"You can explain your code line by line."</td><td>Your mentor picks one function and one line in it, usually a line where something subtle is going on, and asks why it is there.</td></tr>
+  <tr><td>"Every new claim carries a status label."</td><td>A claim from your log is read back to you and you say whether it is <span class="claim proved">proved</span>, <span class="claim cited">cited</span>, <span class="claim observed">observed</span> or <span class="claim conjectured">conjectured</span>, and why.</td></tr>
+</table>
+
+<div class="box win">
+  <span class="box-tag">Being unable to defend something is information, not failure</span>
+  <p>The point of verification is <strong>measurement</strong>. If you cannot reproduce the
+  quadrature proof at the board, the check-in has just discovered a specific, fixable gap in Week 5
+  rather than in Week 14, when the report depends on it and there is no time. That is the system
+  working exactly as designed, and it is why the buffer weeks exist immediately after the two
+  heaviest theory blocks.</p>
+  <p>What <em>is</em> a failure is bluffing: talking around a step you cannot do, or presenting code
+  you did not write as your own. It is also strictly worse strategy, because the gap stays and now
+  nobody is looking for it. The correct move, always, is the sentence: <em>"I can show this far, and
+  I cannot get past this step."</em> That sentence is a research question, and your mentor can do
+  something useful with it in four minutes.</p>
+</div>
+
+<p>Bring the stuck points in the same three-line form the progress log and the check-in template both use:</p>
+
+<div class="box definition">
+  <span class="box-tag">The gap template</span>
+  <pre>I can show X: ______________________
+I need Y:     ______________________
+The gap is Z: ______________________</pre>
+  <p class="muted">Fill it in <em>before</em> the meeting, using the
+  <a href="unstuck.html">unstuck protocol</a>. A filled-in template turns "I'm stuck on Week 5" into
+  "I can get the LLR to be linear, I need the variance of a weighted sum, and I do not see why the
+  cross terms vanish" — which is a question with an answer.</p>
+</div>
+
+<div class="box warning">
+  <span class="box-tag">The two-week time-box</span>
+  If anything has been stuck for two weeks, it goes on the next check-in agenda <em>automatically</em>
+  — not because you decided it was serious enough, but because two weeks is the rule. The check-in
+  template has a checkbox for it. Most things that take four weeks would have taken twenty minutes
+  of somebody else's time in week one, and the whole purpose of a mentored project is to make that
+  trade.
+</div>
+
+<h2>9 &nbsp;A short honest word about pace</h2>
+
+<p>Fifteen weeks is not long, and the middle of a semester is where projects quietly die: the novelty is gone, the report is far away, and one skipped week becomes three. Two things reliably prevent it. The first is the weekly loop above, closed every single week even when the week was bad — a bad week that ends in a committed log is not a lost week. The second is the check-in, which is a fixed external event with a date on it. Neither requires motivation, which is the point.</p>
+
+<h2>10 &nbsp;Related pages</h2>
+<ul>
+  <li><a href="big-picture.html">The big picture: why this project?</a> — what the semester is for, and what it is not enough for.</li>
+  <li><a href="unstuck.html">How to get unstuck</a> — the protocol, with time-boxes, and the debugging section.</li>
+  <li><a href="notation.html">Notation card</a> — every symbol and its Python name.</li>
+  <li><a href="ai-policy.html">AI-use policy</a> — what is allowed, and the disclosure line every progress log carries.</li>
+  <li><a href="problem-bank.html">Problem bank</a> · <a href="resources.html">Resource library</a> · <a href="glossary.html">Glossary</a></li>
+  <li><code>python/SETUP.md</code> for installation, <code>python/README.md</code> for the experiment-to-chapter-to-figure map.</li>
+</ul>
+
+</div>
+
+<footer class="site">How Much Data Does It Take to Tell Two Cell Types Apart? · Course extras · <a href="../index.html">Course home</a></footer>
+
+</body>
+</html>
