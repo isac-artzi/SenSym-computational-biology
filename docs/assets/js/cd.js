@@ -292,8 +292,18 @@ window.CD = (function () {
   function plot(canvasId, opts) {
     const cv = typeof canvasId === "string" ? document.getElementById(canvasId) : canvasId;
     const dpr = window.devicePixelRatio || 1;
-    const cssW = cv.clientWidth || parseInt(cv.getAttribute("width")) || 640;
-    const cssH = parseInt(cv.getAttribute("height")) || 340;
+    // Careful: assigning to cv.width / cv.height writes back into the element's
+    // width and height attributes. So the authored size can only be read ONCE --
+    // after the first call those attributes hold device-pixel values, and
+    // re-reading them would multiply by the pixel ratio again on every redraw
+    // (the canvas doubles in height each time a slider moves, on any display
+    // with dpr > 1). Stash the authored values the first time and reuse them.
+    if (cv.dataset.baseHeight === undefined) {
+      cv.dataset.baseWidth = String(parseInt(cv.getAttribute("width")) || 640);
+      cv.dataset.baseHeight = String(parseInt(cv.getAttribute("height")) || 340);
+    }
+    const cssW = cv.clientWidth || parseInt(cv.dataset.baseWidth);
+    const cssH = parseInt(cv.dataset.baseHeight);
     cv.width = cssW * dpr; cv.height = cssH * dpr;
     cv.style.height = cssH + "px";
     const ctx = cv.getContext("2d");
