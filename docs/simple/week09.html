@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 9 simplified — Dropout and Where the Law Bends, Explained Slowly</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="simple.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+<script defer src="simple.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="index.html">All simplified guides</a><a href="week08.html">← Week 8</a><a href="week10.html">Week 10 →</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Week 9</span>
+      <span class="badge simple">Plain-language companion</span>
+    </div>
+    <h1 class="chapter-title">Dropout and Where the Law Bends, Explained Slowly</h1>
+    <div class="chapter-sub">Losing molecules is the same as sequencing less · the "collapse" test · the difference between the scaling law and the accuracy formula · more than two cell types</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<div class="companion-banner">
+  <span>This is the <strong>simplified companion</strong> to Week 9: the same ideas, slower, with more
+  worked examples and fewer symbols. The labs, the full exercises, the Python assignment and the
+  check-in list are in the original chapter.</span>
+  <a href="../s/week09.html">Open the full Week 9 chapter →</a>
+</div>
+
+<div class="box bigidea">
+  <span class="box-tag">The whole week in one sentence</span>
+  Dropout that loses each molecule with probability $q$ is <strong>mathematically identical</strong> to
+  sequencing at depth $D(1-q)$, so it needs no new theory; what <em>does</em> fail at low depth is not the
+  $\sqrt{\text{depth}}$ law but the bell-curve shortcut inside $\Phi(d'/2)$ — and it fails in a known
+  direction.
+</div>
+
+<h2>1 &nbsp;What dropout is</h2>
+
+<p>Between the cell and the data, molecules get lost: not captured, not copied, not read. In real
+10x experiments only something like 10–30% of a cell's molecules make it into the data. Each molecule
+is lost more or less independently, like a coin flip.</p>
+
+<h2>2 &nbsp;Dropout is just a smaller scoop</h2>
+
+<p>Week 2's thinning rule says: if each molecule survives with probability $1 - q$, a Poisson count with
+rate $\lambda$ becomes a Poisson count with rate $(1-q)\lambda$. Exactly. So:</p>
+
+<div class="box theorem">
+  <span class="box-tag">Dropout = less depth</span>
+  Sequencing at depth $D$ with dropout $q$ produces data with <strong>exactly the same probabilities</strong>
+  as sequencing at depth $D_{\text{eff}} = D(1-q)$ with no dropout. No test, statistic or classifier can tell
+  them apart.
+</div>
+
+<div class="box analogy">
+  <span class="box-tag">Analogy · a leaky scoop</span>
+  A 5,000-bean scoop with holes that lose 60% of beans gives you about 2,000 beans, chosen at random.
+  That is indistinguishable from using a 2,000-bean scoop in the first place.
+</div>
+
+<div class="box steps">
+  <span class="box-tag">Worked example 1 · what dropout costs</span>
+  <p>Depth 5,000 with 60% dropout ($q = 0.6$).</p>
+  <ol>
+    <li>Effective depth: $5000 \times (1 - 0.6) = 2000$.</li>
+    <li>$d'$ goes as $\sqrt{\text{depth}}$, so it is multiplied by $\sqrt{0.4} \approx 0.63$.</li>
+    <li>So 60% dropout costs you 37% of your separation — not 60%. The square root softens the blow.</li>
+  </ol>
+  <p>For the standard marker gene ($p = 0.0040$ vs $0.0055$): depth 5000 with 60% dropout gives
+  $d' = 0.97$, and depth 2000 with no dropout also gives $d' = 0.97$.</p>
+</div>
+
+<p>Bonus: you do not need to know the true dropout rate to test the theory. Whatever it is, it just
+moves you along the curve you already predicted.</p>
+
+<h2>3 &nbsp;The collapse test</h2>
+
+<div class="box steps">
+  <span class="box-tag">How the figure works</span>
+  <ol>
+    <li>Simulate cells at many depths, with dropout $q = 0$, $0.3$ and $0.6$. Measure accuracy.</li>
+    <li>Plot accuracy against the <em>nominal</em> depth $D$: three separate curves; the high-dropout curves are shifted right.</li>
+    <li>Re-plot the same points against <strong>effective</strong> depth $D(1-q)$: if the theorem is right, all three curves land on top of each other — and on the theory curve.</li>
+  </ol>
+  <p>Nothing is fitted. You chose $q$, so $1 - q$ is known before you run anything. That is what makes it a test.</p>
+</div>
+
+<h2>4 &nbsp;Two claims that sound like one</h2>
+
+<p>This is the subtle idea of the week. "The theory" is really two separate claims, and they can fail
+separately:</p>
+
+<table class="simple">
+  <tr><th></th><th>Claim A: the scaling law</th><th>Claim B: the accuracy formula</th></tr>
+  <tr><td>Says</td><td>$d' \propto \sqrt{D \times k}$</td><td>accuracy $= \Phi(d'/2)$</td></tr>
+  <tr><td>Rests on</td><td>Poisson counts + independent genes</td><td>all of that, <em>plus</em> the bell-curve shortcut</td></tr>
+  <tr><td>At very low depth</td><td>still exactly true</td><td>off by a few points</td></tr>
+  <tr><td>Where it really fails</td><td>Week 11 (real data is not Poisson)</td><td>here, this week</td></tr>
+</table>
+
+<h2>5 &nbsp;Why the bell curve fails at low depth, and which way</h2>
+
+<p>When a gene's expected count is tiny, say 0.3, most cells show <strong>zero</strong> — about 74% of them.
+The distribution is a spike at 0, not a bell. A smooth symmetric bell cannot represent a spike, so the
+shortcut misjudges the accuracy.</p>
+
+<div class="box analogy">
+  <span class="box-tag">Analogy · "did I see any at all?"</span>
+  At very low depth the best rule is basically "zero molecules → type 2; one or more → type 1". Both
+  types have a big lump of probability at exactly zero, but different-sized lumps. That difference is
+  real information. The bell curve smooths the lumps away and so <strong>underestimates</strong> how well
+  you can do.
+</div>
+
+<p>From the full chapter (8 genes, per-gene mass 0.004):</p>
+<table class="simple">
+  <tr><th>Fold change</th><th>Depth</th><th>Shortcut $\Phi(d'/2)$</th><th>Exact best</th><th>Difference</th></tr>
+  <tr><td>1.5</td><td>320</td><td>73.9%</td><td>73.9%</td><td>≈ 0</td></tr>
+  <tr><td>3.0</td><td>20</td><td>65.5%</td><td>67.2%</td><td>+1.6 pts</td></tr>
+  <tr><td>5.0</td><td>20</td><td>70.3%</td><td>73.2%</td><td>+2.9 pts</td></tr>
+</table>
+<p>The shortcut is <strong>pessimistic</strong>: the exact answer is higher. The error is biggest when counts
+are small <em>and</em> the fold change is large. So if your simulated accuracy at low depth sits slightly
+<em>above</em> the theory line, that is expected; if it sits below, look for a bug.</p>
+
+<div class="box definition">
+  <span class="box-tag">Three numbers, three meanings</span>
+  <ul>
+    <li><strong>simulated vs exact</strong> — should agree within sampling error. If not: a bug in your code.</li>
+    <li><strong>exact vs shortcut</strong> — the size of the bell-curve error. A finding, not a bug.</li>
+    <li><strong>simulated vs shortcut</strong> — the sum of both. Only interpret after the first check passes.</li>
+  </ul>
+</div>
+
+<h2>6 &nbsp;More than two cell types</h2>
+
+<ul>
+  <li><strong>Chance changes.</strong> With $T$ types, guessing gets $1/T$. With five types, 80% accuracy means much more than with two. Always state the chance level.</li>
+  <li><strong>Every pair has its own $d'$.</strong> T cells vs monocytes: far apart. CD4 vs CD8 T cells: close.</li>
+  <li><strong>The hardest pair dominates.</strong> Overall error is at least the worst pair's error and at most the sum of all pairs' errors. Usually the closest pair accounts for most of the mistakes.</li>
+</ul>
+
+<h2>7 &nbsp;Check yourself</h2>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 1</span></div>
+  <div class="ex-body">Depth 8,000 with 75% dropout. What is the effective depth, and by what factor does $d'$ shrink?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    $8000 \times 0.25 = 2000$. $d'$ is multiplied by $\sqrt{0.25} = 0.5$.
+  </div></details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 2</span></div>
+  <div class="ex-body">A protocol has 30% dropout. How much deeper must you sequence to get back the $d'$ of a no-dropout run?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    Effective depth is $0.7D$; to match $D_0$ you need $D = D_0/0.7 \approx 1.43\,D_0$ — about 43% more sequencing.
+  </div></details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 3</span></div>
+  <div class="ex-body">At very low depth your measured accuracy is 2 points <em>above</em> $\Phi(d'/2)$. Bug or expected?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    Expected, if the exact Bayes accuracy is also about 2 points above. The shortcut is pessimistic at
+    low counts. Compare measured with <em>exact</em> first; that is the bug check.
+  </div></details>
+</div>
+
+<h2>Where to go next</h2>
+<p>Once the ideas on this page feel comfortable, go back to the
+<a href="../s/week09.html">full Week 9 chapter</a> and work through it in order. Read each
+derivation there with this page open beside it: whenever a line of algebra stops making sense,
+find the matching example here, redo it with your own numbers, and then return to the line.</p>
+<p class="muted">The companion pages leave things out on purpose. They are a way into the full
+chapters, not a substitute for them, and the check-ins are based on the full chapters.</p>
+
+</div>
+
+<footer class="site">Plain-language companion · Vihaan Rao with Dr. Isac Artzi ·
+<a href="../s/week09.html">full chapter</a> · <a href="index.html">all simplified guides</a></footer>
+</body>
+</html>

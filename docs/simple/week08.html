@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 8 simplified — Classifiers From Scratch, Explained Slowly</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="simple.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+<script defer src="simple.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="index.html">All simplified guides</a><a href="week07.html">← Week 7</a><a href="week09.html">Week 9 →</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Week 8</span>
+      <span class="badge simple">Plain-language companion</span>
+    </div>
+    <h1 class="chapter-title">Classifiers From Scratch, Explained Slowly</h1>
+    <div class="chapter-sub">The S-curve · what "loss" measures · gradient descent as walking downhill · why test accuracy is the only honest number · why nearest-neighbour struggles with many genes</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<div class="companion-banner">
+  <span>This is the <strong>simplified companion</strong> to Week 8: the same ideas, slower, with more
+  worked examples and fewer symbols. The labs, the full exercises, the Python assignment and the
+  check-in list are in the original chapter.</span>
+  <a href="../s/week08.html">Open the full Week 8 chapter →</a>
+</div>
+
+<div class="box bigidea">
+  <span class="box-tag">The whole week in one sentence</span>
+  Logistic regression is the Week 5 points system with the points <strong>learned from examples</strong>
+  instead of computed from known rates; learning means repeatedly nudging each weight in the
+  direction that reduces the mistakes, and the only accuracy you may report is the one measured on
+  cells the model never saw.
+</div>
+
+<h2>1 &nbsp;The question this week answers</h2>
+
+<p>In Weeks 3–5 you <em>knew</em> the true rates, so you could compute the best possible rule. In real
+life you only have example cells with labels. Does a classifier that has to <em>learn</em> the rule do
+much worse? The answer this week: with a couple of thousand training cells, barely. <strong>The limit is
+the counting noise in the data, not the cleverness of the algorithm.</strong></p>
+
+<h2>2 &nbsp;The S-curve (sigmoid)</h2>
+
+<p>Logistic regression computes the same kind of score as Week 5 — weights × counts + a constant,
+$z = w \cdot x + b$ — and then squashes it into a probability between 0 and 1 using the
+<strong>sigmoid</strong> function:</p>
+$$\sigma(z) = \frac{1}{1 + e^{-z}}.$$
+
+<table class="simple">
+  <tr><th>score $z$</th><th>−4</th><th>−2</th><th>−1</th><th>0</th><th>1</th><th>2</th><th>4</th></tr>
+  <tr><td>$\sigma(z)$ = probability of type 1</td><td>0.018</td><td>0.119</td><td>0.269</td><td>0.500</td><td>0.731</td><td>0.881</td><td>0.982</td></tr>
+</table>
+
+<p>Big positive score → almost certainly type 1. Big negative → almost certainly type 2. Score 0 → 50/50,
+which is the decision boundary.</p>
+
+<h2>3 &nbsp;Loss: a number that measures how wrong you are</h2>
+
+<p>To learn, the model needs a score for its own mistakes. Logistic regression uses <strong>log-loss</strong>:
+for each training cell, if the true answer is type 1 and the model said probability $p$, the penalty is
+$-\log p$.</p>
+
+<div class="box example">
+  <span class="box-tag">Example · confident and right, unsure, confident and wrong</span>
+  <table class="simple">
+    <tr><th>True type 1, model says</th><th>Penalty $-\log p$</th></tr>
+    <tr><td>$p = 0.9$ (confident, right)</td><td>0.11</td></tr>
+    <tr><td>$p = 0.5$ (no idea)</td><td>0.69</td></tr>
+    <tr><td>$p = 0.1$ (confident, wrong)</td><td>2.30</td></tr>
+  </table>
+  <p>Being confidently wrong is punished hardest. The loss is the average penalty over all training cells.</p>
+</div>
+
+<h2>4 &nbsp;Gradient descent: walking downhill</h2>
+
+<div class="box analogy">
+  <span class="box-tag">Analogy · finding the bottom of a valley in fog</span>
+  You cannot see the whole valley. But you can feel which way the ground slopes under your feet. Take a
+  small step downhill. Feel again. Step again. Eventually you reach the bottom. The "slope under your
+  feet" is the <strong>gradient</strong> (the derivative from AP Calculus, one for each weight), and the
+  step size is the <strong>learning rate</strong> $\eta$.
+</div>
+
+<p>The full chapter derives the slope with the chain rule. The result is beautifully simple:</p>
+$$\frac{\partial\,\text{loss}}{\partial w_j} = \text{average over cells of } (p_i - y_i)\,x_{ij}.$$
+
+<p>In words: for each cell, take the <strong>error</strong> (predicted probability minus true label, 1 or 0),
+multiply by that cell's count for gene $j$, and average. Then update $w_j \leftarrow w_j - \eta \times
+\text{slope}$.</p>
+
+<div class="box steps">
+  <span class="box-tag">Worked example · one gene, four cells, two steps</span>
+  <p>Counts $x = 1, 2, 4, 5$ with labels $y = 0, 0, 1, 1$. Start at $w = 0$, $b = 0$; learning rate $\eta = 0.5$.</p>
+  <ol>
+    <li><strong>Predict:</strong> every score is 0, so every $p = 0.5$.</li>
+    <li><strong>Errors</strong> $p - y$: $0.5, 0.5, -0.5, -0.5$.</li>
+    <li><strong>Slope for $w$:</strong> average of error × count $= (0.5 \cdot 1 + 0.5 \cdot 2 - 0.5 \cdot 4 - 0.5 \cdot 5)/4 = -3/4 = -0.75$.</li>
+    <li><strong>Slope for $b$:</strong> average of errors $= 0$.</li>
+    <li><strong>Step:</strong> $w = 0 - 0.5(-0.75) = 0.375$. Now high counts push toward type 1. ✓</li>
+    <li><strong>Step 2:</strong> new probabilities $0.59, 0.68, 0.82, 0.87$. The slopes are now $+0.14$ for $w$ and $+0.24$ for $b$, so $w$ eases back to $0.31$ and $b$ moves to $-0.12$, shifting the boundary toward the middle of the data.</li>
+  </ol>
+</div>
+
+<p>Two useful facts hide in that example:</p>
+<ul>
+  <li><strong>Cells that are already right stop mattering.</strong> If $p_i \approx y_i$, the error is about 0 and that cell barely moves the weights. Learning is driven by the confusing cells near the boundary.</li>
+  <li><strong>The very first step points from the type-2 average toward the type-1 average.</strong> In the example, the type-1 mean count is 4.5 and the type-2 mean is 1.5; the first slope is exactly $-(4.5 - 1.5)/4$. So even one step already gets the direction right.</li>
+</ul>
+
+<div class="box confusion">
+  <span class="box-tag">Why the provided sigmoid has two branches</span>
+  Computing $e^{-z}$ when $z = -5000$ overflows (the number is too big for the computer). The provided
+  <code>_sigmoid</code> uses $1/(1+e^{-z})$ when $z \ge 0$ and the equivalent $e^{z}/(1+e^{z})$ when
+  $z \lt 0$, so it never exponentiates a large positive number. Always call it instead of writing your own.
+</div>
+
+<h2>5 &nbsp;Train and test: the honesty rule</h2>
+
+<div class="box analogy">
+  <span class="box-tag">Analogy · the practice test and the real test</span>
+  If a teacher gives you the exact exam questions to practise on, your exam score says nothing about
+  what you learned. A model is the same: its accuracy on cells it was trained on is inflated.
+</div>
+
+<div class="box steps">
+  <span class="box-tag">The three rules</span>
+  <ol>
+    <li>Split the cells once, at random, into training (70%) and test (30%). Report only test accuracy.</li>
+    <li>Shuffle cells and labels with the same random order (the Week 7 bug again).</li>
+    <li>Anything computed from data — averages for standardizing, chosen genes, thresholds — comes from the training cells only.</li>
+  </ol>
+</div>
+
+<h2>6 &nbsp;Nearest neighbours and too many genes</h2>
+
+<p>The $k$-nearest-neighbour classifier labels a cell by looking at the training cells closest to it.
+That works in 2 or 3 dimensions. With hundreds of genes, a strange thing happens: <strong>every cell is
+about the same distance from every other cell</strong>, so "nearest" stops meaning much.</p>
+
+<div class="box example">
+  <span class="box-tag">Why distances bunch up</span>
+  A distance squared is a <em>sum</em> over genes of squared differences. By the Week 1 coin argument,
+  a sum of $k$ independent pieces has mean $\propto k$ but wobble $\propto \sqrt{k}$. So the spread of
+  distances, relative to their size, shrinks like $1/\sqrt{k}$. With 400 noisy genes, all distances are
+  within a few percent of each other, and the handful of genes that actually differ get drowned out.
+  Logistic regression does not have this problem: it learns to put near-zero weight on useless genes.
+</div>
+
+<h2>7 &nbsp;Check yourself</h2>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 1</span></div>
+  <div class="ex-body">A cell is type 2 ($y = 0$) and the model says $p = 0.8$. What is its error, and which way will it push the weight of a gene this cell has many counts of?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    Error $= 0.8 - 0 = +0.8$. The slope contribution is positive, and we step <em>against</em> the slope,
+    so that gene's weight goes down: next time, high counts of that gene will push less toward type 1.
+  </div></details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 2</span></div>
+  <div class="ex-body">Your classifier gets 99% on the training cells and 81% on the test cells. Which do you report? What might the gap mean?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    Report 81%. A big gap means the model memorised quirks of the training cells (overfitting). Compare
+    the test number with the $\Phi(d'/2)$ prediction to see how much was lost.
+  </div></details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 3</span></div>
+  <div class="ex-body">What is the log-loss for a type-1 cell predicted at $p = 0.99$? At $p = 0.01$?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    $-\log 0.99 \approx 0.010$. $-\log 0.01 \approx 4.6$. Confidently wrong costs about 460 times more.
+  </div></details>
+</div>
+
+<h2>Where to go next</h2>
+<p>Once the ideas on this page feel comfortable, go back to the
+<a href="../s/week08.html">full Week 8 chapter</a> and work through it in order. Read each
+derivation there with this page open beside it: whenever a line of algebra stops making sense,
+find the matching example here, redo it with your own numbers, and then return to the line.</p>
+<p class="muted">The companion pages leave things out on purpose. They are a way into the full
+chapters, not a substitute for them, and the check-ins are based on the full chapters.</p>
+
+</div>
+
+<footer class="site">Plain-language companion · Vihaan Rao with Dr. Isac Artzi ·
+<a href="../s/week08.html">full chapter</a> · <a href="index.html">all simplified guides</a></footer>
+</body>
+</html>
