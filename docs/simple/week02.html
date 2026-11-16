@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 2 simplified — The Probability You Need, Explained Slowly</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="simple.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+<script defer src="simple.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="index.html">All simplified guides</a><a href="week01.html">← Week 1</a><a href="week03.html">Week 3 →</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Week 2</span>
+      <span class="badge simple">Plain-language companion</span>
+    </div>
+    <h1 class="chapter-title">The Probability You Need, Explained Slowly</h1>
+    <div class="chapter-sub">Expectation and variance in plain words · where the binomial and the Poisson come from · why "keeping only some molecules" changes nothing but the rate</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<div class="companion-banner">
+  <span>This is the <strong>simplified companion</strong> to Week 2: the same ideas, slower, with more
+  worked examples and fewer symbols. The labs, the full exercises, the Python assignment and the
+  check-in list are in the original chapter.</span>
+  <a href="../s/week02.html">Open the full Week 2 chapter →</a>
+</div>
+
+<div class="box bigidea">
+  <span class="box-tag">The whole week in one sentence</span>
+  Counting a rare gene among thousands of captured molecules is a <strong>binomial</strong> count; when
+  the gene is rare the binomial becomes a <strong>Poisson</strong>, which is why variance = mean; and
+  if you randomly throw away some molecules, the count stays Poisson with a smaller rate
+  (<strong>thinning</strong>).
+</div>
+
+<h2>1 &nbsp;Expectation: a weighted average</h2>
+
+<p>The <strong>expectation</strong> $E[X]$ of a random number $X$ is its long-run average. You compute
+it by multiplying each possible value by how likely it is, then adding.</p>
+
+<div class="box steps">
+  <span class="box-tag">Worked example · a loaded die</span>
+  <p>A game pays you 0, 1 or 4 points with probabilities 0.5, 0.3 and 0.2.</p>
+  <ol>
+    <li>Multiply each value by its probability: $0 \times 0.5 = 0$, $1 \times 0.3 = 0.3$, $4 \times 0.2 = 0.8$.</li>
+    <li>Add: $E[X] = 0 + 0.3 + 0.8 = 1.1$.</li>
+  </ol>
+  <p>You will never actually win 1.1 points in one game. It is the average over many games.</p>
+</div>
+
+<p>Two rules you will use all the time:</p>
+<ul>
+  <li><strong>Averages add.</strong> $E[X + Y] = E[X] + E[Y]$ — always, even if $X$ and $Y$ influence each other.</li>
+  <li><strong>Constants come out.</strong> $E[3X + 2] = 3E[X] + 2$.</li>
+</ul>
+
+<h2>2 &nbsp;Variance: average squared distance from the average</h2>
+
+<div class="box steps">
+  <span class="box-tag">Worked example · same game, its variance</span>
+  <p>The shortcut formula is $\mathrm{Var}(X) = E[X^2] - (E[X])^2$.</p>
+  <ol>
+    <li>$E[X^2]$: square each value, then weight: $0^2(0.5) + 1^2(0.3) + 4^2(0.2) = 0 + 0.3 + 3.2 = 3.5$.</li>
+    <li>$(E[X])^2 = 1.1^2 = 1.21$.</li>
+    <li>$\mathrm{Var}(X) = 3.5 - 1.21 = 2.29$, so sd $= \sqrt{2.29} \approx 1.51$.</li>
+  </ol>
+</div>
+
+<p>Variance follows <em>different</em> rules from expectation, and the difference matters a lot later:</p>
+<ul>
+  <li><strong>Scaling squares.</strong> $\mathrm{Var}(3X) = 9\,\mathrm{Var}(X)$. (Tripling every value triples the distances, and variance uses <em>squared</em> distances.)</li>
+  <li><strong>Shifting does nothing.</strong> $\mathrm{Var}(X + 2) = \mathrm{Var}(X)$. (Sliding everything over does not spread it out.)</li>
+  <li><strong>Variances add <em>only for independent things</em>.</strong> $\mathrm{Var}(X + Y) = \mathrm{Var}(X) + \mathrm{Var}(Y)$ if knowing $X$ tells you nothing about $Y$.</li>
+</ul>
+
+<div class="box example">
+  <span class="box-tag">Example · why independence matters for variance but not for averages</span>
+  <p>Let $X$ be a fair coin (1 for heads, 0 for tails). Variance $= 0.25$.</p>
+  <p><strong>Case A, independent:</strong> $Y$ is a second, separate coin. $X + Y$ can be 0, 1 or 2, with variance $0.25 + 0.25 = 0.5$.</p>
+  <p><strong>Case B, not independent:</strong> $Y$ is the <em>same</em> coin, $Y = X$. Then $X + Y = 2X$ is either 0 or 2, and its variance is $4 \times 0.25 = 1.0$ — twice as much as the "add the variances" rule predicts.</p>
+  <p>In both cases the average of $X + Y$ is 1. Averages did not care; variance did. Week 5 depends on exactly this: genes that move together do <em>not</em> add their noise the simple way.</p>
+</div>
+
+<h2>3 &nbsp;The binomial: counting successes</h2>
+
+<p>Do something $D$ times. Each time it "succeeds" with probability $p$, independently. The number of
+successes is a <strong>binomial</strong> count, written $\mathrm{Binomial}(D, p)$.</p>
+
+<p>For sequencing: each of the $D$ captured molecules is a "try", and it "succeeds" if it belongs to
+your gene (probability $p$). So the gene's count is $\mathrm{Binomial}(D, p)$.</p>
+
+<p>Its mean and variance are</p>
+$$E[X] = Dp, \qquad \mathrm{Var}(X) = Dp(1-p).$$
+
+<div class="box example">
+  <span class="box-tag">Why those formulas are believable</span>
+  <p>Think of $X$ as the sum of $D$ tiny 0-or-1 scores, one per molecule. Each tiny score has mean $p$
+  and variance $p(1-p)$ (the coin-flip calculation with $p$ instead of 0.5). Means add, so the total
+  mean is $Dp$. The molecules are independent, so variances add too: $Dp(1-p)$. That is the whole
+  proof, in words.</p>
+</div>
+
+<h2>4 &nbsp;How a binomial turns into a Poisson</h2>
+
+<p>Look at the variance formula $Dp(1-p)$ and compare it with the mean $Dp$. They differ only by the
+factor $(1-p)$.</p>
+
+<div class="box steps">
+  <span class="box-tag">Worked example · a typical gene</span>
+  <p>$D = 3000$ molecules, $p = 0.002$.</p>
+  <ol>
+    <li>Mean: $Dp = 6$.</li>
+    <li>Variance: $Dp(1-p) = 6 \times 0.998 = 5.988$.</li>
+    <li>The Poisson answer would be variance $= 6$. The difference is 0.2% — invisible.</li>
+  </ol>
+  <p>The whole table of probabilities agrees too: the binomial gives $P(X = 6) = 0.1608$ and the
+  Poisson with $\lambda = 6$ gives $0.1606$.</p>
+</div>
+
+<div class="box example">
+  <span class="box-tag">Counter-example · the bead jar is <em>not</em> Poisson</span>
+  <p>Draw $D = 20$ beads from a jar that is 30% red ($p = 0.3$). Mean $= 6$, but variance $= 20 \times 0.3 \times 0.7 = 4.2$.
+  That is 30% smaller than the mean, so the Poisson shortcut would be wrong here. This is why
+  the bead weeks (6 and 12) use the binomial formula directly.</p>
+</div>
+
+<p><strong>Rule of thumb:</strong> when $p$ is small (a gene is a tiny fraction of the cell), the factor
+$(1-p)$ is basically 1, the binomial is basically a Poisson, and variance = mean. That is where
+Week 1's "coincidence" comes from: it is not magic, it is just $(1-p) \approx 1$.</p>
+
+<div class="lab">
+  <div class="lab-title">Try it · binomial versus Poisson</div>
+  <div class="lab-desc">Change $D$ and $p$. When $p$ is small the two variances agree; when $p$ is large they do not.</div>
+  <div id="w2calc"></div>
+</div>
+
+<h2>5 &nbsp;Thinning: randomly losing molecules</h2>
+
+<p>Suppose each molecule in the cell is kept with probability $q$ and lost otherwise — independently,
+coin-flip style. This happens in real life in three ways:</p>
+<ul>
+  <li><strong>sequencing less deeply</strong> (a smaller scoop),</li>
+  <li><strong>dropout</strong> (molecules lost during chemistry),</li>
+  <li><strong>discarding beads</strong> with a die roll in the Week 12 experiment.</li>
+</ul>
+
+<div class="box definition">
+  <span class="box-tag">The thinning rule</span>
+  If a count is Poisson with rate $\lambda$, and each item survives with probability $q$, then the
+  survivors are <strong>exactly</strong> Poisson with rate $q\lambda$. Nothing else about the shape changes.
+</div>
+
+<div class="box analogy">
+  <span class="box-tag">Analogy · a leaky bucket</span>
+  Raindrops land in a bucket at random, about 100 per minute. The bucket has holes, and each drop
+  has a 50% chance of leaking out. What you collect still looks like random rain — just lighter rain,
+  about 50 per minute. Thinning does not make the rain "clumpier" or "smoother"; it only turns down
+  the rate.
+</div>
+
+<div class="box confusion">
+  <span class="box-tag">The mistake almost everyone makes</span>
+  <p>"Half the molecules means half the noise." <strong>No.</strong></p>
+  <table class="simple">
+    <tr><th></th><th>Before ($\lambda = 100$)</th><th>After keeping half ($\lambda = 50$)</th></tr>
+    <tr><td>sd $=\sqrt{\lambda}$</td><td>10</td><td>7.07 (not 5!)</td></tr>
+    <tr><td>relative noise $1/\sqrt{\lambda}$</td><td>10%</td><td>14%</td></tr>
+  </table>
+  <p>The absolute wobble went down, but only by $\sqrt{2}$. The wobble <em>compared with the count</em>
+  went up. Losing data always hurts the relative noise.</p>
+</div>
+
+<h2>6 &nbsp;Check yourself</h2>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 1</span></div>
+  <div class="ex-body">A value is 2 with probability 0.25 and 6 with probability 0.75. Find its mean and variance.</div>
+  <details><summary>Show answer</summary><div class="solution">
+    Mean $= 2(0.25) + 6(0.75) = 0.5 + 4.5 = 5$. $E[X^2] = 4(0.25) + 36(0.75) = 1 + 27 = 28$.
+    Variance $= 28 - 25 = 3$.
+  </div></details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 2</span></div>
+  <div class="ex-body">$D = 4000$, $p = 0.001$. Compute the binomial mean and variance. Is Poisson a good approximation?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    Mean $= 4$, variance $= 4 \times 0.999 = 3.996$. Yes — they differ by 0.1%.
+  </div></details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 3</span></div>
+  <div class="ex-body">A gene has $\lambda = 36$. Dropout keeps only 25% of molecules. What is the new rate, the new sd, and the new relative noise?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    New rate $= 0.25 \times 36 = 9$. New sd $= 3$ (was 6). Relative noise goes from $1/6 \approx 17\%$
+    to $1/3 \approx 33\%$. Keeping a quarter of the molecules doubled the relative noise
+    ($\sqrt{4} = 2$).
+  </div></details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 4</span></div>
+  <div class="ex-body">Using $P(X=k) = \lambda^k e^{-\lambda}/k!$ with $\lambda = 3$, compute $P(X = 0)$ and $P(X = 1)$.</div>
+  <details><summary>Show answer</summary><div class="solution">
+    $e^{-3} \approx 0.0498$. $P(X=0) = 3^0 \times 0.0498 / 0! = 0.0498$ (about 5%).
+    $P(X = 1) = 3 \times 0.0498 / 1 = 0.149$ (about 15%).
+  </div></details>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  SIMPLE.calc("w2calc",
+    [{ id: "D", label: "tries D", value: 3000, step: 1 }, { id: "p", label: "success prob p", value: 0.002 }],
+    v => {
+      if (!(v.p > 0 && v.p < 1 && v.D > 0)) throw new Error("need D > 0 and 0 < p < 1");
+      const m = v.D * v.p, vb = m * (1 - v.p);
+      return "mean D·p = <b>" + SIMPLE.fmt(m, 3) + "</b>" +
+        " &nbsp;·&nbsp; binomial variance D·p·(1−p) = <b>" + SIMPLE.fmt(vb, 3) + "</b>" +
+        " &nbsp;·&nbsp; Poisson variance = <b>" + SIMPLE.fmt(m, 3) + "</b>" +
+        "<br>the binomial variance is " + SIMPLE.pct(v.p, 2) + " smaller than the mean (that is the factor 1 − p)";
+    });
+});
+</script>
+
+<h2>Where to go next</h2>
+<p>Once the ideas on this page feel comfortable, go back to the
+<a href="../s/week02.html">full Week 2 chapter</a> and work through it in order. Read each
+derivation there with this page open beside it: whenever a line of algebra stops making sense,
+find the matching example here, redo it with your own numbers, and then return to the line.</p>
+<p class="muted">The companion pages leave things out on purpose. They are a way into the full
+chapters, not a substitute for them, and the check-ins are based on the full chapters.</p>
+
+</div>
+
+<footer class="site">Plain-language companion · Vihaan Rao with Dr. Isac Artzi ·
+<a href="../s/week02.html">full chapter</a> · <a href="index.html">all simplified guides</a></footer>
+</body>
+</html>

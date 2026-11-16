@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 1 simplified — Counting Noise, Explained Slowly</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="simple.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+<script defer src="simple.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="index.html">All simplified guides</a><a href="week02.html">Week 2 →</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Week 1</span>
+      <span class="badge simple">Plain-language companion</span>
+    </div>
+    <h1 class="chapter-title">Counting Noise, Explained Slowly</h1>
+    <div class="chapter-sub">Why a sequencer gives you a sample, what "Poisson" means, and why every square root in this project starts here</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<div class="companion-banner">
+  <span>This is the <strong>simplified companion</strong> to Week 1: the same ideas, slower, with more
+  worked examples and fewer symbols. The labs, the full exercises, the Python assignment and the
+  check-in list are in the original chapter.</span>
+  <a href="../s/week01.html">Open the full Week 1 chapter →</a>
+</div>
+
+<div class="box bigidea">
+  <span class="box-tag">The whole week in one sentence</span>
+  A sequencer does not <em>measure</em> how much of each gene a cell has; it grabs a small random
+  handful of the cell's molecules and counts them, so every number it reports is wobbly, and the
+  wobble follows a simple law: <strong>the bigger the count, the smaller the wobble compared with
+  the count</strong>.
+</div>
+
+<h2>1 &nbsp;The picture to keep in your head</h2>
+
+<div class="box analogy">
+  <span class="box-tag">Analogy · the giant jar of jelly beans</span>
+  <p>Imagine a cell as a jar holding 300,000 jelly beans. Each colour is a gene. Maybe 0.2% of the
+  beans are red (that is one gene), 1% are green (another gene), and so on for 20,000 colours.</p>
+  <p>The sequencer reaches in and pulls out a scoop of about 3,000 beans, then reports how many of
+  each colour were in the scoop. It never sees the whole jar.</p>
+  <p>If 0.2% of the jar is red, you <em>expect</em> about $0.002 \times 3000 = 6$ red beans in the
+  scoop. But scoop again and you might get 4, or 9, or 5. That scoop-to-scoop wobble is
+  <strong>counting noise</strong>, and it is what this whole project is about.</p>
+</div>
+
+<p>Two words you will see constantly:</p>
+<table class="simple symbols">
+  <tr><th>Word / symbol</th><th>Plain meaning</th><th>Jelly-bean version</th></tr>
+  <tr><td>depth, $D$</td><td>how many molecules the sequencer captured from one cell</td><td>the size of the scoop (≈ 3,000)</td></tr>
+  <tr><td>$p$ (or $p_g$)</td><td>the fraction of the cell's molecules that belong to gene $g$</td><td>the fraction of the jar that is red (0.002)</td></tr>
+  <tr><td>$\lambda$ ("lambda")</td><td>the count you <em>expect</em> on average: $\lambda = D \times p$</td><td>6 red beans per scoop, on average</td></tr>
+  <tr><td>$X$</td><td>the count you actually got this time</td><td>"this scoop had 4 red beans"</td></tr>
+</table>
+
+<h2>2 &nbsp;What "Poisson" means, without the formula first</h2>
+
+<p>When you take a big scoop and look for a rare colour, the count you get follows a very specific
+pattern called the <strong>Poisson distribution</strong>. It tells you how likely each count is. For
+example, if you expect $\lambda = 2$ red beans per scoop:</p>
+
+<table class="simple">
+  <tr><th>Red beans in the scoop</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6+</th></tr>
+  <tr><td>How often (out of 100 scoops)</td><td>13.5</td><td>27.1</td><td>27.1</td><td>18.0</td><td>9.0</td><td>3.6</td><td>1.7</td></tr>
+</table>
+
+<p>Notice: even though you "expect" 2, you get exactly 2 only about a quarter of the time, and in
+about 1 scoop out of 7 you get <em>none at all</em>. That zero is not a broken machine — it is just
+bad luck in the scoop. This is why single-cell data is full of zeros.</p>
+
+<p>The formula that produced that table is</p>
+$$P(X = k) = \frac{\lambda^k e^{-\lambda}}{k!}.$$
+<p>You do not need to love it yet. Here is how to read it with $\lambda = 2$ and $k = 3$:</p>
+
+<div class="box steps">
+  <span class="box-tag">Worked example · plugging into the Poisson formula</span>
+  <ol>
+    <li>$\lambda^k = 2^3 = 8$.</li>
+    <li>$e^{-\lambda} = e^{-2} \approx 0.1353$ (this same number appears for every $k$; it just makes the whole table add up to 1).</li>
+    <li>$k! = 3! = 3 \times 2 \times 1 = 6$.</li>
+    <li>Put it together: $\dfrac{8 \times 0.1353}{6} \approx 0.180$, i.e. 18.0 scoops out of 100. That matches the table.</li>
+  </ol>
+</div>
+
+<h2>3 &nbsp;The one fact everything rests on: variance equals mean</h2>
+
+<p>Every distribution has a <strong>mean</strong> (the average value) and a <strong>spread</strong>.
+Spread is measured two ways:</p>
+<ul>
+  <li><strong>Variance</strong>: the average of the squared distances from the mean.</li>
+  <li><strong>Standard deviation (sd)</strong>: the square root of the variance. It is in the same units as the count, so it is the one to picture: "typically off by about this much".</li>
+</ul>
+
+<p>The special thing about a Poisson count is that <strong>its variance is exactly equal to its
+mean</strong>. So if you expect $\lambda$, the standard deviation is $\sqrt{\lambda}$. You do not get
+to choose the spread separately; the mean decides it for you.</p>
+
+<div class="box example">
+  <span class="box-tag">Example · three genes, three noise levels</span>
+  <table class="simple">
+    <tr><th>Expected count $\lambda$</th><th>Typical wobble (sd $=\sqrt{\lambda}$)</th><th>Wobble as a fraction of the count ($1/\sqrt{\lambda}$)</th></tr>
+    <tr><td>4</td><td>2</td><td>50% — very noisy</td></tr>
+    <tr><td>100</td><td>10</td><td>10%</td></tr>
+    <tr><td>10,000</td><td>100</td><td>1% — quite precise</td></tr>
+  </table>
+  <p>Read the table carefully. The <em>absolute</em> wobble grows (2 → 10 → 100), but the wobble
+  <em>compared with the count</em> shrinks (50% → 10% → 1%). Bigger counts are more trustworthy,
+  but only as a square root: to cut the relative noise by 10×, you need 100× the count.</p>
+</div>
+
+<div class="box confusion">
+  <span class="box-tag">Common confusion</span>
+  "Deeper sequencing removes the noise." Not quite. Deeper sequencing makes the noise
+  <em>bigger</em> in absolute terms but <em>smaller compared with the signal</em>. It is the second
+  one that matters for telling cell types apart.
+</div>
+
+<div class="lab">
+  <div class="lab-title">Try it · how noisy is a count?</div>
+  <div class="lab-desc">Type a fraction $p$ and a depth $D$. The calculator gives the expected count, its typical wobble, and the relative noise.</div>
+  <div id="w1calc"></div>
+</div>
+
+<h2>4 &nbsp;The Fano factor: a one-number test for "is this Poisson?"</h2>
+
+<p>Since variance = mean for Poisson counts, the ratio</p>
+$$F = \frac{\text{variance}}{\text{mean}}$$
+<p>should be about 1. This ratio is called the <strong>Fano factor</strong>. If you measure a gene
+across many cells of the same type and get $F$ much bigger than 1, something besides scoop-luck is
+making the counts vary (in Week 11 you will find out what).</p>
+
+<div class="box steps">
+  <span class="box-tag">Worked example · computing a Fano factor by hand</span>
+  <p>Eight cells of the same type give these counts for one gene: <code>3, 5, 4, 6, 2, 4, 5, 3</code>.</p>
+  <ol>
+    <li><strong>Mean.</strong> Add them: $3+5+4+6+2+4+5+3 = 32$. Divide by 8: mean $= 4$.</li>
+    <li><strong>Distances from the mean:</strong> $-1, 1, 0, 2, -2, 0, 1, -1$.</li>
+    <li><strong>Square them:</strong> $1, 1, 0, 4, 4, 0, 1, 1$. Sum $= 12$.</li>
+    <li><strong>Variance.</strong> Divide by $n - 1 = 7$ (not by 8 — see the box below): $12/7 \approx 1.71$.</li>
+    <li><strong>Fano factor:</strong> $1.71 / 4 \approx 0.43$.</li>
+  </ol>
+  <p>Is that "less than Poisson"? Probably not. With only 8 cells the Fano factor itself is very
+  wobbly. Try a second set: <code>12, 30, 5, 22, 9, 18</code>. Mean 16, variance 84.4, so
+  $F \approx 5.3$ — far above 1, and that <em>is</em> suspicious.</p>
+</div>
+
+<div class="box confusion">
+  <span class="box-tag">Why divide by $n-1$ instead of $n$?</span>
+  You computed the distances from the <em>sample's own</em> mean, which is always a little closer to
+  the data than the true mean is. Dividing by $n - 1$ corrects for that. In NumPy this is
+  <code>np.var(x, ddof=1)</code>. Your Week 1 test checks this.
+</div>
+
+<h2>5 &nbsp;Why square roots keep showing up</h2>
+
+<p>Here is the argument behind every square root you will meet this semester, told with coins.</p>
+
+<div class="box example">
+  <span class="box-tag">Example · flipping coins</span>
+  <p>Flip a fair coin and score 1 for heads. One flip has mean 0.5 and variance 0.25 (sd 0.5).</p>
+  <p>Now flip $n$ coins and add the scores. Two facts:</p>
+  <ul>
+    <li><strong>Means add</strong>, always: the total has mean $0.5n$.</li>
+    <li><strong>Variances add</strong>, <em>if the flips are independent</em>: the total has variance $0.25n$, so its sd is $0.5\sqrt{n}$.</li>
+  </ul>
+  <table class="simple">
+    <tr><th>Flips $n$</th><th>Mean of total</th><th>sd of total</th><th>mean ÷ sd</th></tr>
+    <tr><td>4</td><td>2</td><td>1</td><td>2</td></tr>
+    <tr><td>100</td><td>50</td><td>5</td><td>10</td></tr>
+    <tr><td>10,000</td><td>5,000</td><td>50</td><td>100</td></tr>
+  </table>
+  <p>The signal (mean) grows like $n$; the noise (sd) grows like $\sqrt{n}$; so signal-to-noise grows
+  like $n/\sqrt{n} = \sqrt{n}$. <strong>That is the entire reason for every square-root law in this
+  course</strong> — for depth (Week 3), number of genes (Week 5), number of beads (Week 12), and the
+  width of error bars (Week 13).</p>
+</div>
+
+<p>A counted gene is like this: each captured molecule is a "flip" that either is or is not that
+gene. More molecules means signal grows faster than noise, but only as a square root.</p>
+
+<h2>6 &nbsp;Evidence versus derivation</h2>
+
+<p>You will hear this distinction every week, so here it is in everyday terms:</p>
+<ul>
+  <li><strong>Evidence</strong> ("I ran it 10 times and it looked right") tells you something happened in the cases you tried.</li>
+  <li><strong>A derivation</strong> ("starting from these assumptions, step by step, it must be true") tells you it holds in <em>every</em> case where the assumptions hold — and, just as importantly, it tells you which assumption to blame when it fails.</li>
+</ul>
+<p>Example: the coin argument above used "the flips are independent". If someone hands you coins that
+are glued together in pairs, you know immediately which step breaks. A pile of simulations would
+not tell you that.</p>
+
+<h2>7 &nbsp;Check yourself</h2>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 1</span></div>
+  <div class="ex-body">A gene is 0.5% of a cell's molecules ($p = 0.005$) and the depth is $D = 2000$. What count do you expect, and what is the typical wobble?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    $\lambda = 2000 \times 0.005 = 10$. sd $= \sqrt{10} \approx 3.2$. So you would typically see
+    somewhere around 7 to 13, and the relative noise is about 32%.
+  </div></details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 2</span></div>
+  <div class="ex-body">You want that gene's relative noise to be 10% instead of 32%. By what factor must the depth go up?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    Relative noise is $1/\sqrt{\lambda}$. For 10% you need $\sqrt{\lambda} = 10$, so $\lambda = 100$.
+    That is 10× the current $\lambda = 10$, so 10× the depth: $D = 20{,}000$. Cutting noise by about
+    3.2× costs 10× the data — the square root again.
+  </div></details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 3</span></div>
+  <div class="ex-body">Two cell types have expected counts 9 and 11 for a gene. Would you trust one cell's count to tell you its type?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    No. Each count wobbles by about 3 ($\sqrt{9} = 3$, $\sqrt{11} \approx 3.3$), but the two types are
+    only 2 apart. A type-1 cell will often show 11 and a type-2 cell will often show 9. Week 3 turns
+    this "gap compared with wobble" idea into a number called $d'$.
+  </div></details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 4</span></div>
+  <div class="ex-body">Counts for one gene in six cells: <code>2, 0, 1, 3, 1, 5</code>. Compute the mean, the variance (divide by $n-1$) and the Fano factor.</div>
+  <details><summary>Show answer</summary><div class="solution">
+    Mean $= 12/6 = 2$. Distances: $0, -2, -1, 1, -1, 3$; squares: $0, 4, 1, 1, 1, 9$, sum 16.
+    Variance $= 16/5 = 3.2$. Fano $= 3.2/2 = 1.6$. With six cells, that is well within what pure
+    Poisson luck can produce, so you cannot conclude much — which is exactly the lesson of Lab 2
+    in the full chapter.
+  </div></details>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  SIMPLE.calc("w1calc",
+    [{ id: "p", label: "fraction p", value: 0.002 }, { id: "D", label: "depth D", value: 3000, step: 100 }],
+    v => {
+      const lam = v.p * v.D;
+      if (!(lam > 0)) throw new Error("p and D must be positive");
+      const sd = Math.sqrt(lam);
+      return "expected count λ = D × p = <b>" + SIMPLE.fmt(lam, 2) + "</b>" +
+        " &nbsp;·&nbsp; typical wobble √λ = <b>" + SIMPLE.fmt(sd, 2) + "</b>" +
+        " &nbsp;·&nbsp; relative noise 1/√λ = <b>" + SIMPLE.pct(1 / sd) + "</b>" +
+        "<br>chance this cell shows a zero: e<sup>−λ</sup> = " + SIMPLE.pct(Math.exp(-lam));
+    });
+});
+</script>
+
+<h2>Where to go next</h2>
+<p>Once the ideas on this page feel comfortable, go back to the
+<a href="../s/week01.html">full Week 1 chapter</a> and work through it in order. Read each
+derivation there with this page open beside it: whenever a line of algebra stops making sense,
+find the matching example here, redo it with your own numbers, and then return to the line.</p>
+<p class="muted">The companion pages leave things out on purpose. They are a way into the full
+chapters, not a substitute for them, and the check-ins are based on the full chapters.</p>
+
+</div>
+
+<footer class="site">Plain-language companion · Vihaan Rao with Dr. Isac Artzi ·
+<a href="../s/week01.html">full chapter</a> · <a href="index.html">all simplified guides</a></footer>
+</body>
+</html>
