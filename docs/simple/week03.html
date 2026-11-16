@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 3 simplified — The Separation Index d', Explained Slowly</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="simple.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+<script defer src="simple.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="index.html">All simplified guides</a><a href="week02.html">← Week 2</a><a href="week04.html">Week 4 →</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Week 3</span>
+      <span class="badge simple">Plain-language companion</span>
+    </div>
+    <h1 class="chapter-title">The Separation Index $d'$, Explained Slowly</h1>
+    <div class="chapter-sub">"How many wobbles apart are the two cell types?" · why it grows as the square root of depth · the 4× rule with real numbers</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<div class="companion-banner">
+  <span>This is the <strong>simplified companion</strong> to Week 3: the same ideas, slower, with more
+  worked examples and fewer symbols. The labs, the full exercises, the Python assignment and the
+  check-in list are in the original chapter.</span>
+  <a href="../s/week03.html">Open the full Week 3 chapter →</a>
+</div>
+
+<div class="box bigidea">
+  <span class="box-tag">The whole week in one sentence</span>
+  $d'$ ("d-prime") measures how far apart two cell types are <strong>in units of counting noise</strong>,
+  and because the noise is $\sqrt{\text{count}}$, $d'$ grows as $\sqrt{\text{depth}}$: to double $d'$
+  you must sequence <strong>four times</strong> as deeply.
+</div>
+
+<h2>1 &nbsp;The problem, as a guessing game</h2>
+
+<p>A cell is either type 1 or type 2. For one gene, type 1 cells average $\lambda_1$ molecules and type 2
+cells average $\lambda_2$. You see <em>one</em> count from <em>one</em> cell. Which type is it?</p>
+
+<div class="box analogy">
+  <span class="box-tag">Analogy · two basketball players</span>
+  <p>Player A averages 16.5 points a game; player B averages 12. You are told one game's score, 14,
+  and asked who played. Hard! Both players have good and bad nights, and their score ranges overlap.</p>
+  <p>Now suppose A averages 66 and B averages 48. Told "62", you would bet on A with some confidence.
+  The gap is bigger <em>compared with how much each player's score bounces around</em>.</p>
+  <p>$d'$ is that comparison turned into a number.</p>
+</div>
+
+<h2>2 &nbsp;The formula, piece by piece</h2>
+
+$$d' = \frac{|\lambda_1 - \lambda_2|}{\sqrt{\bar\lambda}}, \qquad \bar\lambda = \frac{\lambda_1 + \lambda_2}{2}.$$
+
+<table class="simple symbols">
+  <tr><th>Piece</th><th>What it means</th></tr>
+  <tr><td>$|\lambda_1 - \lambda_2|$</td><td><strong>the gap</strong> between the two types' average counts (the vertical bars mean "ignore the sign")</td></tr>
+  <tr><td>$\bar\lambda$</td><td>the average of the two averages — a "typical" count for this gene</td></tr>
+  <tr><td>$\sqrt{\bar\lambda}$</td><td><strong>the typical wobble</strong>. Remember Week 1: a Poisson count with mean $\lambda$ has sd $\sqrt{\lambda}$.</td></tr>
+  <tr><td>$d'$</td><td>gap ÷ wobble = "how many wobbles apart" the two types are</td></tr>
+</table>
+
+<div class="box steps">
+  <span class="box-tag">Worked example 1 · the course's standard marker gene</span>
+  <p>At depth $D = 3000$, a marker gene has $\lambda_1 = 12$ and $\lambda_2 = 16.5$.</p>
+  <ol>
+    <li>Gap: $|12 - 16.5| = 4.5$.</li>
+    <li>Typical count: $\bar\lambda = (12 + 16.5)/2 = 14.25$.</li>
+    <li>Typical wobble: $\sqrt{14.25} \approx 3.775$.</li>
+    <li>$d' = 4.5 / 3.775 \approx 1.19$.</li>
+  </ol>
+  <p>The types are about 1.2 wobbles apart: real, but heavily overlapping.</p>
+</div>
+
+<p>A rough feel for the scale:</p>
+<table class="simple">
+  <tr><th>$d'$</th><th>What it feels like</th></tr>
+  <tr><td>0</td><td>identical — pure guessing</td></tr>
+  <tr><td>about 1</td><td>noticeable difference, lots of overlap, many mistakes</td></tr>
+  <tr><td>about 2</td><td>clearly different, still some mistakes</td></tr>
+  <tr><td>4 or more</td><td>almost never confused</td></tr>
+</table>
+<p class="muted">Week 4 turns $d'$ into an exact percentage. You do not need that yet.</p>
+
+<h2>3 &nbsp;Why the bottom has a square root (and why that is special)</h2>
+
+<p>For most kinds of data you would have to <em>measure</em> the wobble separately; it could be anything.
+For Poisson counts you do not: the wobble is <strong>forced</strong> to be $\sqrt{\text{mean}}$ (Week 1,
+variance = mean). So $d'$ needs nothing except the two averages. No extra knob, nothing to fit.</p>
+
+<p>Keep a finger on this step. In Week 11 real data turns out <em>not</em> to have variance = mean, and
+this is precisely the line that breaks.</p>
+
+<h2>4 &nbsp;The depth law: $d' \propto \sqrt{D}$</h2>
+
+<p>Each count's average is depth × fraction: $\lambda_1 = Dp_1$ and $\lambda_2 = Dp_2$. Watch what happens
+when the depth goes up by a factor of 4:</p>
+
+<div class="box steps">
+  <span class="box-tag">Worked example 2 · quadruple the depth</span>
+  <ol>
+    <li>The gap gets 4× bigger (both averages are multiplied by 4, so their difference is too).</li>
+    <li>The typical count gets 4× bigger, so the wobble $\sqrt{\bar\lambda}$ gets $\sqrt{4} = 2$× bigger.</li>
+    <li>$d' = \dfrac{\text{gap}}{\text{wobble}}$ goes up by $\dfrac{4}{2} = 2$.</li>
+  </ol>
+  <p><strong>4× the data → 2× the separation.</strong> In general, multiplying depth by $m$ multiplies $d'$ by $\sqrt{m}$.</p>
+</div>
+
+<p>Written as algebra, plug $\lambda = Dp$ into the formula and pull $D$ out:</p>
+$$d' = \frac{D\,|p_1 - p_2|}{\sqrt{D\,\bar p}} = \sqrt{D}\cdot\frac{|p_1 - p_2|}{\sqrt{\bar p}}.$$
+<p>The second piece depends only on the biology (the two fractions). Only the $\sqrt{D}$ changes when
+you sequence more.</p>
+
+<div class="box example">
+  <span class="box-tag">Worked example 3 · what each step up costs</span>
+  <p>Same marker gene ($p_1 = 0.0040$, $p_2 = 0.0055$):</p>
+  <table class="simple">
+    <tr><th>Depth $D$</th><th>$\lambda_1$, $\lambda_2$</th><th>$d'$</th><th>Accuracy (from Week 4)</th><th>Cost</th></tr>
+    <tr><td>3,000</td><td>12, 16.5</td><td>1.19</td><td>72%</td><td>1×</td></tr>
+    <tr><td>12,000</td><td>48, 66</td><td>2.38</td><td>88%</td><td>4×</td></tr>
+    <tr><td>48,000</td><td>192, 264</td><td>4.77</td><td>99%</td><td>16×</td></tr>
+  </table>
+  <p>Each doubling of $d'$ costs four times the sequencing. That is the claim the rest of the course
+  tests.</p>
+</div>
+
+<div class="box steps">
+  <span class="box-tag">Worked example 4 · same ratio, different depth</span>
+  <p>Compare $\lambda_1 = 100,\ \lambda_2 = 121$ with $\lambda_1 = 10,\ \lambda_2 = 12.1$ (the second is one-tenth the depth).</p>
+  <ol>
+    <li>First: gap 21, typical count 110.5, wobble 10.51, $d' \approx 2.00$.</li>
+    <li>Second: gap 2.1, typical count 11.05, wobble 3.32, $d' \approx 0.63$.</li>
+    <li>Ratio: $2.00 / 0.63 \approx 3.16 = \sqrt{10}$. Exactly what the depth law says.</li>
+  </ol>
+</div>
+
+<div class="lab">
+  <div class="lab-title">Try it · compute $d'$ for any gene and depth</div>
+  <div class="lab-desc">Enter the two fractions and the depth. Then multiply the depth by 4 and watch $d'$ double.</div>
+  <div id="w3calc"></div>
+</div>
+
+<h2>5 &nbsp;Two things $d'$ is <em>not</em></h2>
+
+<div class="box confusion">
+  <span class="box-tag">$d'$ is not a percentage</span>
+  $d' = 2$ does not mean "2% accurate" or "twice as good". It is a distance in wobble-units. Week 4
+  converts it to accuracy.
+</div>
+
+<div class="box confusion">
+  <span class="box-tag">$d'$ is not the fold change</span>
+  <p>"Fold change" is the ratio $\lambda_2 / \lambda_1$. It ignores how big the counts are, and that is a trap:</p>
+  <table class="simple">
+    <tr><th>Gene</th><th>$\lambda_1$</th><th>$\lambda_2$</th><th>Fold change</th><th>$d'$</th></tr>
+    <tr><td>A (rare)</td><td>0.2</td><td>0.4</td><td>2.0×</td><td>0.37</td></tr>
+    <tr><td>B (common)</td><td>40</td><td>55</td><td>1.375×</td><td>2.18</td></tr>
+  </table>
+  <p>Gene A has the "better" fold change but is nearly useless: most cells of <em>both</em> types
+  show a count of 0. Gene B is six times more informative. Always compute the actual counts at your
+  depth before trusting a marker.</p>
+</div>
+
+<h2>6 &nbsp;Check yourself</h2>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 1</span></div>
+  <div class="ex-body">$\lambda_1 = 20$, $\lambda_2 = 30$. Compute $d'$.</div>
+  <details><summary>Show answer</summary><div class="solution">
+    Gap 10. $\bar\lambda = 25$, wobble 5. $d' = 10/5 = 2$.
+  </div></details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 2</span></div>
+  <div class="ex-body">That gene came from depth 2,000. What depth gives $d' = 4$? What depth gives $d' = 1$?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    $d'$ doubles when depth is ×4: $D = 8000$ for $d' = 4$. Halving $d'$ needs depth ÷4: $D = 500$ for $d' = 1$.
+  </div></details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 3</span></div>
+  <div class="ex-body">Your budget triples the depth. By what factor does $d'$ improve?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    $\sqrt{3} \approx 1.73$. Tripling the money buys 73% more separation, not 200% more.
+  </div></details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 4</span></div>
+  <div class="ex-body">Dropout keeps only a fraction $q = 0.25$ of molecules in both cell types. Using Week 2's thinning rule, what happens to $d'$?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    Both rates are multiplied by 0.25, which is the same as cutting the depth to a quarter. So $d'$ is
+    multiplied by $\sqrt{0.25} = 0.5$ — it halves. (Week 9 is built on this.)
+  </div></details>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  SIMPLE.calc("w3calc",
+    [{ id: "p1", label: "p₁", value: 0.004 }, { id: "p2", label: "p₂", value: 0.0055 },
+     { id: "D", label: "depth D", value: 3000, step: 100 }],
+    v => {
+      const l1 = v.D * v.p1, l2 = v.D * v.p2;
+      if (!(l1 >= 0 && l2 >= 0 && l1 + l2 > 0)) throw new Error("fractions and depth must be positive");
+      const lb = (l1 + l2) / 2, gap = Math.abs(l1 - l2), dp = gap / Math.sqrt(lb);
+      return "λ₁ = " + SIMPLE.fmt(l1, 2) + ", λ₂ = " + SIMPLE.fmt(l2, 2) +
+        " &nbsp;·&nbsp; gap = " + SIMPLE.fmt(gap, 2) + " &nbsp;·&nbsp; wobble √λ̄ = " + SIMPLE.fmt(Math.sqrt(lb), 2) +
+        "<br><b>d′ = " + SIMPLE.fmt(dp, 3) + "</b> &nbsp;·&nbsp; predicted accuracy Φ(d′/2) = " +
+        SIMPLE.pct(CD.Phi(dp / 2)) + " (Week 4)";
+    });
+});
+</script>
+
+<h2>Where to go next</h2>
+<p>Once the ideas on this page feel comfortable, go back to the
+<a href="../s/week03.html">full Week 3 chapter</a> and work through it in order. Read each
+derivation there with this page open beside it: whenever a line of algebra stops making sense,
+find the matching example here, redo it with your own numbers, and then return to the line.</p>
+<p class="muted">The companion pages leave things out on purpose. They are a way into the full
+chapters, not a substitute for them, and the check-ins are based on the full chapters.</p>
+
+</div>
+
+<footer class="site">Plain-language companion · Vihaan Rao with Dr. Isac Artzi ·
+<a href="../s/week03.html">full chapter</a> · <a href="index.html">all simplified guides</a></footer>
+</body>
+</html>

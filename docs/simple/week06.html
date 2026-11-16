@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 6 simplified — Consolidation and Bead Design, Explained Slowly</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="simple.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+<script defer src="simple.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="index.html">All simplified guides</a><a href="week05.html">← Week 5</a><a href="week07.html">Week 7 →</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Week 6</span>
+      <span class="badge simple">Plain-language companion</span>
+    </div>
+    <h1 class="chapter-title">Consolidation and Bead Design, Explained Slowly</h1>
+    <div class="chapter-sub">The whole Aim 1 argument as one story · beads as a stand-in for molecules · how many trials an experiment needs before you start</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<div class="companion-banner">
+  <span>This is the <strong>simplified companion</strong> to Week 6: the same ideas, slower, with more
+  worked examples and fewer symbols. The labs, the full exercises, the Python assignment and the
+  check-in list are in the original chapter.</span>
+  <a href="../s/week06.html">Open the full Week 6 chapter →</a>
+</div>
+
+<div class="box bigidea">
+  <span class="box-tag">The whole week in one sentence</span>
+  Drawing beads from a jar is the same counting problem as sequencing, so the same square-root law
+  applies; and before you draw a single bead you must check that your error bars will be small enough
+  to see the effect — if they will not be, change the jars, not the hope.
+</div>
+
+<h2>1 &nbsp;The Aim 1 argument as a chain of six links</h2>
+
+<p>The full chapter asks you to derive the accuracy formula with the book closed. Here is the chain in
+plain words. If you can say each link and why it follows from the one before, you are ready.</p>
+
+<div class="box steps">
+  <span class="box-tag">The chain</span>
+  <ol>
+    <li><strong>A sequencer takes a random sample.</strong> Each of $D$ captured molecules belongs to gene $g$ with probability $p_g$. (Week 1)</li>
+    <li><strong>So a gene's count is binomial, and for rare genes, Poisson</strong> with mean $\lambda = Dp$ — and <strong>variance = mean</strong>, because $(1-p) \approx 1$. (Week 2)</li>
+    <li><strong>So the noise is $\sqrt{\lambda}$</strong>, and the separation between two types is gap ÷ noise: $d' = |\lambda_1 - \lambda_2| / \sqrt{\bar\lambda}$, which grows as $\sqrt{D}$. (Week 3)</li>
+    <li><strong>With the line drawn halfway</strong>, each type's centre is $d'/2$ wobbles from it, so accuracy $= \Phi(d'/2)$. (Week 4)</li>
+    <li><strong>Independent genes add in quadrature</strong>, so $k$ equal genes give $\sqrt{k}$ times one. (Week 5)</li>
+    <li><strong>Result:</strong> accuracy $= \Phi\!\left(\tfrac{\sqrt{Dk}\,c}{2}\right)$, where $c = |p_1 - p_2|/\sqrt{\bar p}$ is the per-gene biology.</li>
+  </ol>
+  <p>And the assumptions you used: counts are Poisson (cells of a type identical, random capture),
+  genes are independent, the two types are equally common, the rates are known, and counts are large
+  enough for the bell-curve shortcut.</p>
+</div>
+
+<h2>2 &nbsp;The beads: what they stand for</h2>
+
+<table class="simple">
+  <tr><th>Sequencing</th><th>Bead experiment</th></tr>
+  <tr><td>a cell</td><td>a jar</td></tr>
+  <tr><td>two cell types</td><td>jar A (30% red) and jar B (35% red)</td></tr>
+  <tr><td>a captured molecule</td><td>one bead drawn (and put back)</td></tr>
+  <tr><td>depth $D$</td><td>number of beads drawn, $n$</td></tr>
+  <tr><td>a gene's count</td><td>the number of red beads seen, $K$</td></tr>
+  <tr><td>"what type is this cell?"</td><td>"which jar did these come from?"</td></tr>
+</table>
+
+<p>One difference: red is <em>not</em> rare in a jar (30%), so the bead count is binomial, not Poisson,
+and its variance is $n\bar p(1-\bar p)$ rather than $n\bar p$. The $d'$ formula picks up that extra factor:</p>
+
+$$d' = \frac{\sqrt{n}\;|p_A - p_B|}{\sqrt{\bar p\,(1-\bar p)}}.$$
+
+<p>But look at the front: <strong>$\sqrt{n}$</strong>. The same square-root law as depth.</p>
+
+<div class="box steps">
+  <span class="box-tag">Worked example 1 · the planned jars</span>
+  <p>$p_A = 0.30$, $p_B = 0.35$, so $\bar p = 0.325$.</p>
+  <ol>
+    <li>Gap: $|0.30 - 0.35| = 0.05$.</li>
+    <li>Wobble per bead: $\sqrt{0.325 \times 0.675} = \sqrt{0.219} \approx 0.468$.</li>
+    <li>Per-bead separation: $0.05 / 0.468 \approx 0.107$. So $d' \approx 0.107\sqrt{n}$.</li>
+    <li>At $n = 100$ beads: $d' = 1.07$, accuracy $= \Phi(0.53) \approx 70\%$.</li>
+  </ol>
+</div>
+
+<table class="simple">
+  <tr><th>Beads drawn $n$</th><th>10</th><th>25</th><th>50</th><th>100</th><th>200</th></tr>
+  <tr><td>Predicted accuracy, jars 30/35</td><td>56.7%</td><td>60.5%</td><td>64.7%</td><td>70.3%</td><td>77.5%</td></tr>
+  <tr><td>Predicted accuracy, jars 30/40</td><td>63.0%</td><td>70.0%</td><td>77.1%</td><td>85.3%</td><td>93.1%</td></tr>
+</table>
+
+<h2>3 &nbsp;Error bars: how many trials do you need?</h2>
+
+<p>At each $n$ you will play the "which jar?" game some number of times — say 40 trials — and record
+the fraction you got right. That fraction is itself a noisy measurement. How noisy?</p>
+
+<div class="box definition">
+  <span class="box-tag">The size of an error bar on a proportion</span>
+  If the true chance of being right is $p$ and you do $N$ trials, a 95% error bar is roughly
+  $$\pm\; 1.96\sqrt{\frac{p(1-p)}{N}}.$$
+  (This is the AP Statistics one-proportion interval.)
+</div>
+
+<div class="box steps">
+  <span class="box-tag">Worked example 2 · 40 trials</span>
+  <p>Suppose the true accuracy is 60% and you do $N = 40$ trials.</p>
+  <ol>
+    <li>$p(1-p) = 0.6 \times 0.4 = 0.24$.</li>
+    <li>$0.24 / 40 = 0.006$, and $\sqrt{0.006} \approx 0.0775$.</li>
+    <li>Error bar: $\pm 1.96 \times 0.0775 \approx \pm 0.15$.</li>
+  </ol>
+  <p>So "60%" really means "somewhere from 45% to 75%". Look at the 30/35 table: the whole curve from
+  $n = 10$ to $n = 100$ only climbs from 57% to 70%. With ±15-point error bars, you could not tell
+  the points apart.</p>
+</div>
+
+<div class="box steps">
+  <span class="box-tag">Worked example 3 · turning it around</span>
+  <p>How many trials for an error bar of ±5 points at $p = 0.6$? Solve $1.96\sqrt{0.24/N} = 0.05$:</p>
+  $$N = \frac{1.96^2 \times 0.24}{0.05^2} = \frac{3.8416 \times 0.24}{0.0025} \approx 369.$$
+  <p>Halving the error bar costs four times the trials — the same 4× rule as depth, for the same reason.</p>
+</div>
+
+<h2>4 &nbsp;The real lesson: make the effect bigger</h2>
+
+<div class="box analogy">
+  <span class="box-tag">Analogy · spotting a friend in a crowd</span>
+  If your friend is wearing grey in a grey crowd, you need a very long look. Ask them to wear bright
+  orange and you spot them instantly. Both "look longer" and "wear orange" work — but one of them is
+  free.
+</div>
+
+<p>With jars 30/35 the effect is small and the experiment needs a lot of trials to detect it. With jars
+30/40 the accuracy curve climbs from 63% to 93% across the same range of $n$ — big enough to see
+through ±15-point error bars. The full chapter computes the <em>power</em> (the chance your experiment
+detects the effect at all) for both designs and recommends widening the jars.</p>
+
+<div class="box confusion">
+  <span class="box-tag">An experiment that cannot detect its effect is not an experiment</span>
+  Doing the arithmetic <em>before</em> collecting data takes twenty minutes. Doing it after a month of
+  bead-counting, and finding the error bars swallow everything, costs the month. In sequencing you
+  cannot choose your cell types; with beads you can choose your jars.
+</div>
+
+<div class="lab">
+  <div class="lab-title">Try it · design your jars</div>
+  <div class="lab-desc">Pick two red fractions, a number of beads per trial, and a number of trials per point. Compare the predicted accuracy with the size of the error bar.</div>
+  <div id="w6calc"></div>
+</div>
+
+<h2>5 &nbsp;Check yourself</h2>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 1</span></div>
+  <div class="ex-body">With jars 30/35, how many beads per trial would you need for $d' = 2$?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    $0.107\sqrt{n} = 2$ → $\sqrt{n} = 18.7$ → $n \approx 350$ beads per trial. That is a lot of counting —
+    another argument for wider jars.
+  </div></details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 2</span></div>
+  <div class="ex-body">You do 160 trials instead of 40 at one point. What happens to the error bar?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    4× the trials → error bar shrinks by $\sqrt{4} = 2$. About ±7.5 points instead of ±15.
+  </div></details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 3</span></div>
+  <div class="ex-body">Why do we put each bead back after drawing it?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    So every draw has the same chance of being red and the draws are independent. That makes the red
+    count exactly binomial, which is the model the $d'$ formula assumes. (A jar with thousands of beads
+    is close to this even without replacement, just as a cell with hundreds of thousands of molecules is.)
+  </div></details>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  SIMPLE.calc("w6calc",
+    [{ id: "pa", label: "jar A red fraction", value: 0.30 }, { id: "pb", label: "jar B", value: 0.35 },
+     { id: "n", label: "beads per trial n", value: 100, step: 1 }, { id: "N", label: "trials per point", value: 40, step: 1 }],
+    v => {
+      if (!(v.pa > 0 && v.pa < 1 && v.pb > 0 && v.pb < 1 && v.n >= 1 && v.N >= 1)) throw new Error("check the inputs");
+      const pbar = (v.pa + v.pb) / 2;
+      const dp = Math.sqrt(v.n) * Math.abs(v.pa - v.pb) / Math.sqrt(pbar * (1 - pbar));
+      const acc = CD.Phi(dp / 2);
+      const hw = 1.96 * Math.sqrt(acc * (1 - acc) / v.N);
+      const gap = acc - 0.5;
+      return "d′ = <b>" + SIMPLE.fmt(dp, 3) + "</b> &nbsp;·&nbsp; predicted accuracy <b>" + SIMPLE.pct(acc) + "</b>" +
+        "<br>95% error bar with " + v.N + " trials: <b>±" + (100 * hw).toFixed(1) + " points</b>" +
+        " &nbsp;·&nbsp; distance above chance (50%): " + (100 * gap).toFixed(1) + " points" +
+        (hw > gap ? " <span style='color:var(--red)'>— error bar bigger than the effect</span>" : "");
+    });
+});
+</script>
+
+<h2>Where to go next</h2>
+<p>Once the ideas on this page feel comfortable, go back to the
+<a href="../s/week06.html">full Week 6 chapter</a> and work through it in order. Read each
+derivation there with this page open beside it: whenever a line of algebra stops making sense,
+find the matching example here, redo it with your own numbers, and then return to the line.</p>
+<p class="muted">The companion pages leave things out on purpose. They are a way into the full
+chapters, not a substitute for them, and the check-ins are based on the full chapters.</p>
+
+</div>
+
+<footer class="site">Plain-language companion · Vihaan Rao with Dr. Isac Artzi ·
+<a href="../s/week06.html">full chapter</a> · <a href="index.html">all simplified guides</a></footer>
+</body>
+</html>

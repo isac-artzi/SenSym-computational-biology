@@ -535,13 +535,40 @@ window.CD = (function () {
         saved[i] = cb.checked;
         try { localStorage.setItem(key, JSON.stringify(saved)); } catch (e) { }
       });
+      // Wrap the text in one span first: the <li> is a flex row, and without
+      // the wrapper every inline element (math, <em>, <code>) becomes its own
+      // flex column and the sentence breaks apart.
+      const txt = document.createElement("span");
+      while (li.firstChild) txt.appendChild(li.firstChild);
+      li.appendChild(txt);
       li.prepend(cb);
     });
+  }
+
+  /* Link each chapter to its plain-language companion in docs/simple/.
+     Weeks 1-13 have one; the banner goes just above the Objectives. */
+  function initCompanion() {
+    const m = location.pathname.match(/\/s\/week(\d\d)\.html$/);
+    if (!m) return;
+    const n = parseInt(m[1], 10);
+    if (n < 1 || n > 13) return;
+    const h2 = document.querySelector(".wrap > h2");
+    if (!h2) return;
+    const div = document.createElement("div");
+    div.className = "companion-banner";
+    div.style.cssText = "display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;" +
+      "font-family:var(--sans);font-size:14.5px;background:#f0fdfa;border:1px solid #99f6e4;" +
+      "border-left:5px solid #0d9488;border-radius:10px;padding:10px 16px;margin:0 0 22px;";
+    div.innerHTML = "<span>Finding the math dense? There is a <strong>plain-language companion</strong> " +
+      "to this week, with more worked examples, analogies and a small calculator.</span>" +
+      "<a style=\"font-weight:700;color:#0f766e\" href=\"../simple/week" + m[1] + ".html\">Read the simplified Week " + n + " →</a>";
+    h2.parentNode.insertBefore(div, h2);
   }
 
   document.addEventListener("DOMContentLoaded", function () {
     initMath();
     initObjectives();
+    initCompanion();
   });
 
   return {

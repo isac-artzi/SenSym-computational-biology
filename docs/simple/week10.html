@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 10 simplified — Real Data and Markers, Explained Slowly</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="simple.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+<script defer src="simple.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="index.html">All simplified guides</a><a href="week09.html">← Week 9</a><a href="week11.html">Week 11 →</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Week 10</span>
+      <span class="badge simple">Plain-language companion</span>
+    </div>
+    <h1 class="chapter-title">Real Data and Markers, Explained Slowly</h1>
+    <div class="chapter-sub">Why we keep the raw counts · where the labels come from · how markers are ranked · the "peeking" trap · fold change versus $d'$ again · why downsampling is fair</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<div class="companion-banner">
+  <span>This is the <strong>simplified companion</strong> to Week 10: the same ideas, slower, with more
+  worked examples and fewer symbols. The labs, the full exercises, the Python assignment and the
+  check-in list are in the original chapter.</span>
+  <a href="../s/week10.html">Open the full Week 10 chapter →</a>
+</div>
+
+<div class="box bigidea">
+  <span class="box-tag">The whole week in one sentence</span>
+  Real data only tests the theory if you keep the counts as raw whole numbers, choose your marker
+  genes using <strong>only</strong> training cells, and remember that the labels themselves came from a
+  computation, not from a microscope.
+</div>
+
+<h2>1 &nbsp;The dataset in plain words</h2>
+
+<p><strong>PBMC 3k</strong> is about 2,700 white blood cells from one healthy donor, sequenced by 10x
+Genomics. It is the standard teaching dataset of the field. The numbers in it are <strong>UMI counts</strong>:
+each molecule gets a random barcode before copying, so duplicates can be collapsed back to one
+original molecule. For this project, "UMI count" and "molecules captured" mean the same thing.</p>
+
+<h2>2 &nbsp;Why we must not normalize the counts</h2>
+
+<p>Almost every tutorial starts by dividing each cell's counts by its total and taking a log. That is
+fine for drawing pretty cluster plots. It is fatal here.</p>
+
+<div class="box example">
+  <span class="box-tag">Example · what normalizing destroys</span>
+  <p>A gene count of 4 out of a total of 2,000 molecules becomes $\log(1 + 4/2000 \times 10{,}000) = \log 21 \approx 3.04$.</p>
+  <p>That number is no longer a whole-number count, and its variance no longer equals its mean. The
+  Poisson structure — the thing the whole project measures — is gone. So the data loader keeps the
+  <strong>raw integer counts</strong> and uses the normalized copy only to produce the cluster labels.</p>
+</div>
+
+<h2>3 &nbsp;The labels are not ground truth</h2>
+
+<p>Nobody looked at these cells and identified them. The labels come from a computation on the same
+counts: cluster the cells, then name each cluster by which known marker genes it expresses. That is a
+standard, well-accepted annotation — but it is a <em>cited</em> label, not an independent measurement.
+Say so in the report.</p>
+
+<h2>4 &nbsp;Ranking marker genes</h2>
+
+<p>For each gene, compute its average count in each type, $m^{(1)}$ and $m^{(2)}$, then score it by</p>
+$$\text{score} = \left|\log_2 \frac{m^{(1)} + 1}{m^{(2)} + 1}\right|.$$
+
+<table class="simple symbols">
+  <tr><th>Piece</th><th>Why it is there</th></tr>
+  <tr><td>$\log_2$ of a ratio</td><td>fold change on a doubling scale: 1 means 2×, 2 means 4×</td></tr>
+  <tr><td>absolute value</td><td>you do not care which type is higher</td></tr>
+  <tr><td>the $+1$ ("pseudocount")</td><td>stops tiny averages from producing huge, meaningless ratios</td></tr>
+</table>
+
+<div class="box steps">
+  <span class="box-tag">Worked example 1 · what the $+1$ does</span>
+  <p>Gene A averages 0.05 and 0.25 counts. Gene B averages 30 and 45.</p>
+  <ol>
+    <li>Raw fold changes: A is $0.25/0.05 = 5$×. B is $45/30 = 1.5$×. A looks far better.</li>
+    <li>With the $+1$: A scores $|\log_2(1.25/1.05)| = 0.25$. B scores $|\log_2(46/31)| = 0.57$. Now B ranks higher.</li>
+    <li>Check with $d'$ (Week 3): A has $d' = 0.52$, B has $d' = 2.45$. B really is about five times as useful.</li>
+  </ol>
+  <p>The pseudocount pushes the ranking toward what actually matters — but it is a <em>choice</em>, and a
+  different pseudocount gives a different gene list. State it in the report.</p>
+</div>
+
+<h2>5 &nbsp;Peeking: this week's real lesson</h2>
+
+<div class="box definition">
+  <span class="box-tag">Selection leakage</span>
+  If you use cells' labels to choose which genes to use, and then measure accuracy on those
+  <strong>same cells</strong>, the accuracy is too high. The test cells helped pick the features, so they are
+  no longer a fair test.
+</div>
+
+<div class="box analogy">
+  <span class="box-tag">Analogy · picking "lucky" students</span>
+  Give 13,000 students a coin-flipping test. Pick the 20 who scored highest and announce they are
+  "gifted coin-flippers". Retest them with new flips and they score average. The first scores were the
+  luckiest of thousands, not skill.
+</div>
+
+<p>Same with genes. Even if <em>no</em> gene truly differed between two groups, the 13,000 measured
+differences would scatter around zero, and the biggest of them would land about 3.8 standard
+deviations out — purely by chance. Rank by difference and the top of the list contains real markers
+<em>plus</em> lucky ones.</p>
+
+<div class="box steps">
+  <span class="box-tag">The honest protocol</span>
+  <ol>
+    <li>Split cells into training and test <strong>first</strong>, before looking at anything.</li>
+    <li>Do everything that reads labels — picking markers, estimating rates, fitting, choosing thresholds — on training cells only.</li>
+    <li>Touch the test set once, at the end, for one number.</li>
+  </ol>
+  <p>Rule that catches every case: <strong>any step that reads the labels is part of the model.</strong></p>
+</div>
+
+<h2>6 &nbsp;Downsampling: making real data shallower, fairly</h2>
+
+<p>To trace accuracy against depth with real data, you need the same cells at many depths. You cannot
+re-sequence them, but you can <strong>downsample</strong>: keep each captured molecule with probability $q$.
+By Week 2's thinning rule, that produces exactly what sequencing at depth $qD$ would have produced
+(as long as the original counts were Poisson). It is the same knob as dropout. Week 11 uses it.</p>
+
+<h2>7 &nbsp;Check yourself</h2>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 1</span></div>
+  <div class="ex-body">Score a gene with averages 3 and 7 using the pseudocount formula.</div>
+  <details><summary>Show answer</summary><div class="solution">
+    $|\log_2(4/8)| = |\log_2 0.5| = 1$. (A 2× difference after the +1.)
+  </div></details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 2</span></div>
+  <div class="ex-body">You pick the top 20 markers using all 2,700 cells, then split 70/30 and report test accuracy. What is wrong?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    The test cells' labels were used to pick the markers, so the test is contaminated and the accuracy
+    is inflated. Split first, then pick markers from the 70% only.
+  </div></details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 3</span></div>
+  <div class="ex-body">Why is it fine to downsample real counts but not fine to normalize them?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    Downsampling keeps whole-number counts and, by thinning, keeps them Poisson with a lower rate —
+    exactly a shallower experiment. Normalizing turns counts into non-integers whose variance no
+    longer equals their mean, which destroys the structure being tested.
+  </div></details>
+</div>
+
+<h2>Where to go next</h2>
+<p>Once the ideas on this page feel comfortable, go back to the
+<a href="../s/week10.html">full Week 10 chapter</a> and work through it in order. Read each
+derivation there with this page open beside it: whenever a line of algebra stops making sense,
+find the matching example here, redo it with your own numbers, and then return to the line.</p>
+<p class="muted">The companion pages leave things out on purpose. They are a way into the full
+chapters, not a substitute for them, and the check-ins are based on the full chapters.</p>
+
+</div>
+
+<footer class="site">Plain-language companion · Vihaan Rao with Dr. Isac Artzi ·
+<a href="../s/week10.html">full chapter</a> · <a href="index.html">all simplified guides</a></footer>
+</body>
+</html>

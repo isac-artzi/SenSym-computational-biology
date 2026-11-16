@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 7 simplified — The Simulator, Explained Slowly</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="simple.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+<script defer src="simple.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="index.html">All simplified guides</a><a href="week06.html">← Week 6</a><a href="week08.html">Week 8 →</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Week 7</span>
+      <span class="badge simple">Plain-language companion</span>
+    </div>
+    <h1 class="chapter-title">The Simulator, Explained Slowly</h1>
+    <div class="chapter-sub">Why simulate when you have a formula · the three-rule recipe for a fake cell · the algebra for choosing the two rates · reading the accuracy table along its diagonals</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<div class="companion-banner">
+  <span>This is the <strong>simplified companion</strong> to Week 7: the same ideas, slower, with more
+  worked examples and fewer symbols. The labs, the full exercises, the Python assignment and the
+  check-in list are in the original chapter.</span>
+  <a href="../s/week07.html">Open the full Week 7 chapter →</a>
+</div>
+
+<div class="box bigidea">
+  <span class="box-tag">The whole week in one sentence</span>
+  A simulator builds fake cells by literally following your assumptions — pick a rate, draw a Poisson
+  count — and classifies them; because it never uses the formula's shortcuts, agreement with
+  $\Phi(d'/2)$ is real evidence, and disagreement tells you exactly where to look.
+</div>
+
+<h2>1 &nbsp;Why simulate at all?</h2>
+
+<div class="box analogy">
+  <span class="box-tag">Analogy · checking a math answer a second way</span>
+  You solve an integral with a clever substitution. To check, you do not redo the same substitution —
+  you estimate the area by counting squares on graph paper. The two methods share no steps, so if
+  they agree, both are probably right. If they disagree, one has a mistake.
+</div>
+
+<p>The formula uses three shortcuts: the bell-curve approximation, Pythagoras for combining genes, and
+a pooled noise level. The simulator uses <em>none</em> of them. It just draws random counts and counts
+how often the classifier is right. That is why their agreement means something.</p>
+
+<h2>2 &nbsp;The recipe for a fake cell</h2>
+
+<div class="box steps">
+  <span class="box-tag">The generative model — three rules</span>
+  <ol>
+    <li><strong>A cell type is a list of fractions.</strong> Type 1 has fraction $p^{(1)}_g$ for each gene $g$; type 2 has $p^{(2)}_g$. Every cell of a type uses the same list.</li>
+    <li><strong>Counts are Poisson.</strong> To make a cell of type $c$ at depth $D$: for each gene, draw $x_g$ from Poisson($D \times p^{(c)}_g$), independently.</li>
+    <li><strong>Dropout thins.</strong> Optionally, lose each molecule with probability $q$.</li>
+  </ol>
+  <p>That is all. In Python, step 2 is one line: <code>rng.poisson(D * p)</code>.</p>
+</div>
+
+<p>Every rule is known to be false for real cells (Week 11 breaks rule 1). That is fine: a model stated
+precisely enough to simulate is precise enough to test, and when real data disagrees you will know
+<em>which</em> rule to blame.</p>
+
+<h2>3 &nbsp;Choosing the two rates: a two-equation puzzle</h2>
+
+<p>For each marker gene the simulator needs a rate for type 1 ($a$) and type 2 ($b$). You want two things:</p>
+<ul>
+  <li>the <strong>fold change</strong> is $f$: $\;a / b = f$;</li>
+  <li>the <strong>average</strong> of the two is a chosen "base" level: $\;(a + b)/2 = \text{base}$.</li>
+</ul>
+
+<div class="box steps">
+  <span class="box-tag">Worked example 1 · solving it (Algebra I, nothing more)</span>
+  <ol>
+    <li>From the first equation, $a = f\,b$.</li>
+    <li>Substitute into the second: $(f b + b)/2 = \text{base}$, so $b(f+1) = 2\,\text{base}$.</li>
+    <li>So $b = \dfrac{2\,\text{base}}{1+f}$ and $a = f\,b = \dfrac{2\,\text{base}\,f}{1+f}$.</li>
+  </ol>
+  <p><strong>With numbers:</strong> base $= 0.004$, $f = 1.5$. Then $b = 0.008/2.5 = 0.0032$ and $a = 1.5 \times 0.0032 = 0.0048$.
+  Check: $0.0048 / 0.0032 = 1.5$ ✓ and $(0.0048 + 0.0032)/2 = 0.004$ ✓.</p>
+  <p><strong>Sanity check:</strong> at $f = 1$ both become "base" — the two types are identical, and $d'$ must be 0.</p>
+</div>
+
+<h2>4 &nbsp;What the fake data looks like</h2>
+
+<div class="box steps">
+  <span class="box-tag">Worked example 2 · depth 3000, the rates above</span>
+  <ol>
+    <li>Expected counts: $\lambda_1 = 3000 \times 0.0048 = 14.4$, $\lambda_2 = 3000 \times 0.0032 = 9.6$.</li>
+    <li>Wobbles: $\sqrt{14.4} = 3.8$ and $\sqrt{9.6} = 3.1$.</li>
+    <li>Per-gene $d'$: gap 4.8, typical count 12, $d' = 4.8/\sqrt{12} = 1.39$.</li>
+  </ol>
+  <p>The data is a table of small whole numbers: 8, 12, 15, 11… Drop the depth to 250 and the
+  expected counts become 1.2 and 0.8; then $e^{-1.2} = 30\%$ of type-1 entries and $e^{-0.8} = 45\%$ of
+  type-2 entries are zero, just from Poisson luck.</p>
+</div>
+
+<div class="box example">
+  <span class="box-tag">Worked example 3 · two genes look hopeless, twenty are nearly perfect</span>
+  <p>Plot gene 1 against gene 2 for many cells and you see two overlapping clouds. It looks bad. But:</p>
+  <ul>
+    <li>2 genes: $d' = \sqrt{2} \times 1.39 = 1.96$ → accuracy $\Phi(0.98) \approx 84\%$.</li>
+    <li>20 genes: $d' = \sqrt{20} \times 1.39 = 6.20$ → accuracy $\Phi(3.10) \approx 99.9\%$.</li>
+  </ul>
+  <p>Your eyes can only see two dimensions at a time. Pythagoras sees all twenty.</p>
+</div>
+
+<h2>5 &nbsp;Reading the accuracy table along its diagonals</h2>
+
+<p>For these rates, one gene has $d' = 0.0253\sqrt{D}$. Predicted accuracies:</p>
+
+<table class="simple">
+  <tr><th>Depth $D$</th><th>$d'$ per gene</th><th>$k = 1$</th><th>$k = 4$</th><th>$k = 16$</th></tr>
+  <tr><td>250</td><td>0.40</td><td>57.9%</td><td>65.5%</td><td><strong>78.8%</strong></td></tr>
+  <tr><td>1,000</td><td>0.80</td><td>65.5%</td><td><strong>78.8%</strong></td><td>94.5%</td></tr>
+  <tr><td>4,000</td><td>1.60</td><td><strong>78.8%</strong></td><td>94.5%</td><td>99.93%</td></tr>
+  <tr><td>16,000</td><td>3.20</td><td>94.5%</td><td>99.93%</td><td>&gt; 99.999%</td></tr>
+</table>
+
+<p>The bold cells are all equal. Why? $4000 \times 1 = 1000 \times 4 = 250 \times 16 = 4000$. Since
+$d' \propto \sqrt{D \times k}$, any combination with the same $D \times k$ gives the same accuracy. Seeing
+this pattern in <em>your</em> simulated numbers is a strong check.</p>
+
+<h2>6 &nbsp;The silent bug: labels in the wrong order</h2>
+
+<div class="box confusion">
+  <span class="box-tag">No error message, completely wrong answer</span>
+  <p>Your data is a table of cells (rows) plus a separate list of labels (type 1 or type 2). If you
+  shuffle the rows and the labels <em>separately</em>, every cell gets someone else's label. The
+  shapes still match, nothing crashes, and accuracy drops to about 50%.</p>
+  <p>Fix: create one random ordering and apply it to both: <code>idx = rng.permutation(n); X, y = X[idx], y[idx]</code>.</p>
+</div>
+
+<div class="box confusion">
+  <span class="box-tag">Do not tune until it agrees</span>
+  If the simulation and the formula disagree, do not adjust parameters until they match. Find out
+  <em>why</em>. Either there is a bug (great — fix it) or the formula's shortcut genuinely fails there
+  (even better — that is a finding).
+</div>
+
+<h2>7 &nbsp;Check yourself</h2>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 1</span></div>
+  <div class="ex-body">Base $= 0.006$, fold change $f = 2$. Find $a$ and $b$.</div>
+  <details><summary>Show answer</summary><div class="solution">
+    $b = 2(0.006)/3 = 0.004$, $a = 2 \times 0.004 = 0.008$. Check: ratio 2 ✓, average 0.006 ✓.
+  </div></details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 2</span></div>
+  <div class="ex-body">Using the table, what accuracy do you predict at $D = 1000$ with $k = 16$ genes? Which other cell has the same $D \times k$?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    94.5%. $1000 \times 16 = 16{,}000 = 4000 \times 4 = 16000 \times 1$, and those cells are also 94.5%.
+  </div></details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 3</span></div>
+  <div class="ex-body">Your simulated accuracy at every depth is about 50%. What is the first thing to check?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    Whether the labels still belong to the right rows (the label-order bug). Print the first few rows
+    with their labels and compare against how you built them.
+  </div></details>
+</div>
+
+<h2>Where to go next</h2>
+<p>Once the ideas on this page feel comfortable, go back to the
+<a href="../s/week07.html">full Week 7 chapter</a> and work through it in order. Read each
+derivation there with this page open beside it: whenever a line of algebra stops making sense,
+find the matching example here, redo it with your own numbers, and then return to the line.</p>
+<p class="muted">The companion pages leave things out on purpose. They are a way into the full
+chapters, not a substitute for them, and the check-ins are based on the full chapters.</p>
+
+</div>
+
+<footer class="site">Plain-language companion · Vihaan Rao with Dr. Isac Artzi ·
+<a href="../s/week07.html">full chapter</a> · <a href="index.html">all simplified guides</a></footer>
+</body>
+</html>

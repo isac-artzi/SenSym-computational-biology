@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 12 simplified — The Beads and Three Lines of Evidence, Explained Slowly</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="simple.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+<script defer src="simple.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="index.html">All simplified guides</a><a href="week11.html">← Week 11</a><a href="week13.html">Week 13 →</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Week 12</span>
+      <span class="badge simple">Plain-language companion</span>
+    </div>
+    <h1 class="chapter-title">The Beads and Three Lines of Evidence, Explained Slowly</h1>
+    <div class="chapter-sub">Check the data first · how wide the error bars really are · turning accuracy back into $d'$ · what a slope on log-log axes means · why only slopes can be compared</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<div class="companion-banner">
+  <span>This is the <strong>simplified companion</strong> to Week 12: the same ideas, slower, with more
+  worked examples and fewer symbols. The labs, the full exercises, the Python assignment and the
+  check-in list are in the original chapter.</span>
+  <a href="../s/week12.html">Open the full Week 12 chapter →</a>
+</div>
+
+<div class="box bigidea">
+  <span class="box-tag">The whole week in one sentence</span>
+  Convert every measured accuracy back into a $d'$ (accuracy itself flattens out near 100%, but $d'$ does
+  not), plot $\log d'$ against $\log(\text{amount of data})$, and the <strong>slope</strong> of that line is the
+  number every line of evidence — theory, simulation, real data, beads — must agree on: $\tfrac12$.
+</div>
+
+<h2>1 &nbsp;Check the data before you plot anything</h2>
+
+<p>Hand-written tally sheets typed into a spreadsheet at night will have typos. The analysis script
+runs four checks first: the "correct" column must match "true jar = guess"; jar labels must be A or B;
+no trial may appear twice; and the jar order must have been randomized. If a check fires, go back
+to the photographed paper sheet. <strong>Never</strong> edit the data file just to make the message go away.</p>
+
+<h2>2 &nbsp;How wide are the error bars?</h2>
+
+<p>The full chapter uses the <strong>Wilson interval</strong> (explained in Week 13's companion). For now, one
+worked point:</p>
+
+<div class="box steps">
+  <span class="box-tag">Worked example 1 · 28 right out of 40</span>
+  <ol>
+    <li>Measured accuracy: $28/40 = 0.700$.</li>
+    <li>Wilson 95% interval: $[0.546,\ 0.819]$.</li>
+    <li>The theory predicts $0.703$ at that point — comfortably inside. But so is almost everything from 55% to 82%.</li>
+  </ol>
+  <p>With 40 trials per point, each point is fuzzy. That is why the conclusion comes from the
+  <em>whole line</em> of points, not from any single one.</p>
+</div>
+
+<h2>3 &nbsp;Why not just fit a curve to the accuracies?</h2>
+
+<p>A power law $y = c\,n^{\alpha}$ keeps growing forever. Accuracy cannot pass 100%; it bends over and
+flattens. So if you fit a power law to accuracy, the slope you get depends on where along the bend
+your points happen to sit — it does not estimate anything real.</p>
+
+<p>$d'$, on the other hand, really is a power law: $d' = c\sqrt{n}$, with no ceiling (for beads, which are
+genuinely binomial). So convert first:</p>
+
+$$d' = 2\,\Phi^{-1}(\text{accuracy}).$$
+
+<p>$\Phi^{-1}$ ("inverse phi") just runs the normal table backwards: "which $z$ gives this percentage?" —
+<code>invNorm</code> on a TI-84.</p>
+
+<div class="box steps">
+  <span class="box-tag">Worked example 2 · accuracy to $d'$</span>
+  <table class="simple">
+    <tr><th>Measured accuracy</th><th>$\Phi^{-1}$ (invNorm)</th><th>$d' = 2 \times$ that</th></tr>
+    <tr><td>60%</td><td>0.253</td><td>0.51</td></tr>
+    <tr><td>70%</td><td>0.524</td><td>1.05</td></tr>
+    <tr><td>80%</td><td>0.842</td><td>1.68</td></tr>
+    <tr><td>90%</td><td>1.282</td><td>2.56</td></tr>
+  </table>
+</div>
+
+<div class="box confusion">
+  <span class="box-tag">Points at or below 50%</span>
+  At 50% accuracy, $d' = 0$; below 50%, $d'$ is negative. You cannot take the log of zero or a negative
+  number, so those points cannot go on the log-log plot. With 40 trials at $n = 10$ (true accuracy about
+  57%), landing at or below 50% happens roughly one time in five, just by chance. Drop those points,
+  and <strong>say how many you dropped and which ones</strong>.
+</div>
+
+<div class="lab">
+  <div class="lab-title">Try it · accuracy → $d'$</div>
+  <div class="lab-desc">Type a measured accuracy (as a decimal) to get its $d'$.</div>
+  <div id="w12calc"></div>
+</div>
+
+<h2>4 &nbsp;What the slope on log-log axes means</h2>
+
+<p>Take logs of $d' = c\,n^{\alpha}$:</p>
+$$\log d' = \log c + \alpha \log n.$$
+<p>That is a straight line, $y = b + mx$, with slope $\alpha$. So on log-log axes, a power law is a
+straight line, and its slope is the exponent.</p>
+
+<div class="box steps">
+  <span class="box-tag">Worked example 3 · slope from two points</span>
+  <p>From the 30/35 jars, theory says $d' = 0.534$ at $n = 25$ and $d' = 1.068$ at $n = 100$.</p>
+  <ol>
+    <li>Rise: $\log(1.068) - \log(0.534) = \log(2)$.</li>
+    <li>Run: $\log(100) - \log(25) = \log(4)$.</li>
+    <li>Slope: $\log 2 / \log 4 = 0.5$. ✓ (Any base of logarithm gives the same slope.)</li>
+  </ol>
+  <p>In words: 4× the beads gave 2× the $d'$. A slope of 0.5 <em>is</em> the 4× rule.</p>
+</div>
+
+<div class="lab">
+  <div class="lab-title">Try it · slope between two measured points</div>
+  <div class="lab-desc">Enter two (beads, accuracy) points. The calculator converts each accuracy to $d'$ and gives the log-log slope.</div>
+  <div id="w12slope"></div>
+</div>
+
+<h2>5 &nbsp;The dropout arm collapses too</h2>
+
+<p>In the second arm, each drawn bead is discarded with probability $q$ (a die roll) before you look.
+The beads you keep are still a fair sample from the jar, just fewer: on average $n(1-q)$. Plot both arms
+against $n$ and you get two curves; plot them against $n(1-q)$ and they should land on top of each
+other — the same collapse as Week 9.</p>
+
+<h2>6 &nbsp;The figure of the project, and how to read it</h2>
+
+<p>All the evidence goes on one log-log plot: theory, simulation, real PBMC data, beads. Each line has a
+slope and a height.</p>
+
+<div class="box confusion">
+  <span class="box-tag">Only the slopes can be compared</span>
+  A "unit of data" means one bead for the bead line and one molecule for the sequencing lines. Change
+  the unit (count beads in dozens) and a line slides up or down without anything real changing. So the
+  <strong>heights mean nothing</strong> across lines. The slope does not depend on units: "10× the data
+  multiplies $d'$ by $10^{\alpha}$" means the same thing for beads and molecules.
+</div>
+
+<h2>7 &nbsp;Why the beads are worth the tedium</h2>
+
+<p>The theory and the simulation were written by the same person. If you misunderstood something, you
+probably misunderstood it in both places, and they will agree while both being wrong. The beads are
+physical. Nobody coded them. If the square-root law appears in a jar on a kitchen table, it is not an
+artifact of your software.</p>
+
+<p>And if your fitted slope is 0.34 or 0.7 instead of 0.5? Report it with its interval. Do not round it
+to 0.5. If the interval includes 0.5, the beads are consistent with the theory; if it does not, that is
+a finding to explain.</p>
+
+<h2>8 &nbsp;Check yourself</h2>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 1</span></div>
+  <div class="ex-body">You measure 84.1% accuracy. What is $d'$?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    $\Phi^{-1}(0.841) = 1$, so $d' = 2$.
+  </div></details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 2</span></div>
+  <div class="ex-body">On log-log axes, going from $n = 10$ to $n = 1000$ raises $d'$ by a factor of 10. What is the slope?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    $\log 10 / \log 100 = 1/2 = 0.5$.
+  </div></details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 3</span></div>
+  <div class="ex-body">With 30% dropout and $n = 100$ beads drawn, what is the effective $n$?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    $100 \times 0.7 = 70$. That point should sit where a no-dropout run with 70 beads would.
+  </div></details>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  SIMPLE.calc("w12calc", [{ id: "a", label: "accuracy", value: 0.7 }], v => {
+    if (!(v.a > 0 && v.a < 1)) throw new Error("accuracy must be between 0 and 1");
+    const z = SIMPLE.PhiInv(v.a), d = 2 * z;
+    return "Φ⁻¹(" + v.a + ") = " + SIMPLE.fmt(z, 3) + " &nbsp;→&nbsp; <b>d′ = " + SIMPLE.fmt(d, 3) + "</b>" +
+      (d <= 0 ? " <span style='color:var(--red)'>— at or below chance: cannot go on a log-log plot</span>" : "");
+  });
+  SIMPLE.calc("w12slope",
+    [{ id: "n1", label: "n₁", value: 25, step: 1 }, { id: "a1", label: "accuracy₁", value: 0.605 },
+     { id: "n2", label: "n₂", value: 100, step: 1 }, { id: "a2", label: "accuracy₂", value: 0.703 }],
+    v => {
+      const d1 = 2 * SIMPLE.PhiInv(v.a1), d2 = 2 * SIMPLE.PhiInv(v.a2);
+      if (!(d1 > 0 && d2 > 0)) throw new Error("both accuracies must be above 0.5");
+      if (!(v.n1 > 0 && v.n2 > 0 && v.n1 !== v.n2)) throw new Error("need two different positive n");
+      const s = Math.log(d2 / d1) / Math.log(v.n2 / v.n1);
+      return "d′₁ = " + SIMPLE.fmt(d1, 3) + ", d′₂ = " + SIMPLE.fmt(d2, 3) +
+        " &nbsp;·&nbsp; <b>slope = " + SIMPLE.fmt(s, 3) + "</b> (theory 0.500)";
+    });
+});
+</script>
+
+<h2>Where to go next</h2>
+<p>Once the ideas on this page feel comfortable, go back to the
+<a href="../s/week12.html">full Week 12 chapter</a> and work through it in order. Read each
+derivation there with this page open beside it: whenever a line of algebra stops making sense,
+find the matching example here, redo it with your own numbers, and then return to the line.</p>
+<p class="muted">The companion pages leave things out on purpose. They are a way into the full
+chapters, not a substitute for them, and the check-ins are based on the full chapters.</p>
+
+</div>
+
+<footer class="site">Plain-language companion · Vihaan Rao with Dr. Isac Artzi ·
+<a href="../s/week12.html">full chapter</a> · <a href="index.html">all simplified guides</a></footer>
+</body>
+</html>

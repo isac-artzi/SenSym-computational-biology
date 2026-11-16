@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 13 simplified — Error Bars and the Claim Ledger, Explained Slowly</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="simple.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+<script defer src="simple.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="index.html">All simplified guides</a><a href="week12.html">← Week 12</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Week 13</span>
+      <span class="badge simple">Plain-language companion</span>
+    </div>
+    <h1 class="chapter-title">Error Bars and the Claim Ledger, Explained Slowly</h1>
+    <div class="chapter-sub">Why the textbook interval misbehaves · the Wilson interval as "add two and two" · what 95% really promises · bootstrap and permutation tests by hand · many tests at once · labelling every claim</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<div class="companion-banner">
+  <span>This is the <strong>simplified companion</strong> to Week 13: the same ideas, slower, with more
+  worked examples and fewer symbols. The labs, the full exercises, the Python assignment and the
+  check-in list are in the original chapter.</span>
+  <a href="../s/week13.html">Open the full Week 13 chapter →</a>
+</div>
+
+<div class="box bigidea">
+  <span class="box-tag">The whole week in one sentence</span>
+  Every number you measured needs an honest range of values it is compatible with, and every claim
+  you make needs a label saying <em>how</em> you know it — proved, cited, observed or conjectured.
+</div>
+
+<h2>1 &nbsp;The textbook interval and its two failures</h2>
+
+<p>AP Statistics teaches the interval $\hat p \pm 1.96\sqrt{\hat p(1-\hat p)/n}$ (called the
+<strong>Wald</strong> interval). It works well for large $n$ and proportions near 50%. Your bead points have
+$n = 40$ and some accuracies near 90–100%, which is exactly where it breaks:</p>
+
+<div class="box example">
+  <span class="box-tag">Example · the Wald interval behaving badly</span>
+  <table class="simple">
+    <tr><th>Result</th><th>Wald interval</th><th>Problem</th></tr>
+    <tr><td>40 out of 40</td><td>$[1.00,\ 1.00]$</td><td>zero width — "certainly 100%", from 40 trials?</td></tr>
+    <tr><td>36 out of 40</td><td>$[0.807,\ 0.993]$</td><td>squeezed against 1 and too narrow</td></tr>
+    <tr><td>3 out of 10</td><td>$[0.016,\ 0.584]$</td><td>nearly touches 0; can go negative for smaller counts</td></tr>
+  </table>
+  <p>The cause: the formula estimates the wobble using $\hat p$ itself. When $\hat p = 1$, the estimated
+  wobble is $\sqrt{1 \times 0} = 0$.</p>
+</div>
+
+<h2>2 &nbsp;The Wilson interval: a better idea</h2>
+
+<div class="box definition">
+  <span class="box-tag">The key idea, in words</span>
+  A confidence interval is <strong>the set of true values your data does not rule out</strong>. For each
+  candidate true value $p_0$, ask "if the truth were $p_0$, would a result like mine be surprising
+  (more than 1.96 standard deviations away)?" — computing the standard deviation from $p_0$, not from
+  your data. Keep every $p_0$ that passes. That set is the Wilson interval.
+</div>
+
+<p>Solving that inequality gives a formula (in the full chapter). A handy way to remember what it does:</p>
+
+<div class="box analogy">
+  <span class="box-tag">"Add two successes and two failures"</span>
+  The centre of the Wilson interval is almost exactly $\dfrac{k + 2}{n + 4}$: pretend you had two more
+  right answers and two more wrong ones. It refuses to believe an extreme result from few trials,
+  and the pull fades as $n$ grows.
+</div>
+
+<div class="box steps">
+  <span class="box-tag">Worked example 1 · Wilson versus Wald</span>
+  <table class="simple">
+    <tr><th>Result</th><th>Wald</th><th>Wilson</th></tr>
+    <tr><td>40 / 40</td><td>[1.000, 1.000]</td><td>[0.912, 1.000]</td></tr>
+    <tr><td>36 / 40</td><td>[0.807, 0.993]</td><td>[0.769, 0.960]</td></tr>
+    <tr><td>28 / 40</td><td>[0.558, 0.842]</td><td>[0.546, 0.819]</td></tr>
+    <tr><td>3 / 10</td><td>[0.016, 0.584]</td><td>[0.108, 0.603]</td></tr>
+  </table>
+  <p>For 36/40, the "add two and two" centre is $38/44 \approx 0.864$ — close to the true Wilson centre
+  0.865, and below the raw 0.900. Wilson never leaves $[0, 1]$ and never has zero width.</p>
+</div>
+
+<div class="lab">
+  <div class="lab-title">Try it · Wilson interval</div>
+  <div class="lab-desc">Successes $k$ out of $n$ trials. Compare Wilson with the textbook (Wald) interval.</div>
+  <div id="w13calc"></div>
+</div>
+
+<h2>3 &nbsp;What "95% confident" actually promises</h2>
+
+<div class="box analogy">
+  <span class="box-tag">Analogy · a ring toss</span>
+  The true value is a peg you cannot see. Each experiment throws a ring (an interval). A "95% method"
+  is one whose rings land around the peg 95% of the time, over many throws. Any single ring either
+  caught the peg or did not — you never find out which. The 95% is a promise about the <em>method</em>,
+  not about one interval.
+</div>
+
+<p>This promise is called <strong>coverage</strong>, and the full chapter has you check it by simulation:
+generate many fake experiments with a known true value, and count how often the interval catches it.
+Wilson stays close to 95%; Wald drops well below near 0 and 1.</p>
+
+<h2>4 &nbsp;The bootstrap: error bars for anything</h2>
+
+<p>For a proportion there is a formula. For something complicated — a fitted slope, a $d'$, a median —
+there often is not. The <strong>bootstrap</strong> gets an interval by brute force:</p>
+
+<div class="box steps">
+  <span class="box-tag">The recipe</span>
+  <ol>
+    <li>From your $n$ data values, draw $n$ values <strong>with replacement</strong> (some repeat, some are left out).</li>
+    <li>Compute your statistic on this "resample".</li>
+    <li>Repeat 2,000 times.</li>
+    <li>The middle 95% of those 2,000 values (2.5th to 97.5th percentile) is the interval.</li>
+  </ol>
+</div>
+
+<div class="box example">
+  <span class="box-tag">Example · three resamples by hand</span>
+  <p>Data: <code>4, 7, 7, 9, 13</code> (mean 8.0). Three resamples, each of size 5:</p>
+  <ul>
+    <li><code>7, 4, 13, 7, 7</code> → mean 7.6</li>
+    <li><code>9, 9, 13, 4, 7</code> → mean 8.4</li>
+    <li><code>4, 4, 7, 9, 4</code> → mean 5.6</li>
+  </ul>
+  <p>Do that 2,000 times, and the spread of the means tells you how much the mean could have wobbled.</p>
+</div>
+
+<div class="box confusion">
+  <span class="box-tag">What the bootstrap cannot do</span>
+  It only knows the data you gave it. If your data is biased (a jar that was not well mixed, a leaky
+  marker list), the bootstrap reproduces the bias with a tight, confident-looking interval. It measures
+  wobble, not mistakes.
+</div>
+
+<h2>5 &nbsp;The permutation test: "could this be luck?"</h2>
+
+<p>You have two groups (say, beads with and without dropout at the same effective $n$) and they differ.
+Could the difference be chance? Pretend the group labels mean nothing, shuffle them, and see how often
+shuffling alone produces a difference this big.</p>
+
+<div class="box steps">
+  <span class="box-tag">Worked example 2 · a permutation test you can do on paper</span>
+  <p>Group $a$: <code>5, 7, 9</code> (mean 7). Group $b$: <code>1, 2, 3</code> (mean 2). Observed difference: 5.</p>
+  <ol>
+    <li>Pool all six: <code>1, 2, 3, 5, 7, 9</code>.</li>
+    <li>There are $\binom{6}{3} = 20$ ways to choose which three are "group $a$".</li>
+    <li>A difference of 5 or more happens only for $\{5, 7, 9\}$ vs $\{1, 2, 3\}$ and the reverse: 2 out of 20.</li>
+    <li>$p = 2/20 = 0.10$.</li>
+  </ol>
+  <p>Even though the groups look completely separated, with three values each, pure shuffling produces
+  a split this extreme 10% of the time. Small samples cannot prove much. (With many values, you
+  shuffle randomly a few thousand times instead of listing every split.)</p>
+</div>
+
+<h2>6 &nbsp;Many tests at once</h2>
+
+<p>Compare theory and measurement at 8 depths, each at the 5% level, and even if the theory is perfect
+the chance that <em>at least one</em> comparison looks "significant" is</p>
+$$1 - 0.95^8 \approx 0.34.$$
+<p>A one-in-three chance of a false alarm. <strong>Bonferroni's fix:</strong> test each of the $m$ comparisons
+at level $0.05/m$ — here $0.05/8 = 0.00625$. Then the chance of any false alarm is at most 5%.</p>
+
+<h2>7 &nbsp;The claim ledger</h2>
+
+<p>Every sentence in the report that claims something gets a label:</p>
+<table class="simple">
+  <tr><th>Label</th><th>Means</th><th>Example from this project</th></tr>
+  <tr><td><span class="claim proved">proved</span></td><td>you can derive it at the whiteboard, without notes</td><td>"$d' \propto \sqrt{D}$ for Poisson counts"</td></tr>
+  <tr><td><span class="claim cited">cited</span></td><td>someone else showed it; you give the reference</td><td>"the PBMC cell-type labels" (from the standard annotation)</td></tr>
+  <tr><td><span class="claim observed">observed</span></td><td>you measured it, with a seed, a sample size and an interval</td><td>"bead slope 0.46, 95% interval [0.31, 0.62]" (your numbers will differ)</td></tr>
+  <tr><td><span class="claim conjectured">conjectured</span></td><td>you believe it, and say it is a belief</td><td>"correlated genes explain most of the gap to theory"</td></tr>
+</table>
+
+<div class="box confusion">
+  <span class="box-tag">"I read a proof once" is not "proved"</span>
+  If you cannot reproduce it on demand, label it cited and give the reference. There is no shame in
+  cited — the shame is in a label that does not match what you can actually do.
+</div>
+
+<h2>8 &nbsp;Check yourself</h2>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 1</span></div>
+  <div class="ex-body">You got 20 out of 20 right. Using "add two and two", estimate the Wilson centre.</div>
+  <details><summary>Show answer</summary><div class="solution">
+    $22/24 \approx 0.917$. (The exact Wilson interval is about $[0.84, 1.00]$ — a long way from "certainly 100%".)
+  </div></details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 2</span></div>
+  <div class="ex-body">You run 5 comparisons. What per-test level does Bonferroni require?</div>
+  <details><summary>Show answer</summary><div class="solution">$0.05/5 = 0.01$.</div></details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 3</span></div>
+  <div class="ex-body">Label each: (a) "accuracy $= \Phi(d'/2)$ for equal-variance Gaussians"; (b) "real counts have Fano factor above 1 in PBMC monocytes"; (c) "this would also hold for neurons".</div>
+  <details><summary>Show answer</summary><div class="solution">
+    (a) proved, if you can derive it from Week 4. (b) observed — with the number of cells and an interval.
+    (c) conjectured — you have not measured neurons.
+  </div></details>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  SIMPLE.calc("w13calc",
+    [{ id: "k", label: "successes k", value: 36, step: 1 }, { id: "n", label: "trials n", value: 40, step: 1 }],
+    v => {
+      if (!(v.n >= 1 && v.k >= 0 && v.k <= v.n)) throw new Error("need 0 ≤ k ≤ n and n ≥ 1");
+      const z = 1.96, ph = v.k / v.n;
+      const w = CD.wilson(v.k, v.n, z);
+      const h = z * Math.sqrt(ph * (1 - ph) / v.n);
+      const lo = Array.isArray(w) ? w[0] : w.lo, hi = Array.isArray(w) ? w[1] : w.hi;
+      return "measured " + SIMPLE.fmt(ph, 3) +
+        " &nbsp;·&nbsp; <b>Wilson [" + SIMPLE.fmt(lo, 3) + ", " + SIMPLE.fmt(hi, 3) + "]</b>" +
+        " &nbsp;·&nbsp; Wald [" + SIMPLE.fmt(ph - h, 3) + ", " + SIMPLE.fmt(ph + h, 3) + "]" +
+        "<br>“add two and two” centre: (k+2)/(n+4) = " + SIMPLE.fmt((v.k + 2) / (v.n + 4), 3);
+    });
+});
+</script>
+
+<h2>Where to go next</h2>
+<p>Once the ideas on this page feel comfortable, go back to the
+<a href="../s/week13.html">full Week 13 chapter</a> and work through it in order. Read each
+derivation there with this page open beside it: whenever a line of algebra stops making sense,
+find the matching example here, redo it with your own numbers, and then return to the line.</p>
+<p class="muted">The companion pages leave things out on purpose. They are a way into the full
+chapters, not a substitute for them, and the check-ins are based on the full chapters.</p>
+
+</div>
+
+<footer class="site">Plain-language companion · Vihaan Rao with Dr. Isac Artzi ·
+<a href="../s/week13.html">full chapter</a> · <a href="index.html">all simplified guides</a></footer>
+</body>
+</html>

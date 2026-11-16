@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 4 simplified — From d' to an Error Rate, Explained Slowly</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="simple.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+<script defer src="simple.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="index.html">All simplified guides</a><a href="week03.html">← Week 3</a><a href="week05.html">Week 5 →</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Week 4</span>
+      <span class="badge simple">Plain-language companion</span>
+    </div>
+    <h1 class="chapter-title">From $d'$ to an Error Rate, Explained Slowly</h1>
+    <div class="chapter-sub">Where to draw the line · why the answer is $\Phi(d'/2)$ · what ROC curves and AUC mean · why we compare in $d'$, not in percent</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<div class="companion-banner">
+  <span>This is the <strong>simplified companion</strong> to Week 4: the same ideas, slower, with more
+  worked examples and fewer symbols. The labs, the full exercises, the Python assignment and the
+  check-in list are in the original chapter.</span>
+  <a href="../s/week04.html">Open the full Week 4 chapter →</a>
+</div>
+
+<div class="box bigidea">
+  <span class="box-tag">The whole week in one sentence</span>
+  If two cell types are $d'$ wobbles apart, the best you can do is draw the decision line halfway
+  between them; each type's average then sits $d'/2$ wobbles from the line, and the bell-curve
+  table $\Phi$ tells you the fraction of cells on the correct side: <strong>accuracy $= \Phi(d'/2)$</strong>.
+</div>
+
+<h2>1 &nbsp;Drawing the line</h2>
+
+<p>Take the standard marker gene: type 1 averages $\lambda_1 = 16.5$, type 2 averages $\lambda_2 = 12$.
+The simplest rule is a <strong>threshold</strong>: "if the count is above $t$, call it type 1".</p>
+
+<div class="box analogy">
+  <span class="box-tag">Analogy · sorting apples and oranges by weight</span>
+  Apples average 150 g, oranges 180 g, and each varies by ±15 g or so. You put a single line on the
+  scale: heavier than the line → orange. Put the line at 100 g and almost every apple is called an
+  orange. Put it at 250 g and almost every orange is called an apple. Somewhere in between the
+  total number of mistakes is smallest. When the two kinds are equally common and equally spread
+  out, that best line is <strong>halfway</strong>: 165 g.
+</div>
+
+<p>For the counts, the best rule is actually "pick whichever type makes this count more likely". For
+Poisson counts that rule is always a threshold, and it lands close to the middle — for $16.5$ vs $12$
+the middle is $14.25$.</p>
+
+<h2>2 &nbsp;Why the answer is $\Phi(d'/2)$</h2>
+
+<p>For large-ish counts (roughly 10 or more), a Poisson count looks like a <strong>bell curve</strong>
+(a normal distribution) with the same mean and the same wobble $\sqrt{\lambda}$. That approximation is
+what turns $d'$ into a percentage.</p>
+
+<div class="box steps">
+  <span class="box-tag">The argument in four steps</span>
+  <ol>
+    <li>The two bell curves are centred $d'$ wobbles apart (that is what $d'$ means).</li>
+    <li>The line is drawn halfway, so each centre is <strong>$d'/2$ wobbles</strong> from the line.</li>
+    <li>A type-1 cell is classified correctly if its count lands on its own side of the line — that is, if it does not fall more than $d'/2$ wobbles below its average.</li>
+    <li>For a bell curve, "the chance of landing below $z$ wobbles above the centre" is a standard table value called $\Phi(z)$. So the chance of being right is $\Phi(d'/2)$. By symmetry, the same is true for type 2.</li>
+  </ol>
+</div>
+
+<p>$\Phi$ (capital "phi") is just the normal-distribution table from AP Statistics — the same thing as
+<code>normalcdf(−1E99, z)</code> on a TI-84. A few values to remember:</p>
+
+<table class="simple">
+  <tr><th>$z$</th><th>0</th><th>0.5</th><th>1</th><th>1.5</th><th>2</th><th>2.5</th><th>3</th></tr>
+  <tr><td>$\Phi(z)$</td><td>50.0%</td><td>69.1%</td><td>84.1%</td><td>93.3%</td><td>97.7%</td><td>99.4%</td><td>99.9%</td></tr>
+</table>
+
+<div class="box steps">
+  <span class="box-tag">Worked example 1 · the standard marker gene</span>
+  <ol>
+    <li>From Week 3: $d' = 1.19$.</li>
+    <li>Halve it: $d'/2 = 0.596$.</li>
+    <li>Look up $\Phi(0.596) \approx 0.724$.</li>
+    <li>So this one gene classifies about <strong>72%</strong> of cells correctly.</li>
+  </ol>
+</div>
+
+<div class="box steps">
+  <span class="box-tag">Worked example 2 · going backwards</span>
+  <p>You want 97.7% accuracy from one gene. What $d'$ do you need?</p>
+  <ol>
+    <li>From the table, $\Phi(2) = 97.7\%$, so $d'/2 = 2$.</li>
+    <li>So $d' = 4$.</li>
+    <li>If the gene currently has $d' = 1$, you need $d'$ to go up 4×, which means depth up $4^2 = 16$×.</li>
+  </ol>
+</div>
+
+<p>Three sanity checks that the formula passes, and that every formula you ever write should pass:</p>
+<ul>
+  <li><strong>Identical types</strong> ($d' = 0$): $\Phi(0) = 50\%$ — a coin flip. Correct; nothing can do better.</li>
+  <li><strong>Huge separation</strong>: $\Phi$ approaches 100% but never reaches it. Correct; a cell can always have a freak count.</li>
+  <li><strong>More separation is never worse</strong>: $\Phi$ only goes up.</li>
+</ul>
+
+<div class="lab">
+  <div class="lab-title">Try it · convert between $d'$ and accuracy</div>
+  <div class="lab-desc">Type a $d'$ to get the accuracy, or type an accuracy (between 0.5 and 1) to get the $d'$ it needs.</div>
+  <div id="w4calc"></div>
+</div>
+
+<h2>3 &nbsp;How good is the bell-curve shortcut?</h2>
+
+<p>The full chapter also computes the <strong>exact</strong> best accuracy by adding up the real
+Poisson probabilities, with no bell-curve approximation. Comparing the two tells you when to trust
+$\Phi(d'/2)$:</p>
+
+<table class="simple">
+  <tr><th>$\lambda_1$, $\lambda_2$</th><th>$d'$</th><th>Shortcut $\Phi(d'/2)$</th><th>Exact</th><th>Verdict</th></tr>
+  <tr><td>66, 48</td><td>2.38</td><td>88.3%</td><td>88.4%</td><td>excellent</td></tr>
+  <tr><td>16.5, 12</td><td>1.19</td><td>72.4%</td><td>72.5%</td><td>excellent</td></tr>
+  <tr><td>4, 1</td><td>1.90</td><td>82.9%</td><td>84.1%</td><td>off by a point — small counts, big ratio</td></tr>
+</table>
+
+<p>When the counts are small, the Poisson is lopsided rather than bell-shaped, and the shortcut
+starts to slip. Week 9 studies exactly where.</p>
+
+<h2>4 &nbsp;ROC curves and AUC, without the jargon</h2>
+
+<p>A threshold is a trade-off. Move it down and you catch more type-1 cells, but you also wrongly
+catch more type-2 cells. The <strong>ROC curve</strong> draws every possible threshold at once:</p>
+<ul>
+  <li>across the bottom: the fraction of type-2 cells wrongly called type 1 ("false alarms"),</li>
+  <li>up the side: the fraction of type-1 cells correctly called type 1 ("hits").</li>
+</ul>
+<p>A useless gene gives a diagonal line. A perfect gene hugs the top-left corner.</p>
+
+<div class="box definition">
+  <span class="box-tag">AUC in one sentence</span>
+  The <strong>AUC</strong> (area under the ROC curve) is the chance that a randomly picked type-1 cell
+  has a higher count than a randomly picked type-2 cell (ties count as half). 0.5 = useless,
+  1.0 = perfect.
+</div>
+
+<div class="box steps">
+  <span class="box-tag">Worked example 3 · AUC by hand, tiny data</span>
+  <p>Type-1 counts: <code>5, 7, 9</code>. Type-2 counts: <code>4, 6, 7</code>. There are $3 \times 3 = 9$ pairs.</p>
+  <ol>
+    <li>5 vs (4, 6, 7): wins, loses, loses → 1</li>
+    <li>7 vs (4, 6, 7): wins, wins, tie → 2.5</li>
+    <li>9 vs (4, 6, 7): wins, wins, wins → 3</li>
+    <li>Total $= 6.5$ out of 9, so AUC $\approx 0.72$.</li>
+  </ol>
+</div>
+
+<div class="box confusion">
+  <span class="box-tag">The $2$ versus $\sqrt{2}$ trap</span>
+  <p>For bell curves, accuracy $= \Phi(d'/2)$ but AUC $= \Phi(d'/\sqrt{2})$. Why different? Accuracy
+  compares <em>one</em> noisy count to a <em>fixed</em> line. AUC compares <em>two</em> noisy counts to
+  each other, and two sources of noise wobble more than one. For the standard gene: accuracy 72.4%,
+  AUC 80.0%. Do not mix them up.</p>
+</div>
+
+<div class="box confusion">
+  <span class="box-tag">Ties are not an edge case here</span>
+  Counts are whole numbers, so two cells often have exactly the same count. If your code breaks ties
+  by the order the cells happen to be listed in, you can get a very wrong AUC. At $\lambda = (1.5, 1.0)$
+  the honest AUC is about 0.62; break ties by file order and you might report 0.75. Always count a
+  tie as half a win.
+</div>
+
+<h2>5 &nbsp;Why the course compares in $d'$, not in percent</h2>
+
+<p>Percentages bunch up near 100%, which hides big differences:</p>
+<table class="simple">
+  <tr><th>Method</th><th>Accuracy</th><th>$d' = 2\,\Phi^{-1}(\text{accuracy})$</th></tr>
+  <tr><td>A</td><td>98.0%</td><td>4.11</td></tr>
+  <tr><td>B</td><td>99.0%</td><td>4.65</td></tr>
+</table>
+<p>"One percentage point" sounds tiny. But in $d'$ it is a 13% difference, and since depth goes as
+$d'^2$, matching B with method A would need about 28% more sequencing. So: <strong>measure accuracy,
+convert to $d'$, compare there.</strong></p>
+
+<h2>6 &nbsp;Check yourself</h2>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 1</span></div>
+  <div class="ex-body">A gene has $d' = 2$. What accuracy does it give? What AUC?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    Accuracy $= \Phi(1) = 84.1\%$. AUC $= \Phi(2/\sqrt2) = \Phi(1.414) \approx 92.1\%$.
+  </div></details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 2</span></div>
+  <div class="ex-body">You need 93.3% accuracy. What $d'$ is that, and how much more depth do you need if you currently have $d' = 1.5$?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    $\Phi(1.5) = 93.3\%$, so $d'/2 = 1.5$ and $d' = 3$. That is 2× the current $d'$, so 4× the depth.
+  </div></details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 3</span></div>
+  <div class="ex-body">Your code reports an exact error rate of 0.6 (60% wrong). What went wrong?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    The best possible rule can never be wrong more than 50% of the time — you could always ignore the
+    data and flip a coin. Most likely you added the <em>larger</em> probability at each count instead
+    of the smaller, or forgot the factor of ½. Test the identical-types case first: it must give
+    exactly 0.5.
+  </div></details>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  SIMPLE.calc("w4calc",
+    [{ id: "d", label: "d′", value: 1.19 }, { id: "a", label: "accuracy", value: 0.9 }],
+    v => {
+      let s = "";
+      if (isFinite(v.d) && v.d >= 0)
+        s += "d′ = " + SIMPLE.fmt(v.d, 3) + " &nbsp;→&nbsp; accuracy Φ(d′/2) = <b>" + SIMPLE.pct(CD.Phi(v.d / 2), 2) +
+             "</b>, AUC Φ(d′/√2) = " + SIMPLE.pct(CD.Phi(v.d / Math.SQRT2), 2);
+      if (isFinite(v.a) && v.a > 0.5 && v.a < 1)
+        s += "<br>accuracy " + SIMPLE.pct(v.a, 2) + " &nbsp;→&nbsp; needs d′ = 2·Φ⁻¹(accuracy) = <b>" +
+             SIMPLE.fmt(2 * SIMPLE.PhiInv(v.a), 3) + "</b>";
+      else s += "<br><span class='muted'>(accuracy must be between 0.5 and 1 to convert back)</span>";
+      return s;
+    });
+});
+</script>
+
+<h2>Where to go next</h2>
+<p>Once the ideas on this page feel comfortable, go back to the
+<a href="../s/week04.html">full Week 4 chapter</a> and work through it in order. Read each
+derivation there with this page open beside it: whenever a line of algebra stops making sense,
+find the matching example here, redo it with your own numbers, and then return to the line.</p>
+<p class="muted">The companion pages leave things out on purpose. They are a way into the full
+chapters, not a substitute for them, and the check-ins are based on the full chapters.</p>
+
+</div>
+
+<footer class="site">Plain-language companion · Vihaan Rao with Dr. Isac Artzi ·
+<a href="../s/week04.html">full chapter</a> · <a href="index.html">all simplified guides</a></footer>
+</body>
+</html>
