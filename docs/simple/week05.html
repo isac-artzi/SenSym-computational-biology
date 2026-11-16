@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 5 simplified — Many Genes and \sqrt{k}, Explained Slowly</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="simple.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+<script defer src="simple.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="index.html">All simplified guides</a><a href="week04.html">← Week 4</a><a href="week06.html">Week 6 →</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Week 5</span>
+      <span class="badge simple">Plain-language companion</span>
+    </div>
+    <h1 class="chapter-title">Many Genes and $\sqrt{k}$, Explained Slowly</h1>
+    <div class="chapter-sub">Scoring a whole cell · why evidence adds like the sides of a right triangle · the full scaling law in one line</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<div class="companion-banner">
+  <span>This is the <strong>simplified companion</strong> to Week 5: the same ideas, slower, with more
+  worked examples and fewer symbols. The labs, the full exercises, the Python assignment and the
+  check-in list are in the original chapter.</span>
+  <a href="../s/week05.html">Open the full Week 5 chapter →</a>
+</div>
+
+<div class="box bigidea">
+  <span class="box-tag">The whole week in one sentence</span>
+  With many independent marker genes, the best rule gives each gene a fixed number of "points per
+  molecule" and adds them up, and the separations combine like Pythagoras:
+  $d'_{\text{total}} = \sqrt{d_1'^2 + d_2'^2 + \cdots}$ — so $k$ equally good genes give
+  $\sqrt{k}$ times one gene, and <strong>$d' \propto \sqrt{\text{depth} \times k}$</strong>.
+</div>
+
+<h2>1 &nbsp;From one gene to a whole cell</h2>
+
+<p>A real cell gives you counts for many genes at once: $x_1, x_2, \dots, x_k$. How do you combine
+them? The key assumption this week is:</p>
+
+<div class="box definition">
+  <span class="box-tag">The "naive" assumption</span>
+  Once you know a cell's type, its genes' counts are <strong>independent</strong>: knowing gene 1's count
+  tells you nothing extra about gene 2's. (This is false in real cells — genes switch on in groups —
+  and the full chapter names it as the main limitation. But it gives a clean, testable answer.)
+</div>
+
+<p>With independence, the probability of a whole cell's counts is just the product of the single-gene
+Poisson probabilities, the same way the probability of two independent coin flips is the product.</p>
+
+<h2>2 &nbsp;Taking logs turns the rule into a points system</h2>
+
+<p>Products are awkward, so take logarithms: logs turn multiplication into addition. After the
+algebra in the full chapter, the best rule becomes:</p>
+
+$$\text{score} = \sum_{g=1}^{k}\Big[\,x_g \cdot \underbrace{\log\frac{\lambda_{1g}}{\lambda_{2g}}}_{\text{points per molecule}} \;-\; \underbrace{(\lambda_{1g} - \lambda_{2g})}_{\text{fixed handicap}}\Big],
+\qquad \text{call type 1 if score} > 0.$$
+
+<div class="box analogy">
+  <span class="box-tag">Analogy · a points-based judge</span>
+  Each gene is a judge. Every molecule of a gene that type 1 makes more of earns
+  <strong>positive points</strong> for type 1; every molecule of a gene that type 2 makes more of earns
+  <strong>negative points</strong>. Each judge also starts with a fixed handicap so that an "average" cell
+  scores around zero. Add up all the judges; positive total → type 1.
+</div>
+
+<div class="box steps">
+  <span class="box-tag">Worked example 1 · scoring three cells with two genes</span>
+  <p>Gene A: $\lambda_1 = 8$, $\lambda_2 = 4$ (type 1 makes more). Gene B: $\lambda_1 = 3$, $\lambda_2 = 6$ (type 2 makes more).</p>
+  <ol>
+    <li>Points per molecule: gene A $\log(8/4) = \log 2 \approx +0.693$; gene B $\log(3/6) = \log 0.5 \approx -0.693$.</li>
+    <li>Handicap: $-\big[(8-4) + (3-6)\big] = -1$.</li>
+    <li>Cell with counts (A=9, B=2): $9(0.693) + 2(-0.693) - 1 = 3.85$ → <strong>type 1</strong>.</li>
+    <li>Cell with (A=5, B=5): $5(0.693) - 5(0.693) - 1 = -1.0$ → <strong>type 2</strong>.</li>
+    <li>Cell with (A=3, B=7): $3(0.693) - 7(0.693) - 1 = -3.77$ → <strong>type 2</strong>, confidently.</li>
+  </ol>
+  <p>(Here "log" means the natural log, <code>np.log</code>.)</p>
+</div>
+
+<p>Two things worth noticing: the factorials $x_g!$ in the Poisson formula cancel out completely (they
+are the same under both hypotheses), and the score is a straight-line function of the counts:
+weights × counts + a constant. That is why, in Week 8, logistic regression — which also uses
+"weights × counts + constant" — can learn the same rule from data.</p>
+
+<h2>3 &nbsp;How separations combine: Pythagoras</h2>
+
+<p>Each gene has its own $d'_g$. How far apart are the cell types when you use all of them?</p>
+
+<div class="box definition">
+  <span class="box-tag">Evidence adds "in quadrature"</span>
+  $$d'_{\text{total}} = \sqrt{d_1'^2 + d_2'^2 + \cdots + d_k'^2}.$$
+  Square each gene's $d'$, add the squares, take the square root.
+</div>
+
+<div class="box analogy">
+  <span class="box-tag">Why Pythagoras?</span>
+  Walk 3 blocks east and 4 blocks north: you are $\sqrt{9 + 16} = 5$ blocks from the start, not 7.
+  Independent genes are like perpendicular directions — each one moves you apart in its own
+  direction, and perpendicular distances combine by Pythagoras. (The reason underneath: noise
+  <em>variances</em> add for independent genes, as you saw in Week 2.)
+</div>
+
+<div class="box steps">
+  <span class="box-tag">Worked example 2 · three genes</span>
+  <p>Genes with $d'_g = 2, 3, 6$:</p>
+  <ol>
+    <li>Squares: $4, 9, 36$.</li>
+    <li>Sum: $49$.</li>
+    <li>Square root: $d'_{\text{total}} = 7$.</li>
+  </ol>
+  <p>Now add a weak fourth gene with $d' = 1$: $\sqrt{49 + 1} = 7.07$. It barely helps. <strong>Weak genes
+  hardly matter next to strong ones.</strong></p>
+</div>
+
+<div class="box confusion">
+  <span class="box-tag">The most common mistake this week: adding $d'$ directly</span>
+  <p>Ten genes, each with $d' = 0.4$.</p>
+  <ul>
+    <li>Wrong: $10 \times 0.4 = 4.0$ → accuracy $\Phi(2) = 97.7\%$.</li>
+    <li>Right: $\sqrt{10 \times 0.4^2} = \sqrt{10} \times 0.4 = 1.26$ → accuracy $\Phi(0.63) = 73.6\%$.</li>
+  </ul>
+  <p>Those are wildly different predictions. Always add the <em>squares</em>.</p>
+</div>
+
+<div class="lab">
+  <div class="lab-title">Try it · combine genes</div>
+  <div class="lab-desc">Type the $d'$ of each gene, separated by commas (e.g. <code>2, 3, 6</code>). Or use the second box: $k$ copies of the same gene.</div>
+  <div id="w5list" class="controls" style="margin-bottom:0"></div>
+  <div id="w5calc"></div>
+</div>
+
+<h2>4 &nbsp;The $\sqrt{k}$ law and the full scaling law</h2>
+
+<p>If all $k$ genes are equally good, each with $d'_g = c$, then</p>
+$$d'_{\text{total}} = \sqrt{k \cdot c^2} = \sqrt{k}\;c.$$
+<p>And from Week 3, each gene's $c$ grows as $\sqrt{D}$. Put them together:</p>
+
+<div class="box theorem">
+  <span class="box-tag">The Aim 1 result</span>
+  $$d' \propto \sqrt{D \times k}, \qquad \text{accuracy} = \Phi\!\left(\frac{d'}{2}\right).$$
+  Doubling the depth and doubling the number of markers buy you <strong>exactly the same thing</strong>.
+  Nothing in this is fitted to data — given the rates and the depth, the accuracy is predicted.
+</div>
+
+<div class="box steps">
+  <span class="box-tag">Worked example 3 · planning a panel</span>
+  <p>You have 20 genes, each with $d' = 0.3$. You want 95% accuracy.</p>
+  <ol>
+    <li>Now: $d' = \sqrt{20} \times 0.3 = 1.34$, accuracy $= \Phi(0.67) \approx 74.9\%$.</li>
+    <li>Target: $\Phi(z) = 0.95$ at $z = 1.645$, so you need $d' = 2 \times 1.645 = 3.29$.</li>
+    <li><strong>Option A, more genes:</strong> $\sqrt{k} \times 0.3 = 3.29$ → $\sqrt{k} = 10.97$ → $k \approx 120$ genes.</li>
+    <li><strong>Option B, more depth:</strong> $d'$ must rise by $3.29 / 1.34 = 2.45$×, so depth must rise by $2.45^2 \approx 6.0$×.</li>
+  </ol>
+  <p>Both are "6× the data": 6× the genes (20 → 120) or 6× the depth. That is the symmetry of $\sqrt{D \times k}$.</p>
+</div>
+
+<h2>5 &nbsp;The subtle part: new evidence, or the same evidence cut thinner?</h2>
+
+<p>"More genes help" is only true if the new genes carry <em>new</em> differences between the types.</p>
+
+<div class="box analogy">
+  <span class="box-tag">Analogy · cutting a pizza</span>
+  If the two cell types differ by one "pizza" worth of expression, cutting that pizza into 16 slices
+  instead of 4 does not give you more pizza. Each slice is smaller, and the total evidence stays the
+  same. Only if the types differ in <em>more places</em> (more pizzas) does $d'$ grow as $\sqrt{k}$.
+</div>
+
+<p>In the code this is the difference between holding the <strong>marker mass per gene</strong> fixed
+(new genes = new evidence, $d' \propto \sqrt{k}$) and holding the <strong>total marker mass</strong>
+fixed (same evidence sliced thinner, $d'$ does not change with $k$). If your simulation doubles $k$
+and nothing improves, check which one you used before deciding the law is wrong. Whenever you write
+"$d' \propto \sqrt{k}$", add "at fixed marker mass per gene".</p>
+
+<h2>6 &nbsp;Check yourself</h2>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 1</span></div>
+  <div class="ex-body">Combine genes with $d' = 3$ and $d' = 4$.</div>
+  <details><summary>Show answer</summary><div class="solution">$\sqrt{9 + 16} = 5$.</div></details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 2</span></div>
+  <div class="ex-body">100 genes, each $d' = 0.37$. Total $d'$ and accuracy?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    $\sqrt{100} \times 0.37 = 3.7$. Accuracy $\Phi(1.85) \approx 96.8\%$.
+  </div></details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 3</span></div>
+  <div class="ex-body">One excellent gene ($d' = 3$) plus thirty poor ones ($d' = 0.2$ each). What is the total, and how much did the thirty contribute?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    Squares: $9 + 30 \times 0.04 = 9 + 1.2 = 10.2$. Total $= \sqrt{10.2} \approx 3.19$. The thirty genes
+    raised $d'$ from 3.00 to 3.19 — they supply about 12% of the squared total (1.2 of 10.2).
+  </div></details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 4</span></div>
+  <div class="ex-body">You double the depth <em>and</em> double the number of (equally good) genes. By what factor does $d'$ change?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    $\sqrt{2 \times 2} = 2$. $d'$ doubles.
+  </div></details>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  // free-text list of d' values
+  const holder = document.getElementById("w5list");
+  holder.innerHTML = "<label>gene d′ values <input id='w5in' type='text' value='2, 3, 6' style='width:220px;font-family:var(--mono);padding:4px 6px;border:1px solid var(--rule);border-radius:6px'></label>";
+  const out = document.createElement("div"); out.className = "readout"; holder.after(out);
+  function runList() {
+    const vals = document.getElementById("w5in").value.split(/[ ,;]+/).filter(s => s.length).map(Number);
+    if (!vals.length || vals.some(x => !isFinite(x))) { out.innerHTML = "type numbers separated by commas"; return; }
+    const tot = CD.combineDPrime(vals), naive = vals.reduce((a, b) => a + b, 0);
+    out.innerHTML = "<b>d′ total = √(sum of squares) = " + SIMPLE.fmt(tot, 3) + "</b> → accuracy " + SIMPLE.pct(CD.Phi(tot / 2), 2) +
+      "<br><span class='muted'>if you wrongly just added them: " + SIMPLE.fmt(naive, 3) + " → " + SIMPLE.pct(CD.Phi(naive / 2), 2) + "</span>";
+  }
+  document.getElementById("w5in").addEventListener("input", runList); runList();
+
+  SIMPLE.calc("w5calc",
+    [{ id: "k", label: "number of genes k", value: 20, step: 1 }, { id: "c", label: "d′ per gene", value: 0.3 }],
+    v => {
+      if (!(v.k >= 1 && v.c >= 0)) throw new Error("need k ≥ 1 and d′ ≥ 0");
+      const t = Math.sqrt(v.k) * v.c;
+      return "d′ total = √k × d′ = " + SIMPLE.fmt(Math.sqrt(v.k), 3) + " × " + v.c + " = <b>" + SIMPLE.fmt(t, 3) +
+        "</b> → accuracy <b>" + SIMPLE.pct(CD.Phi(t / 2)) + "</b>";
+    });
+});
+</script>
+
+<h2>Where to go next</h2>
+<p>Once the ideas on this page feel comfortable, go back to the
+<a href="../s/week05.html">full Week 5 chapter</a> and work through it in order. Read each
+derivation there with this page open beside it: whenever a line of algebra stops making sense,
+find the matching example here, redo it with your own numbers, and then return to the line.</p>
+<p class="muted">The companion pages leave things out on purpose. They are a way into the full
+chapters, not a substitute for them, and the check-ins are based on the full chapters.</p>
+
+</div>
+
+<footer class="site">Plain-language companion · Vihaan Rao with Dr. Isac Artzi ·
+<a href="../s/week05.html">full chapter</a> · <a href="index.html">all simplified guides</a></footer>
+</body>
+</html>
