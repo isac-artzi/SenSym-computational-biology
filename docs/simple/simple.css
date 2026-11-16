@@ -1,0 +1,24 @@
+/* ============================================================
+   Plain-language companion pages (docs/simple/)
+   ============================================================ */
+.badge.simple { background: #ccfbf1; color: #0f766e; }
+.box.bigidea { border-left: 5px solid #0d9488; background: #f0fdfa; }
+.box.bigidea .box-tag { color: #0f766e; }
+.box.analogy { border-left: 5px solid #7c3aed; background: #faf5ff; }
+.box.analogy .box-tag { color: #6d28d9; }
+.box.steps { border-left: 5px solid var(--green); }
+.box.steps .box-tag { color: var(--green); }
+.box.steps ol { margin: 6px 0 4px; }
+.box.confusion { border-left: 5px solid #ea580c; background: #fff7ed; }
+.box.confusion .box-tag { color: #c2410c; }
+table.symbols td:first-child { white-space: nowrap; font-weight: 600; }
+.companion-banner {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+  font-family: var(--sans); font-size: 14.5px;
+  background: #f0fdfa; border: 1px solid #99f6e4; border-left: 5px solid #0d9488;
+  border-radius: 10px; padding: 10px 16px; margin: 0 0 22px;
+}
+.companion-banner a { font-weight: 700; color: #0f766e; }
+.lab .controls input[type="number"] {
+  padding: 4px 6px; border: 1px solid var(--rule); border-radius: 6px; font-size: 14px;
+}
