@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 11 simplified — Overdispersion and the Depth Ceiling, Explained Slowly</title>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="simple.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="../assets/js/cd.js"></script>
+<script defer src="simple.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="crumbs">
+      <a href="../index.html">← Course home</a>
+      <span class="nextprev"><a href="index.html">All simplified guides</a><a href="week10.html">← Week 10</a><a href="week12.html">Week 12 →</a></span>
+    </div>
+    <div class="badges">
+      <span class="badge week">Week 11</span>
+      <span class="badge simple">Plain-language companion</span>
+    </div>
+    <h1 class="chapter-title">Overdispersion and the Depth Ceiling, Explained Slowly</h1>
+    <div class="chapter-sub">Real counts wobble more than Poisson · why: cells of one type are not identical · the formula $m + \varphi m^2$ · why sequencing deeper eventually stops helping</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<div class="companion-banner">
+  <span>This is the <strong>simplified companion</strong> to Week 11: the same ideas, slower, with more
+  worked examples and fewer symbols. The labs, the full exercises, the Python assignment and the
+  check-in list are in the original chapter.</span>
+  <a href="../s/week11.html">Open the full Week 11 chapter →</a>
+</div>
+
+<div class="box bigidea">
+  <span class="box-tag">The whole week in one sentence</span>
+  Real cells of the same type do not all have the same rate for a gene, so real counts carry an
+  <strong>extra wobble that grows with depth just as fast as the signal does</strong>; that wobble can never
+  be sequenced away, so $d'$ stops growing and hits a <strong>ceiling</strong>.
+</div>
+
+<h2>1 &nbsp;The measurement that breaks the model</h2>
+
+<p>Week 1 said: for Poisson counts, the Fano factor $F = \text{variance}/\text{mean}$ is 1. On real PBMC
+data, compute $F$ for each gene within one cell type, and you find $F$ well above 1, and growing for
+more highly expressed genes. That is called <strong>overdispersion</strong>: more variation than scoop-luck
+alone can explain. Something else is varying.</p>
+
+<h2>2 &nbsp;Why: every cell has its own rate</h2>
+
+<div class="box analogy">
+  <span class="box-tag">Analogy · jars that are not quite identical</span>
+  <p>In Week 1 every type-1 cell was the same jar of jelly beans. In real life, each type-1 cell is a
+  slightly different jar: one is 0.15% red, the next 0.25%, the next 0.2%. Bigger cells, cells
+  dividing, cells reacting to something — they all shift the recipe a little.</p>
+  <p>Now there are <strong>two</strong> sources of wobble when you scoop:</p>
+  <ol>
+    <li>scoop-luck (Poisson noise), as before, and</li>
+    <li>jar-to-jar differences (biological variability), which is new.</li>
+  </ol>
+</div>
+
+<p>The full chapter puts this into one formula. If the cell-to-cell rates have average $m$ and vary by a
+relative amount $\sqrt{\varphi}$ (the Greek letter "phi"), then the counts have</p>
+
+$$\text{mean} = m, \qquad \text{variance} = \underbrace{m}_{\text{scoop-luck}} + \underbrace{\varphi m^2}_{\text{cell-to-cell}}.$$
+
+<p>The two kinds of wobble simply add. When $\varphi = 0$ (all jars identical) it goes back to Poisson.
+When the rates are gamma-distributed this is called the <strong>negative binomial</strong>, but you only
+need the mean and variance.</p>
+
+<div class="box definition">
+  <span class="box-tag">How to read $\varphi$</span>
+  $\sqrt{\varphi}$ is how much cells of the same type differ in their rate, as a fraction. $\varphi = 0.25$
+  means $\sqrt{0.25} = 0.5$: cells differ by about <strong>50%</strong> from cell to cell. $\varphi = 0.04$ means about 20%.
+</div>
+
+<div class="box steps">
+  <span class="box-tag">Worked example 1 · how much extra wobble</span>
+  <p>A gene averages $m = 10$ with $\varphi = 0.25$.</p>
+  <ol>
+    <li>Scoop-luck variance: 10.</li>
+    <li>Cell-to-cell variance: $0.25 \times 10^2 = 25$.</li>
+    <li>Total variance: 35. Fano factor: $35/10 = 3.5$.</li>
+  </ol>
+  <p>The new term is already bigger than the old one. And notice it grows with $m^2$ while
+  scoop-luck grows with $m$ — so the deeper you sequence, the more the cell-to-cell term dominates.</p>
+</div>
+
+<h2>3 &nbsp;Measuring $\varphi$ from data</h2>
+
+<p>Rearrange the variance formula: $\varphi = (\text{variance} - \text{mean}) / \text{mean}^2$. Equivalently,
+$F = 1 + \varphi m$. (If the answer comes out negative, set it to 0.)</p>
+
+<div class="box steps">
+  <span class="box-tag">Worked example 2 · estimating $\varphi$</span>
+  <p>Among monocytes, a gene has mean count 8 and variance 24.</p>
+  <ol>
+    <li>Extra variance beyond Poisson: $24 - 8 = 16$.</li>
+    <li>Divide by mean squared: $16 / 64 = 0.25$.</li>
+    <li>So $\varphi \approx 0.25$: monocytes differ by about 50% in this gene's rate.</li>
+  </ol>
+</div>
+
+<h2>4 &nbsp;The headline: a ceiling on $d'$</h2>
+
+<p>Week 3's $d'$ divided the gap by the Poisson wobble $\sqrt{\bar\lambda}$. With overdispersion, the wobble
+is bigger:</p>
+$$d' = \frac{|\lambda_1 - \lambda_2|}{\sqrt{\bar\lambda + \varphi\,\bar\lambda^2}}.$$
+
+<p>Now watch what happens as depth grows. Every $\lambda$ is depth × fraction, so:</p>
+<ul>
+  <li>the <strong>gap</strong> on top grows like depth;</li>
+  <li>the <strong>bottom</strong> eventually is dominated by $\varphi\bar\lambda^2$, whose square root <em>also</em> grows like depth.</li>
+</ul>
+<p>Top and bottom grow at the same speed, so their ratio levels off. That level is the ceiling.</p>
+
+<div class="box example">
+  <span class="box-tag">Worked example 3 · the standard marker gene with $\varphi = 0.5$</span>
+  <table class="simple">
+    <tr><th>Depth</th><th>$d'$ if Poisson (Week 3)</th><th>$d'$ with overdispersion</th></tr>
+    <tr><td>1,000</td><td>0.69</td><td>0.38</td></tr>
+    <tr><td>3,000</td><td>1.19</td><td>0.42</td></tr>
+    <tr><td>10,000</td><td>2.18</td><td>0.44</td></tr>
+    <tr><td>30,000</td><td>3.77</td><td>0.44</td></tr>
+    <tr><td>forever</td><td>keeps growing</td><td><strong>0.45 — the ceiling</strong></td></tr>
+  </table>
+  <p>The Poisson column keeps climbing. The real column is flat almost from the start. Thirty times the
+  sequencing buys almost nothing.</p>
+</div>
+
+<div class="box theorem">
+  <span class="box-tag">The ceiling in one formula</span>
+  If the two types differ by a fold change $f$,
+  $$d'_\infty = \frac{2(f-1)}{(f+1)\sqrt{\varphi}}.$$
+  <strong>Depth is not in it.</strong> Neither is how highly the gene is expressed. Only the fold change and
+  how variable cells of a type are.
+</div>
+
+<div class="box steps">
+  <span class="box-tag">Worked example 4 · plugging into the ceiling</span>
+  <p>$f = 2$, $\varphi = 0.25$:</p>
+  <ol>
+    <li>Top: $2(2 - 1) = 2$.</li>
+    <li>Bottom: $(2 + 1)\sqrt{0.25} = 3 \times 0.5 = 1.5$.</li>
+    <li>$d'_\infty = 2/1.5 = 1.33$, so the best this one gene can ever do is $\Phi(0.67) \approx 75\%$, at any depth.</li>
+  </ol>
+</div>
+
+<div class="lab">
+  <div class="lab-title">Try it · the ceiling for a marker panel</div>
+  <div class="lab-desc">Choose a fold change, a dispersion, and a number of (independent, equally good) marker genes.</div>
+  <div id="w11calc"></div>
+</div>
+
+<h2>5 &nbsp;What beats the ceiling, and what does not</h2>
+
+<table class="simple">
+  <tr><th>Idea</th><th>Works?</th><th>Why</th></tr>
+  <tr><td>Sequence deeper</td><td>No (past the knee)</td><td>The ceiling has no depth in it.</td></tr>
+  <tr><td>More marker genes</td><td>Yes</td><td>Pythagoras still applies: 32 genes each at 0.566 give $\sqrt{32}\times 0.566 = 3.2$, about 94.5%. (Caveat: if genes share their cell-to-cell variation, the gain is smaller.)</td></tr>
+  <tr><td>Better genes</td><td>Yes</td><td>Pick genes with big fold change <em>and</em> small $\varphi$ — rank by $f/\sqrt{\varphi}$, not $f$ alone.</td></tr>
+  <tr><td>More cells</td><td>For averages, yes. For one cell, no.</td><td>See below.</td></tr>
+</table>
+
+<div class="box confusion">
+  <span class="box-tag">"Just measure more cells" — careful</span>
+  More cells let you pin down the <em>average</em> expression of a type very precisely. But classifying
+  <em>one particular cell</em> uses only that cell's molecules. That cell's own rate really is different
+  from the type's average, and no number of other cells changes that. (Week 1's Quick-check about
+  "more cells vs more depth" returns here with real consequences.)
+</div>
+
+<h2>6 &nbsp;Check yourself</h2>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 1</span></div>
+  <div class="ex-body">A gene has mean 20 and $\varphi = 0.1$. What is its variance and Fano factor?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    Variance $= 20 + 0.1 \times 400 = 60$. Fano $= 60/20 = 3$. (Check: $1 + \varphi m = 1 + 2 = 3$ ✓.)
+  </div></details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 2</span></div>
+  <div class="ex-body">Mean 5, variance 5.2. Estimate $\varphi$. Is this gene overdispersed in any meaningful way?</div>
+  <details><summary>Show answer</summary><div class="solution">
+    $\varphi = 0.2/25 = 0.008$ — cells differ by only about 9%. Nearly Poisson; with a finite sample this
+    could easily be zero.
+  </div></details>
+</div>
+
+<div class="exercise">
+  <div class="ex-head"><span class="ex-num">Quick check 3</span></div>
+  <div class="ex-body">Compute the ceiling for $f = 3$, $\varphi = 0.25$, and the best possible single-gene accuracy.</div>
+  <details><summary>Show answer</summary><div class="solution">
+    $d'_\infty = 2(2)/(4 \times 0.5) = 2$. Accuracy $\Phi(1) \approx 84\%$.
+  </div></details>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  SIMPLE.calc("w11calc",
+    [{ id: "f", label: "fold change f", value: 2 }, { id: "phi", label: "dispersion φ", value: 0.25 },
+     { id: "k", label: "genes k", value: 1, step: 1 }],
+    v => {
+      if (!(v.f >= 1 && v.phi > 0 && v.k >= 1)) throw new Error("need f ≥ 1, φ > 0, k ≥ 1");
+      const one = 2 * (v.f - 1) / ((v.f + 1) * Math.sqrt(v.phi));
+      const tot = Math.sqrt(v.k) * one;
+      return "cells differ by about " + SIMPLE.pct(Math.sqrt(v.phi), 0) + " from cell to cell" +
+        "<br>ceiling per gene d′<sub>∞</sub> = <b>" + SIMPLE.fmt(one, 3) + "</b> → best one-gene accuracy " + SIMPLE.pct(CD.Phi(one / 2)) +
+        "<br>with " + v.k + " independent gene(s): d′ = √k × d′<sub>∞</sub> = <b>" + SIMPLE.fmt(tot, 3) + "</b> → <b>" + SIMPLE.pct(CD.Phi(tot / 2)) + "</b>, at any depth";
+    });
+});
+</script>
+
+<h2>Where to go next</h2>
+<p>Once the ideas on this page feel comfortable, go back to the
+<a href="../s/week11.html">full Week 11 chapter</a> and work through it in order. Read each
+derivation there with this page open beside it: whenever a line of algebra stops making sense,
+find the matching example here, redo it with your own numbers, and then return to the line.</p>
+<p class="muted">The companion pages leave things out on purpose. They are a way into the full
+chapters, not a substitute for them, and the check-ins are based on the full chapters.</p>
+
+</div>
+
+<footer class="site">Plain-language companion · Vihaan Rao with Dr. Isac Artzi ·
+<a href="../s/week11.html">full chapter</a> · <a href="index.html">all simplified guides</a></footer>
+</body>
+</html>
